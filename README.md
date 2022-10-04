@@ -5,7 +5,26 @@ QuantumPDB
 [![codecov](https://codecov.io/gh/REPLACE_WITH_OWNER_ACCOUNT/QuantumPDB/branch/main/graph/badge.svg)](https://codecov.io/gh/REPLACE_WITH_OWNER_ACCOUNT/QuantumPDB/branch/main)
 
 
-Automated generator of large QM-cluster models.
+# QuantumPDB Package
+## Table of Contents
+1. **Overview**
+    * Introduction
+    * Purpose
+2. **Installation**
+    * Installing pyQMMM
+    * Prerequisites
+    * File structure
+3. **What is included?**
+    * Library
+    * Utility functions
+4. **Documentation**
+    * Read the Docs
+    * Examples
+
+
+## Overview
+QuantumPDB is a automated procedure for generating calculation-ready QM-cluster models from PDB files.
+The package was used for the generation of a comprehensive set of non-heme iron cluster models.
 
 ### Copyright
 
