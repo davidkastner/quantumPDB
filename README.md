@@ -24,7 +24,8 @@ QuantumPDB
 
 ## Overview
 QuantumPDB is a automated procedure for generating calculation-ready QM-cluster models from PDB files.
-The package was used for the generation of a comprehensive set of non-heme iron cluster models.
+The package was used for the generation of a comprehensive set of non-heme iron cluster models,
+applied to a convolutional neural network to predict charge-critical residues.
 
 ### Copyright
 
