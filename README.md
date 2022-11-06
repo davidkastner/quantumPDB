@@ -16,7 +16,6 @@ QuantumPDB
     * File structure
 3. **What is included?**
     * Library
-    * Utility functions
 4. **Documentation**
     * Read the Docs
     * Examples
