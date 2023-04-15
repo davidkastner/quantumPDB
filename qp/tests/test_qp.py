@@ -1,5 +1,5 @@
 """
-Unit and regression test for the quantumpdb package.
+Unit and regression test for the qp package.
 """
 
 # Import package, test suite, and other packages as needed
@@ -7,9 +7,9 @@ import sys
 
 import pytest
 
-import quantumpdb
+import qp
 
 
-def test_quantumpdb_imported():
+def test_qp_imported():
     """Sample test, will always pass so long as import statement worked."""
-    assert "quantumpdb" in sys.modules
+    assert "qp" in sys.modules

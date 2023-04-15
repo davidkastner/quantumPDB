@@ -3,5 +3,8 @@ API Documentation
 
 .. autosummary::
    :toctree: autosummary
+   :recursive:
 
-   quantumpdb.canvas
+   qp.analyze
+   qp.process
+   qp.plot

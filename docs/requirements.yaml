@@ -5,8 +5,15 @@ dependencies:
   - python
   - pip
 
-
+    # Package depends
+  - matplotlib
+  - numpy
+  - pandas
+  - pytorch
+  - seaborn
+  - scikit-learn
 
     # Pip-only installs
-  #- pip:
-
+  - pip:
+    - sphinx-autoapi
+    - https://github.com/revitron/revitron-sphinx-theme/archive/master.zip

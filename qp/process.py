@@ -1,4 +1,4 @@
-"""Provide the primary functions."""
+"""Process protein structures and QM calculations."""
 
 
 def canvas(with_attribution=True):
