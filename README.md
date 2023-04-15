@@ -62,12 +62,10 @@ alias ml='python /path/to/the/quantumPDB/cli.py
 .
 |── cli.py          # Command-line interface entry point
 ├── docs            # Readthedocs documentation site
-├── ml              # Directory containing the quantumAllostery modules
-│   ├── process     # Processes raw dynamics data
-│   ├── predict     # Machine learning analysis
-│   ├── manage      # File management functionality and routines
-│   ├── analyze     # Data analysis to combine process and plot routines
-│   └── plot        # Automated plotting and vizualization 
+├── qp              # Directory containing the quantumPDB modules
+│   ├── process     # Processes protein structures
+│   ├── analyze     # Analysis of electronic structure calculations
+│   └── plot        # Generalizable plotting and vizualization 
 └── ...
 ```
 
