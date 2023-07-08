@@ -33,7 +33,7 @@ Compatibility is automatically tested for python versions 3.8 and higher.
 If you are only going to be using the package run:
 ```bash
 conda env create -f environment.yml
-source activate ml
+source activate qp
 ```
 
 ### Setup developing environment
