@@ -62,13 +62,24 @@ alias ml='python /path/to/the/quantumPDB/cli.py
 ### File structure
 ```
 .
-|── cli.py          # Command-line interface entry point
-├── docs            # Readthedocs documentation site
-├── qp              # Directory containing the quantumPDB modules
-│   ├── process     # Processes protein structures
-│   ├── analyze     # Analysis of electronic structure calculations
-│   └── plot        # Generalizable plotting and vizualization 
-└── ...
+|── cli.py                         # Command-line interface entry point
+├── docs                           # Readthedocs documentation site
+└── qp                             # quantumPDB subpackages and modules
+    ├── setup                      # Get a PDB and perform necessary quality and structural checks
+    │   ├── fetch_pdb              # Get a PDB
+    │   ├── check_edia             # Check the quality of each chain
+    │   ├── choose_conformer       # Choose the best conformer
+    │   ├── to_pdb                 # Save structure to a new PDB
+    │   └── to_xyz                 # Save structure to a new XYZ
+    ├── structure                  # Correct the PDB structure
+    │   ├── missing_hetatoms       # Add any missing heteroatoms
+    │   ├── missing_loops          # Use modeller to add missing loops
+    │   ├── protoss_upload         # Upload a PDB to Protoss to add hydrogens
+    │   └── protoss_download       # Get the structure with hydrogens
+    └── clusters                   # Generalizable plotting and vizualization
+        ├── find_metal             # Identify the metal center
+        └── coordination_shells    # Select the first, second, and tertiary coordination spheres
+
 ```
 
 
