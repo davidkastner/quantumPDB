@@ -66,7 +66,7 @@ alias ml='python /path/to/the/quantumPDB/cli.py
 |── cli.py                         # Command-line interface entry point
 ├── docs                           # Readthedocs documentation site
 └── qp                             # quantumPDB subpackages and modules
-    ├── setup                      # Get a PDB and perform necessary quality and structural checks
+    ├── checks                     # Get a PDB and perform necessary quality and structural checks
     │   ├── fetch_pdb              # Get a PDB
     │   ├── check_edia             # Check the quality of each chain
     │   ├── choose_conformer       # Choose the best conformer
