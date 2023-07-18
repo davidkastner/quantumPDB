@@ -9,7 +9,7 @@ The purpose of quantumPDB (qp) is to serve as a toolkit for working with our dat
 
 
 2 Installation
-------------
+--------------
 Install the package by running the follow commands inside the repository. This will perform a developmental version install. It is good practice to do this inside of a virtual environment. A yaml environmental file has been created to automate the installation of dependencies.
 
 **Creating python environment**

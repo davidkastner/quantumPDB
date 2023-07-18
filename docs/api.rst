@@ -6,5 +6,5 @@ API Documentation
    :recursive:
 
    qp.checks
-   qp.strcuture
+   qp.structure
    qp.cluster
