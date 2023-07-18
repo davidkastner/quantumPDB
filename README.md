@@ -66,7 +66,7 @@ alias ml='python /path/to/the/quantumPDB/cli.py
 |── cli.py                         # Command-line interface entry point
 ├── docs                           # Readthedocs documentation site
 └── qp                             # quantumPDB subpackages and modules
-    ├── checks                     # Get a PDB and perform necessary quality and structural checks
+    ├── checks                     # Perform quality and structural checks
     │   ├── fetch_pdb              # Get a PDB
     │   ├── check_edia             # Check the quality of each chain
     │   ├── choose_conformer       # Choose the best conformer
@@ -79,7 +79,7 @@ alias ml='python /path/to/the/quantumPDB/cli.py
     │   └── protoss_download       # Get the structure with hydrogens
     └── clusters                   # Generalizable plotting and vizualization
         ├── find_metal             # Identify the metal center
-        └── coordination_shells    # Select the first, second, and tertiary coordination spheres
+        └── coordination_shells    # Select the first, second, etc. spheres
 
 ```
 
