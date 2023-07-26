@@ -6,8 +6,6 @@ QuantumPDB
 
 ## Table of Contents
 1. **Overview**
-    * Introduction
-    * Purpose
 2. **Installation**
     * Installing quantumPDB
     * Prerequisites
