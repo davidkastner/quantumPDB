@@ -7,8 +7,9 @@ QuantumPDB
 ## Table of Contents
 1. **Overview**
 2. **Installation**
-    * Installing quantumPDB
-    * Prerequisites
+    * Creating python environment
+    * Setup developing environment
+    * Command-line interface
 3. **What is included?**
     * File structure
 4. **Documentation**
