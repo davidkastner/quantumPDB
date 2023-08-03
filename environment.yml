@@ -3,6 +3,7 @@ channels:
   - conda-forge
   - defaults
 dependencies:
+  - biopython
   - black
   - cookiecutter
   - click
@@ -11,6 +12,7 @@ dependencies:
   - numpy
   - pandas
   - pip
+  - requests
   - scikit-learn
   - scipy
   - seaborn
