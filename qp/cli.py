@@ -78,6 +78,11 @@ def cli(
     if protoss:
         from qp.structure import protoss
 
+    err = {
+        "PDB": [],
+        "Protoss": [],
+        "Coordination sphere": [],
+    }
     for pdb, path in pdb_all:
         click.secho(pdb, bold=True)
 
@@ -87,7 +92,9 @@ def cli(
             try:
                 fetch_pdb(pdb, path)
             except ValueError:
-                click.secho("Error fetching PDB file", italic=True, fg="red")
+                click.secho("Error fetching PDB file\n", italic=True, fg="red")
+                err["PDB"].append(pdb)
+                continue
 
         mod_path = f"{o}/{pdb}/{pdb}_modeller.pdb"
         if modeller:
@@ -111,10 +118,11 @@ def cli(
                 try:
                     pid = protoss.upload(path)
                 except ValueError:
-                    click.secho("Error uploading PDB file", italic=True, fg="red")
+                    click.secho("Error uploading PDB file\n", italic=True, fg="red")
                     # Occurs when uploading a PDB file > 4MB
                     # TODO retry with parsed PDB code? Will raise Bio.PDB error if  
                     #      number of atoms in output exceeds 99999
+                    err["Protoss"].append(pdb)
                     continue
                 job = protoss.submit(pid)
                 protoss.download(job, prot_path)
@@ -129,8 +137,15 @@ def cli(
             try:
                 coordination_spheres.extract_clusters(path, f"{o}/{pdb}", metals, limit, ligands, capping)
             except KeyError:
-                click.secho("Missing template atoms for capping", italic=True, fg="red")
+                click.secho("Missing template atoms for capping\n", italic=True, fg="red")
+                err["Coordination sphere"].append(pdb)
+                continue
+        
+        click.echo("")
 
+    for k, v in err.items():
+        if v:
+            click.echo(click.style(k + " errors: ", bold=True, fg="red") + ", ".join(v))
 
 if __name__ == "__main__":
     # Run the command-line interface when this script is executed
