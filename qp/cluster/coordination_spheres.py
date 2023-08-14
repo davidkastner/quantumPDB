@@ -65,9 +65,9 @@ def get_next_neighbors(start, neighbors, limit, ligands):
             for atom in res.get_unpacked_list():
                 for n in neighbors[atom]:
                     par = n.get_parent()
-                    if par not in seen and (Polypeptide.is_aa(par) or
+                    if (par not in seen and (Polypeptide.is_aa(par) or
                         par.get_resname() == "HOH" or 
-                        par.get_resname() in ligands):
+                        par.get_resname() in ligands)):
                         nxt.add(par)
                         seen.add(par)
         spheres.append(nxt)
