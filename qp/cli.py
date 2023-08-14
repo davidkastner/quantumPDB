@@ -47,7 +47,7 @@ def cli(
         if os.path.isfile(p):
             pdb, ext = os.path.splitext(os.path.basename(p))
             pdb = pdb.replace(".", "_")
-            if ext == "pdb":
+            if ext == ".pdb":
                 pdb_all.append((pdb, p))
             else:
                 with open(p, "r") as f:
