@@ -66,7 +66,7 @@ def get_next_neighbors(start, neighbors, limit, ligands):
                 for n in neighbors[atom]:
                     par = n.get_parent()
                     if par not in seen and (Polypeptide.is_aa(par) or
-                        par.get_resname() == 'HOH' or 
+                        par.get_resname() == "HOH" or 
                         par.get_resname() in ligands):
                         nxt.add(par)
                         seen.add(par)
@@ -120,18 +120,18 @@ def construct_hydrogen(chain, parent, template, atom):
     res: Bio.PDB.Residue
         Residue containing added hydrogen
     """
-    if atom == 'N':
-        pos = scale_hydrogen(parent['N'], template['C'], 1 / 1.32) # TODO verify scaling
+    if atom == "N":
+        pos = scale_hydrogen(parent["N"], template["C"], 1 / 1.32) # TODO verify scaling
     else:
-        pos = scale_hydrogen(parent['C'], template['N'], 1.09 / 1.32)
+        pos = scale_hydrogen(parent["C"], template["N"], 1.09 / 1.32)
 
-    res_id = ('H_' + parent.get_resname(), template.get_id()[1], ' ')
+    res_id = ("H_" + parent.get_resname(), template.get_id()[1], " ")
     if not chain.has_id(res_id):
-        res = Residue(res_id, parent.get_resname(), ' ')
-        res.add(Atom('H1', pos, 0, 1, ' ', 'H1', None, 'H'))
+        res = Residue(res_id, parent.get_resname(), " ")
+        res.add(Atom("H1", pos, 0, 1, " ", "H1", None, "H"))
         chain.add(res)
     else:
-        chain[res_id].add(Atom('H2', pos, 0, 1, ' ', 'H2', None, 'H'))
+        chain[res_id].add(Atom("H2", pos, 0, 1, " ", "H2", None, "H"))
     return chain[res_id]
 
 
@@ -148,45 +148,45 @@ def construct_heavy(chain, parent, template, atom):
     template: Bio.PDB.Residue
         Upstream or downstream residue
     atom: str
-        Flag for adding to the 'N' (ACE) or 'C' (NME) side of the residue
+        Flag for adding to the "N" (ACE) or "C" (NME) side of the residue
     
     Returns
     -------
     res: Bio.PDB.Residue
         Residue containing added group
     """
-    pos = {'CH3': template['CA'].get_coord()}
-    if template.get_resname() == 'GLY':
-        pos['HH31'] = template['HA2'].get_coord()
-        pos['HH32'] = template['HA3'].get_coord()
+    pos = {"CH3": template["CA"].get_coord()}
+    if template.get_resname() == "GLY":
+        pos["HH31"] = template["HA2"].get_coord()
+        pos["HH32"] = template["HA3"].get_coord()
     else:
-        pos['HH31'] = template['HA'].get_coord()
-        pos['HH32'] = scale_hydrogen(template['CA'], template['CB'], 1.09 / 1.54) # TODO verify scaling
+        pos["HH31"] = template["HA"].get_coord()
+        pos["HH32"] = scale_hydrogen(template["CA"], template["CB"], 1.09 / 1.54) # TODO verify scaling
     
-    if atom == 'N':
-        pos['C'] = template['C'].get_coord()
-        pos['O'] = template['O'].get_coord()
-        pos['HH33'] = scale_hydrogen(template['CA'], template['N'], 1.09 / 1.46)
+    if atom == "N":
+        pos["C"] = template["C"].get_coord()
+        pos["O"] = template["O"].get_coord()
+        pos["HH33"] = scale_hydrogen(template["CA"], template["N"], 1.09 / 1.46)
     else:
-        pos['N'] = template['N'].get_coord()
-        if template.get_resname() == 'PRO':
-            pos['H'] = scale_hydrogen(template['N'], template['CD'], 1 / 1.46)
+        pos["N"] = template["N"].get_coord()
+        if template.get_resname() == "PRO":
+            pos["H"] = scale_hydrogen(template["N"], template["CD"], 1 / 1.46)
         else:
-            pos['H'] = template['H'].get_coord()
-        pos['HH33'] = scale_hydrogen(template['CA'], template['C'], 1.09 / 1.51)
+            pos["H"] = template["H"].get_coord()
+        pos["HH33"] = scale_hydrogen(template["CA"], template["C"], 1.09 / 1.51)
 
-    adj_id = ('H_' + ('NME' if atom == 'N' else 'ACE'), template.get_id()[1], ' ')
+    adj_id = ("H_" + ("NME" if atom == "N" else "ACE"), template.get_id()[1], " ")
     skip = chain.has_id(adj_id) # skip building methyl if already present in adjacent cap
     if skip:
-        chain[adj_id].detach_child('HH33')
+        chain[adj_id].detach_child("HH33")
 
-    name = 'ACE' if atom == 'N' else 'NME'
-    res_id = ('H_' + name, template.get_id()[1], ' ')
-    res = Residue(res_id, name, ' ')
+    name = "ACE" if atom == "N" else "NME"
+    res_id = ("H_" + name, template.get_id()[1], " ")
+    res = Residue(res_id, name, " ")
     for k, v in pos.items():
-        if skip and k in ['CH3', 'HH31', 'HH32', 'HH33']:
+        if skip and k in ["CH3", "HH31", "HH32", "HH33"]:
             continue
-        res.add(Atom(k, v, 0, 1, ' ', k, None, k[0]))
+        res.add(Atom(k, v, 0, 1, " ", k, None, k[0]))
     chain.add(res)
     return res
 
@@ -221,20 +221,20 @@ def cap_chains(model, residues, capping):
         ind = chain_list.index(res)
         
         pre = chain_list[ind - 1]
-        if (pre.get_id()[1] == res_id[3][1] - 1 and pre.get_id()[0] == ' ' and 
+        if (pre.get_id()[1] == res_id[3][1] - 1 and pre.get_id()[0] == " " and 
             pre not in residues and Polypeptide.is_aa(pre)):
             if capping == 1:
-                cap_residues.add(construct_hydrogen(chain, res, pre, 'N'))
+                cap_residues.add(construct_hydrogen(chain, res, pre, "N"))
             else:
-                cap_residues.add(construct_heavy(chain, res, pre, 'N'))
+                cap_residues.add(construct_heavy(chain, res, pre, "N"))
         
         nxt = chain_list[ind + 1]
-        if (nxt.get_id()[1] == res_id[3][1] + 1 and nxt.get_id()[0] == ' ' and 
+        if (nxt.get_id()[1] == res_id[3][1] + 1 and nxt.get_id()[0] == " " and 
             nxt not in residues and Polypeptide.is_aa(nxt)):
             if capping == 1:
-                cap_residues.add(construct_hydrogen(chain, res, nxt, 'C'))
+                cap_residues.add(construct_hydrogen(chain, res, nxt, "C"))
             else:
-                cap_residues.add(construct_heavy(chain, res, nxt, 'C'))
+                cap_residues.add(construct_heavy(chain, res, nxt, "C"))
 
     return cap_residues
 
@@ -280,7 +280,7 @@ def extract_clusters(path, out, metals, limit=2, ligands=[], capping=0):
         Whether to cap chains with nothing (0), H (1), or ACE/NME (2)
     """
     parser = PDBParser(QUIET=True)
-    structure = parser.get_structure('PDB', path)
+    structure = parser.get_structure("PDB", path)
     io = PDBIO()
     io.set_structure(structure)
 
@@ -290,12 +290,12 @@ def extract_clusters(path, out, metals, limit=2, ligands=[], capping=0):
     for res in model.get_residues():
         if res.get_resname() in metals:
             metal_id, residues, spheres = get_next_neighbors(res, neighbors, limit, ligands)
-            os.makedirs(f'{out}/{metal_id}', exist_ok=True)
+            os.makedirs(f"{out}/{metal_id}", exist_ok=True)
             if capping:
                 cap_residues = cap_chains(model, residues, capping)
                 spheres[-1] |= cap_residues
             for i in range(limit + 1):
-                write_pdb(io, spheres[i], f'{out}/{metal_id}/{i}.pdb')
+                write_pdb(io, spheres[i], f"{out}/{metal_id}/{i}.pdb")
             if capping:
                 for cap in cap_residues:
                     cap.get_parent().detach_child(cap.get_id())

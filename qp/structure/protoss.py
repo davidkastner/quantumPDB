@@ -23,13 +23,13 @@ def upload(path):
                        files={"pdb_file[pathvar]": open(path, "rb")})
     if pp.status_code == 400:
         raise ValueError("Bad request")
-    loc = json.loads(pp.text)['location']
+    loc = json.loads(pp.text)["location"]
 
     r = requests.get(loc)
     while r.status_code == 202:
         time.sleep(1)
         r = requests.get(loc)
-    return json.loads(r.text)['id']
+    return json.loads(r.text)["id"]
 
 
 def submit(pid):
@@ -49,7 +49,7 @@ def submit(pid):
     protoss = requests.post("https://proteins.plus/api/protoss_rest",
                             json={"protoss": {"pdbCode": pid}},
                             headers={"Accept": "application/json"})
-    return json.loads(protoss.text)['location']
+    return json.loads(protoss.text)["location"]
 
 
 def download(job, out):
@@ -68,10 +68,10 @@ def download(job, out):
         time.sleep(1)
         r = requests.get(job)
     
-    loc = json.loads(r.text)['protein']
+    loc = json.loads(r.text)["protein"]
     pdb = requests.get(loc)
     os.makedirs(os.path.dirname(out), exist_ok=True)
-    with open(out, 'wb') as f:
+    with open(out, "wb") as f:
         f.write(pdb.content)
 
 
@@ -89,7 +89,7 @@ def adjust_active_sites(path, metals):
         List of active site metal IDs
     """
     parser = PDBParser(QUIET=True)
-    structure = parser.get_structure('PDB', path)
+    structure = parser.get_structure("PDB", path)
 
     points = []
     for res in structure[0].get_residues():
@@ -100,10 +100,10 @@ def adjust_active_sites(path, metals):
         def accept_atom(self, atom):
             res = atom.get_parent()
             coord = None
-            if atom.get_name() == 'HH' and res.get_resname() == 'TYR':
-                coord = res['OH']
-            elif atom.get_name() == 'HG' and res.get_resname() == 'CYS':
-                coord = res['SG']
+            if atom.get_name() == "HH" and res.get_resname() == "TYR":
+                coord = res["OH"]
+            elif atom.get_name() == "HG" and res.get_resname() == "CYS":
+                coord = res["SG"]
                
             if coord:
                 for p in points:
