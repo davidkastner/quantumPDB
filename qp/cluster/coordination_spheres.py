@@ -220,21 +220,23 @@ def cap_chains(model, residues, capping):
         chain_list = chain.get_unpacked_list()
         ind = chain_list.index(res)
         
-        pre = chain_list[ind - 1]
-        if (pre.get_id()[1] == res_id[3][1] - 1 and pre.get_id()[0] == " " and 
-            pre not in residues and Polypeptide.is_aa(pre)):
-            if capping == 1:
-                cap_residues.add(construct_hydrogen(chain, res, pre, "N"))
-            else:
-                cap_residues.add(construct_heavy(chain, res, pre, "N"))
+        if ind > 0:
+            pre = chain_list[ind - 1]
+            if (pre.get_id()[1] == res_id[3][1] - 1 and pre.get_id()[0] == " " and 
+                pre not in residues and Polypeptide.is_aa(pre)): # ignores hetero residues
+                if capping == 1:
+                    cap_residues.add(construct_hydrogen(chain, res, pre, "N"))
+                else:
+                    cap_residues.add(construct_heavy(chain, res, pre, "N"))
         
-        nxt = chain_list[ind + 1]
-        if (nxt.get_id()[1] == res_id[3][1] + 1 and nxt.get_id()[0] == " " and 
-            nxt not in residues and Polypeptide.is_aa(nxt)):
-            if capping == 1:
-                cap_residues.add(construct_hydrogen(chain, res, nxt, "C"))
-            else:
-                cap_residues.add(construct_heavy(chain, res, nxt, "C"))
+        if ind < len(chain_list) - 1:
+            nxt = chain_list[ind + 1]
+            if (nxt.get_id()[1] == res_id[3][1] + 1 and nxt.get_id()[0] == " " and 
+                nxt not in residues and Polypeptide.is_aa(nxt)):
+                if capping == 1:
+                    cap_residues.add(construct_hydrogen(chain, res, nxt, "C"))
+                else:
+                    cap_residues.add(construct_heavy(chain, res, nxt, "C"))
 
     return cap_residues
 
