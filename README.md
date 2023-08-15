@@ -50,21 +50,16 @@ python -m pip install -e .
 
 ### Command-line interface
 All of the functionality of quantumPDB has been organized into a command-line interface (CLI).
-With one additional step, the CLI can be called from anywhere.
-We just have to setup a shortcut command in your BASHRC.
-Add the following line to your BASHRC:
-```bash
-alias ml='python /path/to/the/quantumPDB/cli.py
-```
+After performing the developer install, the CLI can be called from anywhere using `qpdb`.
 
 
 ## 3. What is included?
 ### File structure
 ```
 .
-|── cli.py                         # Command-line interface entry point
 ├── docs                           # Readthedocs documentation site
 └── qp                             # quantumPDB subpackages and modules
+    |── cli.py                     # Command-line interface entry point
     ├── checks                     # Perform quality and structural checks
     │   ├── fetch_pdb              # Get a PDB
     │   ├── check_edia             # Check the quality of each chain

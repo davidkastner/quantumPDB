@@ -1,16 +1,20 @@
 name: qp
 channels:
   - conda-forge
+  - salilab
   - defaults
 dependencies:
+  - biopython
   - black
   - cookiecutter
   - click
   - jupyterlab
   - matplotlib
+  - modeller
   - numpy
   - pandas
   - pip
+  - requests
   - scikit-learn
   - scipy
   - seaborn

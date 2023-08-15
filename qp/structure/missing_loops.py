@@ -1,0 +1,209 @@
+import os
+from modeller import *
+from modeller.automodel import *
+
+
+log.none()
+e = Environ()
+e.io.hetatm = True
+e.io.water = True
+
+AA = {
+    "CYS": "C",
+    "ASP": "D",
+    "SER": "S",
+    "GLN": "Q",
+    "LYS": "K",
+    "ILE": "I",
+    "PRO": "P",
+    "THR": "T",
+    "PHE": "F",
+    "ASN": "N",
+    "GLY": "G",
+    "HIS": "H",
+    "LEU": "L",
+    "ARG": "R",
+    "TRP": "W",
+    "ALA": "A",
+    "VAL": "V",
+    "GLU": "E",
+    "TYR": "Y",
+    "MET": "M",
+    "MSE": "M", # other non-standard residues not recognized by MODELLER
+}
+
+
+def get_residues(path):
+    """
+    Extracts residues from a PDB file, filling in missing residues
+
+    Parameters
+    ----------
+    path: str
+        Path to PDB file
+    
+    Returns
+    -------
+    residues: list of list
+        Residues separated by chain. Stored as a tuple of
+        ((sequence number, insertion code), one letter code, flag),
+        where flag is R for completely absent, A for missing atoms, empty otherwise
+    """
+    with open(path, "r") as f:
+        p = f.read().splitlines()
+
+    missing = {}
+    ind = {}
+    seen = {}
+    residues = []
+    cur = None
+
+    for line in p:
+        if line.startswith("ENDMDL"):
+            break
+        
+        elif line.startswith("REMARK 465   "): # missing residues
+            res = line[15:18]
+            if res in AA and (line[13] == " " or line[13] == "1"): # want only the first model
+                chain = line[19]
+                rid = int(line[21:26])
+                ic = line[26]
+                missing.setdefault(chain, set()).add(((rid, ic), AA[res], "R"))
+
+        elif line.startswith("REMARK 470   "): # missing atoms
+            res = line[15:18]
+            if res in AA and (line[13] == " " or line[13] == "1"):
+                chain = line[19]
+                rid = int(line[20:24])
+                ic = line[24]
+                missing.setdefault(chain, set()).add(((rid, ic), AA[res], "A"))
+
+        elif line.startswith("ATOM") or line.startswith("HETATM"):
+            res = line[17:20]
+            chain = line[21]
+            rid = int(line[22:26])
+            ic = line[26]
+
+            if chain != cur:
+                residues.append([])
+                if chain in missing and chain not in ind:
+                    missing[chain] = sorted(missing[chain])
+                    ind[chain] = 0
+                if chain not in seen:
+                    seen[chain] = set()
+                cur = chain
+            
+            if chain in missing:
+                while ind[chain] < len(missing[chain]) and (rid, ic) >= missing[chain][ind[chain]][0]:
+                    residues[-1].append(missing[chain][ind[chain]])
+                    ind[chain] += 1
+                    seen[chain].add(residues[-1][-1][:2])
+
+            if line.startswith("HETATM") and res != "MSE":
+                resname = "w" if res == "HOH" else "."
+            else:
+                resname = AA.get(res, ".")
+            if ((rid, ic), resname) not in seen[chain]:
+                residues[-1].append(((rid, ic), resname, ""))
+                seen[chain].add(residues[-1][-1][:2])
+        
+        elif line.startswith("TER"):
+            chain = line[21]
+            if chain in missing:
+                while ind[chain] < len(missing[chain]):
+                    residues[-1].append(missing[chain][ind[chain]])
+                    ind[chain] += 1
+
+    return residues
+
+
+def write_alignment(residues, pdb, path, out):
+    """
+    Writes MODELLER alignment file for missing residues, according to
+    https://salilab.org/modeller/10.4/manual/node501.html and
+    https://salilab.org/modeller/wiki/Missing_residues
+
+    Parameters
+    ----------
+    residues: list of list
+        Residues separated by chain. Stored as a tuple of
+        ((sequence number, insertion code), one letter code, flag)
+    pdb: str
+        PDB code
+    path: str
+        Path to PDB file
+    out: str
+        Path to output file
+    """
+    seq = "/".join("".join(res[1] if res[2] != "R" else "-" for res in chain)
+                   for chain in residues)
+    seq_fill = "/".join("".join(res[1] for res in chain) for chain in residues)
+
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    with open(out, "w") as f:
+        f.write(f">P1;{pdb}\nstructureX:{path}:FIRST:@ END::::::\n{seq}*\n")
+        f.write(f">P1;{pdb}_fill\nsequence:::::::::\n{seq_fill}*\n")
+
+
+def build_model(residues, ali, pdb, out, optimize=1):
+    """
+    Runs MODELLER for the given alignment file
+
+    Parameters
+    ----------
+    residues: list of list
+        Residues separated by chain. Stored as a tuple of
+        ((sequence number, insertion code), one letter code, flag)
+    ali: str
+        Path to alignment file
+    pdb: str
+        PDB code
+    out: str
+        Path to output PDB file
+    optimize: int
+        Flag for level of optimization to use
+        0 - no optimization,
+        1 - only missing residues or residues with missing atoms,
+        2 - everything
+    """
+    ali = os.path.abspath(ali)
+    cwd = os.getcwd()
+    dir = os.path.dirname(out)
+    os.makedirs(dir, exist_ok=True)
+    os.chdir(dir) # MODELLER only supports writing files to the current working directory
+
+    class CustomModel(AutoModel):
+        def get_model_filename(self, root_name, id1, id2, file_ext):
+            return os.path.basename(out)
+
+    missing = []
+    offset = 0
+    for i, c in enumerate(residues):
+        chain = chr(ord("A") + i)
+        ind = None
+        for j, res in enumerate(c):
+            if res[2] and ind is None:
+                ind = j + 1
+            elif not res[2] and ind is not None:
+                missing.append((f"{ind + offset}:{chain}", f"{j + offset}:{chain}"))
+                ind = None
+        if ind is not None:
+            missing.append((f"{ind + offset}:{chain}", f"{len(c) + offset}:{chain}"))
+        offset += len(c)
+
+    if optimize == 1 and missing:
+        CustomModel.select_atoms = lambda self: Selection(*[self.residue_range(x, y) for x, y in missing])
+    
+    a = CustomModel(e, alnfile=ali, knowns=pdb, sequence=f"{pdb}_fill")
+    a.starting_model = 1
+    a.ending_model = 1
+
+    if not optimize or (optimize == 1 and not missing):
+        a.make(exit_stage=2)
+        os.rename(f"{pdb}_fill.ini", os.path.basename(out))
+    else:
+        a.make()
+        for ext in ["ini", "rsr", "sch", "D00000001", "V99990001"]:
+            os.remove(f"{pdb}_fill.{ext}")
+
+    os.chdir(cwd)
