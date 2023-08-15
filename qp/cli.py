@@ -76,7 +76,7 @@ def cli(
         click.echo("")
 
     if protoss:
-        from qp.structure import protoss
+        from qp.structure import add_hydrogens
 
     err = {
         "PDB": [],
@@ -116,7 +116,7 @@ def cli(
                 if modeller:
                     path = mod_path
                 try:
-                    pid = protoss.upload(path)
+                    pid = add_hydrogens.upload(path)
                 except ValueError:
                     click.secho("Error uploading PDB file\n", italic=True, fg="red")
                     # Occurs when uploading a PDB file > 4MB
@@ -124,8 +124,8 @@ def cli(
                     #      number of atoms in output exceeds 99999
                     err["Protoss"].append(pdb)
                     continue
-                job = protoss.submit(pid)
-                protoss.download(job, prot_path)
+                job = add_hydrogens.submit(pid)
+                add_hydrogens.download(job, prot_path)
         
         if coordination:
             click.echo("> Extracting clusters")
@@ -133,7 +133,7 @@ def cli(
                 path = mod_path
             if protoss:
                 path = prot_path
-                protoss.adjust_active_sites(path, metals)
+                add_hydrogens.adjust_active_sites(path, metals)
             try:
                 coordination_spheres.extract_clusters(path, f"{o}/{pdb}", metals, limit, ligands, capping)
             except KeyError:
