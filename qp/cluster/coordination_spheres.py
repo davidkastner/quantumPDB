@@ -209,6 +209,10 @@ def cap_chains(model, residues, capping):
     cap_residues: set
         Set of residues containing added groups 
     """
+    orig_chains = {}
+    for chain in model:
+        orig_chains[chain.get_id()] = chain.get_unpacked_list()
+
     cap_residues = set()
 
     for res in list(sorted(residues)):
@@ -217,7 +221,7 @@ def cap_chains(model, residues, capping):
 
         res_id = res.get_full_id()
         chain = model[res_id[2]]
-        chain_list = chain.get_unpacked_list()
+        chain_list = orig_chains[chain.get_id()]
         ind = chain_list.index(res)
         
         if ind > 0:

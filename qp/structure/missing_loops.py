@@ -87,7 +87,7 @@ def get_residues(path):
             if chain != cur:
                 residues.append([])
                 if chain in missing and chain not in ind:
-                    missing[chain] = list(sorted(missing[chain]))
+                    missing[chain] = sorted(missing[chain])
                     ind[chain] = 0
                 if chain not in seen:
                     seen[chain] = set()
