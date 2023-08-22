@@ -176,8 +176,18 @@ def build_model(residues, pdb, ali, out, optimize=1):
         def get_model_filename(self, root_name, id1, id2, file_ext):
             return os.path.basename(out)
 
+        def special_patches(self, aln): # renumber residues to avoid hybrid-36 notation with large models
+            chain_ids = []
+            for i in range(26):
+                chain_ids.append(chr(ord("A") + i))
+            for i in range(10):
+                chain_ids.append(str(i))
+            for i in range(26):
+                chain_ids.append(chr(ord("a") + i))
+            n = len(residues)
+            self.rename_segments(chain_ids[:n], [1] * n)
+
     missing = []
-    offset = 0
     for i, c in enumerate(residues):
         chain = chr(ord("A") + i)
         ind = None
@@ -185,11 +195,10 @@ def build_model(residues, pdb, ali, out, optimize=1):
             if res[2] and ind is None:
                 ind = j + 1
             elif not res[2] and ind is not None:
-                missing.append((f"{ind + offset}:{chain}", f"{j + offset}:{chain}"))
+                missing.append((f"{ind}:{chain}", f"{j}:{chain}"))
                 ind = None
         if ind is not None:
-            missing.append((f"{ind + offset}:{chain}", f"{len(c) + offset}:{chain}"))
-        offset += len(c)
+            missing.append((f"{ind}:{chain}", f"{len(c)}:{chain}"))
 
     if optimize == 1 and missing:
         CustomModel.select_atoms = lambda self: Selection(*[self.residue_range(x, y) for x, y in missing])

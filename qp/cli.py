@@ -11,6 +11,7 @@ print("Documenation: https://quantumpdb.readthedocs.io\n")
 import os
 import click
 from qp.checks import fetch_pdb
+from Bio.PDB.PDBExceptions import PDBIOException
 
 @click.command()
 @click.option("-i", required=True, multiple=True, help="Input PDB code, PDB file, or batch file")
@@ -83,6 +84,7 @@ def cli(
         "PDB": [],
         "Protoss": [],
         "Coordination sphere": [],
+        "Other": []
     }
     for pdb, path in pdb_all:
         click.secho(pdb, bold=True)
