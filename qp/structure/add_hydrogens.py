@@ -49,6 +49,8 @@ def submit(pid):
     protoss = requests.post("https://proteins.plus/api/protoss_rest",
                             json={"protoss": {"pdbCode": pid}},
                             headers={"Accept": "application/json"})
+    if protoss.status_code == 400:
+        raise ValueError("Invalid PDB code")
     return json.loads(protoss.text)["location"]
 
 

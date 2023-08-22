@@ -139,7 +139,7 @@ def write_alignment(residues, pdb, path, out):
                    for chain in residues)
     seq_fill = "/".join("".join(res[1] for res in chain) for chain in residues)
 
-    os.makedirs(os.path.dirname(out), exist_ok=True)
+    os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     with open(out, "w") as f:
         f.write(f">P1;{pdb}\nstructureX:{path}:FIRST:@ END::::::\n{seq}*\n")
         f.write(f">P1;{pdb}_fill\nsequence:::::::::\n{seq_fill}*\n")
@@ -168,7 +168,7 @@ def build_model(residues, pdb, ali, out, optimize=1):
     """
     ali = os.path.abspath(ali)
     cwd = os.getcwd()
-    dir = os.path.dirname(out)
+    dir = os.path.dirname(os.path.abspath(out))
     os.makedirs(dir, exist_ok=True)
     os.chdir(dir) # MODELLER only supports writing files to the current working directory
 

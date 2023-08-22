@@ -19,7 +19,8 @@ from Bio.PDB.PDBExceptions import PDBIOException
 @click.option("--modeller", "-m", is_flag=True, help="Use MODELLER to add missing loops")
 @click.option("--protoss", "-p", is_flag=True, help="Use Protoss to add hydrogens")
 @click.option("--coordination", "-c", is_flag=True, help="Select the first, second, etc. coordination spheres")
-@click.option("--skip", "-s", type=click.Choice(["modeller", "protoss", "all"]), help="Skips rerunning MODELLER or Protoss if an existing output file is found")
+@click.option("--skip", "-s", type=click.Choice(["modeller", "protoss", "all"]), is_flag=False, flag_value="all",
+                              help="Skips rerunning MODELLER or Protoss if an existing output file is found")
 def cli(
     i,
     o,
