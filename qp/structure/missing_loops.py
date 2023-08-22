@@ -1,3 +1,42 @@
+"""Build missing residues and atoms using MODELLER
+
+**Usage**::
+
+    >>> from qp.structure import missing_loops
+    >>> pdb = "1lnh"
+
+    # Parse PDB file, filling in missing residues
+    >>> residues = missing_loops.get_residues("path/to/PDB.pdb")
+
+    # Write alignment file
+    >>> missing_loops.write_alignment(
+    ...     residues, 
+    ...     pdb, 
+    ...     "path/to/PDB.pdb", 
+    ...     "path/to/ALI.ali"
+    ... )
+    >P1;1lnh (template from original PDB file)
+    structureX:1lnh.pdb:FIRST:@ END::::::
+    --------GHKIKGTVVLMRKNVLDVNSVTSV-------------TLDTLTAFLGRSVSLQLISAT...
+    >P1;1lnh_fill (full sequence)
+    sequence:::::::::
+    MLGGLLHRGHKIKGTVVLMRKNVLDVNSVTSVGGIIGQGLDLVGSTLDTLTAFLGRSVSLQLISAT...
+
+    # Run MODELLER with the given alignment file
+    >>> missing_loops.build_model(
+    ...     residues, 
+    ...     pdb, 
+    ...     "path/to/ALI.ali", 
+    ...     "path/to/OUT.pdb"
+    ... )
+
+Optimization level (``optimize`` argument in ``missing_loops.build_model``): 
+
+* 0. No optimization. Missing coordinates filled in using MODELLER's topology library.
+* 1. Optimize missing residues and residues with missing atoms only. (Default)
+* 2. Optimize the entire structure. Hetero atoms are included but treated as rigid bodies. 
+"""
+
 import os
 from modeller import *
 from modeller.automodel import *
@@ -35,7 +74,8 @@ AA = {
 
 def get_residues(path):
     """
-    Extracts residues from a PDB file, filling in missing residues
+    Extracts residues from a PDB file, filling in missing residues based on 
+    sequence number
 
     Parameters
     ----------
@@ -46,7 +86,7 @@ def get_residues(path):
     -------
     residues: list of list
         Residues separated by chain. Stored as a tuple of
-        ((sequence number, insertion code), one letter code, flag),
+        ``((sequence number, insertion code), one letter code, flag)``,
         where flag is R for completely absent, A for missing atoms, empty otherwise
     """
     with open(path, "r") as f:
@@ -127,7 +167,7 @@ def write_alignment(residues, pdb, path, out):
     ----------
     residues: list of list
         Residues separated by chain. Stored as a tuple of
-        ((sequence number, insertion code), one letter code, flag)
+        ``((sequence number, insertion code), one letter code, flag)``
     pdb: str
         PDB code
     path: str
@@ -139,13 +179,13 @@ def write_alignment(residues, pdb, path, out):
                    for chain in residues)
     seq_fill = "/".join("".join(res[1] for res in chain) for chain in residues)
 
-    os.makedirs(os.path.dirname(out), exist_ok=True)
+    os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     with open(out, "w") as f:
         f.write(f">P1;{pdb}\nstructureX:{path}:FIRST:@ END::::::\n{seq}*\n")
         f.write(f">P1;{pdb}_fill\nsequence:::::::::\n{seq_fill}*\n")
 
 
-def build_model(residues, ali, pdb, out, optimize=1):
+def build_model(residues, pdb, ali, out, optimize=1):
     """
     Runs MODELLER for the given alignment file
 
@@ -153,22 +193,22 @@ def build_model(residues, ali, pdb, out, optimize=1):
     ----------
     residues: list of list
         Residues separated by chain. Stored as a tuple of
-        ((sequence number, insertion code), one letter code, flag)
-    ali: str
-        Path to alignment file
+        ``((sequence number, insertion code), one letter code, flag)``
     pdb: str
         PDB code
+    ali: str
+        Path to alignment file
     out: str
         Path to output PDB file
     optimize: int
         Flag for level of optimization to use
-        0 - no optimization,
+        (0 - no optimization,
         1 - only missing residues or residues with missing atoms,
-        2 - everything
+        2 - everything)
     """
     ali = os.path.abspath(ali)
     cwd = os.getcwd()
-    dir = os.path.dirname(out)
+    dir = os.path.dirname(os.path.abspath(out))
     os.makedirs(dir, exist_ok=True)
     os.chdir(dir) # MODELLER only supports writing files to the current working directory
 
@@ -176,8 +216,18 @@ def build_model(residues, ali, pdb, out, optimize=1):
         def get_model_filename(self, root_name, id1, id2, file_ext):
             return os.path.basename(out)
 
+        def special_patches(self, aln): # renumber residues to avoid hybrid-36 notation with large models
+            chain_ids = []
+            for i in range(26):
+                chain_ids.append(chr(ord("A") + i))
+            for i in range(10):
+                chain_ids.append(str(i))
+            for i in range(26):
+                chain_ids.append(chr(ord("a") + i))
+            n = len(residues)
+            self.rename_segments(chain_ids[:n], [1] * n)
+
     missing = []
-    offset = 0
     for i, c in enumerate(residues):
         chain = chr(ord("A") + i)
         ind = None
@@ -185,11 +235,10 @@ def build_model(residues, ali, pdb, out, optimize=1):
             if res[2] and ind is None:
                 ind = j + 1
             elif not res[2] and ind is not None:
-                missing.append((f"{ind + offset}:{chain}", f"{j + offset}:{chain}"))
+                missing.append((f"{ind}:{chain}", f"{j}:{chain}"))
                 ind = None
         if ind is not None:
-            missing.append((f"{ind + offset}:{chain}", f"{len(c) + offset}:{chain}"))
-        offset += len(c)
+            missing.append((f"{ind}:{chain}", f"{len(c)}:{chain}"))
 
     if optimize == 1 and missing:
         CustomModel.select_atoms = lambda self: Selection(*[self.residue_range(x, y) for x, y in missing])

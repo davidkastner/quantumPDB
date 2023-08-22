@@ -1,3 +1,25 @@
+"""Extract active site coordination sphere clusters
+
+**Usage**::
+
+    >>> from qp.cluster import coordination_spheres
+
+    >>> coordination_spheres.extract_clusters(
+    ...     "path/to/PDB.pdb", 
+    ...     "path/to/out/dir/", 
+    ...     metals=["FE", "FE2"], # PDB IDs of active site metals
+    ...     limit=2,              # Number of spheres to extract
+    ...     ligands=["AKG"]       # PDB IDs of additional ligands
+    ... )
+
+Extracting clusters leaves open valences in the outermost sphere. Capping may be
+performed by specifying ``capping`` in ``coordination_spheres.extract_clusters``:
+
+* 0. No capping. (Default)
+* 1. Cap with hydrogens.
+* 2. Cap with ACE/NME groups. 
+"""
+
 import os
 from Bio.PDB import PDBParser, Polypeptide, PDBIO, Select
 from Bio.PDB.Atom import Atom
@@ -265,7 +287,46 @@ def write_pdb(io, sphere, out):
     io.save(out, ResSelect())
 
 
-def extract_clusters(path, out, metals, limit=2, ligands=[], capping=0):
+def compute_charge(spheres):
+    """
+    Computes the total charge of coordinating AAs
+
+    Parameters
+    ----------
+    spheres: list of sets
+        Sets of residues separated by spheres
+
+    Returns
+    -------
+    charge: list
+        Total charge of AAs in each sphere
+    """
+    pos = {
+        'ARG': ['HE', 'HH11', 'HH12', 'HH21', 'HH22'],
+        'LYS': ['HZ1', 'HZ2', 'HZ3'],
+        'HIS': ['HD1', 'HD2', 'HE1', 'HE2'],
+    }
+    neg = {
+        'ASP': ['HD2'],
+        'GLU': ['HE2'],
+        'CYS': ['HG'],
+        'TYR': ['HH'],
+    }
+
+    charge = []
+    for s in spheres[1:]:
+        c = 0
+        for res in s:
+            resname = res.get_resname()
+            if resname in pos and all(res.has_id(h) for h in pos[resname]):
+                c += 1
+            elif resname in neg and all(not res.has_id(h) for h in neg[resname]):
+                c -= 1
+        charge.append(c)
+    return charge
+
+
+def extract_clusters(path, out, metals, limit=2, ligands=[], capping=0, charge=None):
     """
     Extract active site coordination spheres. Neighboring residues determined by
     Voronoi tessellation.
@@ -284,6 +345,9 @@ def extract_clusters(path, out, metals, limit=2, ligands=[], capping=0):
         Other ligand IDs to include, in addition to AAs and waters
     capping: int
         Whether to cap chains with nothing (0), H (1), or ACE/NME (2)
+    charge: str
+        Optional path to csv file. If given, total charge of coordinating AAs
+        will be computed and written.
     """
     parser = PDBParser(QUIET=True)
     structure = parser.get_structure("PDB", path)
@@ -293,10 +357,14 @@ def extract_clusters(path, out, metals, limit=2, ligands=[], capping=0):
     model = structure[0]
     neighbors = voronoi(model)
 
+    aa_charge = {}
     for res in model.get_residues():
         if res.get_resname() in metals:
             metal_id, residues, spheres = get_next_neighbors(res, neighbors, limit, ligands)
             os.makedirs(f"{out}/{metal_id}", exist_ok=True)
+
+            if charge:
+                aa_charge[metal_id] = compute_charge(spheres)
             if capping:
                 cap_residues = cap_chains(model, residues, capping)
                 spheres[-1] |= cap_residues
@@ -305,3 +373,10 @@ def extract_clusters(path, out, metals, limit=2, ligands=[], capping=0):
             if capping:
                 for cap in cap_residues:
                     cap.get_parent().detach_child(cap.get_id())
+
+    if charge:
+        os.makedirs(os.path.dirname(os.path.abspath(charge)), exist_ok=True)
+        with open(charge, 'w') as f:
+            f.write(f"Name,{','.join(str(x + 1) for x in range(limit))}\n")
+            for k, v in aa_charge.items():
+                f.write(f"{k},{','.join(str(x) for x in v)}\n")

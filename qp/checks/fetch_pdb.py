@@ -1,6 +1,7 @@
+"""Fetch PDB and perform quality checks"""
+
 import requests
 import os
-import time
 
 
 def fetch_pdb(pdb, out):
@@ -15,11 +16,10 @@ def fetch_pdb(pdb, out):
         Path to output PDB file
     """
     url = f"https://files.rcsb.org/view/{pdb}.pdb"
-    time.sleep(1)
     r = requests.get(url)
     if r.status_code != 200:
         raise ValueError("Error fetching PDB file")
 
-    os.makedirs(os.path.dirname(out), exist_ok=True)
-    with open(out, "wb") as f:
-        f.write(r.content)
+    os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
+    with open(out, "w") as f:
+        f.write(r.text)
