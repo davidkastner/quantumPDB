@@ -1,3 +1,34 @@
+"""Add hydrogens using Protoss
+
+**Usage**
+
+#. Submitting existing or custom PDB file::
+
+    >>> from qp.structure import add_hydrogens
+    >>> pid = add_hydrogens.upload("path/to/PDB.pdb")
+    >>> job = add_hydrogens.submit(pid)
+    >>> add_hydrogens.download(job, "path/to/OUT.pdb")
+
+#. Submitting PDB code::
+
+    >>> from qp.structure import add_hydrogens
+    >>> pdb = "1dry"
+    >>> job = add_hydrogens.submit(pdb)
+    >>> add_hydrogens.download(job, "path/to/OUT.pdb")
+    >>> add_hydrogens.download(job, "path/to/OUT.sdf", "ligands")
+    >>> add_hydrogens.compute_charge("path/to/OUT.sdf")
+    {"AAG_A331": 0, "SO4_A901": -2, "SO4_A325": -2, 
+     "SO4_A903": -2, "AKG_A330": -2,  "GOL_A328": 0, 
+     "GOL_A329": 0, "GOL_A900": 0, "GOL_A904": 0}
+
+Protoss automatically removes alternative conformations and overlapping entries. 
+Download the log file (``key="log"`` in ``add_hydrogens.download``) to see affected atoms. 
+
+Some metal-coordinating residues may be incorrectly protonated. Use 
+``add_hydrogens.adjust_active_sites(path, metals)`` with the metal IDs to deprotonate
+these residues. 
+"""
+
 import os
 import requests
 import json

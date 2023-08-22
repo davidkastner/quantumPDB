@@ -1,3 +1,25 @@
+"""Extract active site coordination sphere clusters
+
+**Usage**::
+
+    >>> from qp.cluster import coordination_spheres
+
+    >>> coordination_spheres.extract_clusters(
+    ...     "path/to/PDB.pdb", 
+    ...     "path/to/out/dir/", 
+    ...     metals=["FE", "FE2"], # PDB IDs of active site metals
+    ...     limit=2,              # Number of spheres to extract
+    ...     ligands=["AKG"]       # PDB IDs of additional ligands
+    ... )
+
+Extracting clusters leaves open valences in the outermost sphere. Capping may be
+performed by specifying ``capping`` in ``coordination_spheres.extract_clusters``:
+
+* 0. No capping. (Default)
+* 1. Cap with hydrogens.
+* 2. Cap with ACE/NME groups. 
+"""
+
 import os
 from Bio.PDB import PDBParser, Polypeptide, PDBIO, Select
 from Bio.PDB.Atom import Atom

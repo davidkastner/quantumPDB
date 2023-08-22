@@ -1,3 +1,5 @@
+"""Fetch PDB and perform quality checks"""
+
 import requests
 import os
 
