@@ -71,7 +71,8 @@ def cli(
         ligands = click.prompt("> Additional ligands [AAs and waters]", default=[], show_default=False)
         capping = int(click.prompt("> Capping (requires Protoss)\n   0: [None]\n   1: H\n   2: ACE/NME\n ", 
                                    type=click.Choice(["0", "1", "2"]), default="0", show_default=False))
-        if capping:
+        charge = click.confirm("> Compute charges (requires Protoss)")
+        if capping or charge:
             protoss = True
         click.echo("")
 
@@ -105,11 +106,11 @@ def cli(
                 residues = missing_loops.get_residues(path)
                 ali_path = f"{o}/{pdb}/{pdb}.ali"
                 missing_loops.write_alignment(residues, pdb, path, ali_path)
-                missing_loops.build_model(residues, ali_path, pdb, mod_path, optimize)
+                missing_loops.build_model(residues, pdb, ali_path, mod_path, optimize)
 
-        prot_path = f"{o}/{pdb}/{pdb}_protoss.pdb"
+        prot_path = f"{o}/{pdb}/Protoss"
         if protoss: 
-            if skip in ["protoss", "all"] and os.path.isfile(prot_path):
+            if skip in ["protoss", "all"] and os.path.isfile(f"{prot_path}/{pdb}_protoss.pdb"):
                 click.echo("> Protoss file found")
             else:
                 click.echo("> Running Protoss")
@@ -125,21 +126,37 @@ def cli(
                     err["Protoss"].append(pdb)
                     continue
                 job = add_hydrogens.submit(pid)
-                add_hydrogens.download(job, prot_path)
+                add_hydrogens.download(job, f"{prot_path}/{pdb}_protoss.pdb", "protein")
+                add_hydrogens.download(job, f"{prot_path}/{pdb}_ligands.sdf", "ligands")
+                add_hydrogens.download(job, f"{prot_path}/{pdb}_log.txt", "log")
         
         if coordination:
             click.echo("> Extracting clusters")
             if modeller:
                 path = mod_path
             if protoss:
-                path = prot_path
-                add_hydrogens.adjust_active_sites(path, metals)
+                path = f"{prot_path}/{pdb}_protoss.pdb"
+            charge_path = f"{o}/{pdb}/{pdb}_charge.csv" if charge else None
+
             try:
-                coordination_spheres.extract_clusters(path, f"{o}/{pdb}", metals, limit, ligands, capping)
+                if protoss:
+                    add_hydrogens.adjust_active_sites(path, metals)
+                clusters = coordination_spheres.extract_clusters(path, f"{o}/{pdb}", metals, limit, ligands, capping, charge_path)
+            except (ValueError, PDBIOException):
+                click.secho("Residue or atom limit exceeded\n", italic=True, fg="red")
+                err["Other"].append(pdb)
+                continue
             except KeyError:
                 click.secho("Missing template atoms for capping\n", italic=True, fg="red")
                 err["Coordination sphere"].append(pdb)
                 continue
+
+            if charge:
+                ligand_charge = add_hydrogens.compute_charge(f"{prot_path}/{pdb}_ligands.sdf")
+                with open(charge_path, "a") as f:
+                    f.write("\n")
+                    for k, v in ligand_charge.items():
+                        f.write(f"{k},{v}\n")
         
         click.echo("")
 

@@ -145,7 +145,7 @@ def write_alignment(residues, pdb, path, out):
         f.write(f">P1;{pdb}_fill\nsequence:::::::::\n{seq_fill}*\n")
 
 
-def build_model(residues, ali, pdb, out, optimize=1):
+def build_model(residues, pdb, ali, out, optimize=1):
     """
     Runs MODELLER for the given alignment file
 
@@ -153,11 +153,11 @@ def build_model(residues, ali, pdb, out, optimize=1):
     ----------
     residues: list of list
         Residues separated by chain. Stored as a tuple of
-        ((sequence number, insertion code), one letter code, flag)
-    ali: str
-        Path to alignment file
+        ``((sequence number, insertion code), one letter code, flag)``
     pdb: str
         PDB code
+    ali: str
+        Path to alignment file
     out: str
         Path to output PDB file
     optimize: int
