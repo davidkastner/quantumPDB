@@ -326,7 +326,39 @@ def compute_charge(spheres):
     return charge
 
 
-def extract_clusters(path, out, metals, limit=2, ligands=[], capping=0, charge=None):
+def count_residues(spheres):
+    """
+    Computes the frequency of coordinating residues
+
+    Parameters
+    ----------
+    spheres: list of sets
+        Sets of residues separated by spheres
+
+    Returns
+    -------
+    count: list of dicts
+        Frequency table by sphere
+    """
+    count = []
+    for s in spheres[1:]:
+        c = {}
+        for res in s:
+            c[res.get_resname()] = c.get(res.get_resname(), 0) + 1
+        count.append(c)
+    return count
+
+
+def extract_clusters(
+    path, 
+    out, 
+    metals, 
+    limit=2, 
+    ligands=[], 
+    capping=0, 
+    charge=False, 
+    count=False
+):
     """
     Extract active site coordination spheres. Neighboring residues determined by
     Voronoi tessellation.
@@ -345,9 +377,10 @@ def extract_clusters(path, out, metals, limit=2, ligands=[], capping=0, charge=N
         Other ligand IDs to include, in addition to AAs and waters
     capping: int
         Whether to cap chains with nothing (0), H (1), or ACE/NME (2)
-    charge: str
-        Optional path to csv file. If given, total charge of coordinating AAs
-        will be computed and written.
+    charge: bool
+        If true, total charge of coordinating AAs will written to out/charge.csv
+    count: bool
+        If true, residue counts will be written to out/count.csv
     """
     parser = PDBParser(QUIET=True)
     structure = parser.get_structure("PDB", path)
@@ -358,6 +391,7 @@ def extract_clusters(path, out, metals, limit=2, ligands=[], capping=0, charge=N
     neighbors = voronoi(model)
 
     aa_charge = {}
+    res_count = {}
     for res in model.get_residues():
         if res.get_resname() in metals:
             metal_id, residues, spheres = get_next_neighbors(res, neighbors, limit, ligands)
@@ -365,9 +399,12 @@ def extract_clusters(path, out, metals, limit=2, ligands=[], capping=0, charge=N
 
             if charge:
                 aa_charge[metal_id] = compute_charge(spheres)
+            if count:
+                res_count[metal_id] = count_residues(spheres)
             if capping:
                 cap_residues = cap_chains(model, residues, capping)
                 spheres[-1] |= cap_residues
+
             for i in range(limit + 1):
                 write_pdb(io, spheres[i], f"{out}/{metal_id}/{i}.pdb")
             if capping:
@@ -375,8 +412,17 @@ def extract_clusters(path, out, metals, limit=2, ligands=[], capping=0, charge=N
                     cap.get_parent().detach_child(cap.get_id())
 
     if charge:
-        os.makedirs(os.path.dirname(os.path.abspath(charge)), exist_ok=True)
-        with open(charge, 'w') as f:
+        with open(f"{out}/charge.csv", "w") as f:
             f.write(f"Name,{','.join(str(x + 1) for x in range(limit))}\n")
             for k, v in aa_charge.items():
                 f.write(f"{k},{','.join(str(x) for x in v)}\n")
+    
+    if count:
+        with open(f"{out}/count.csv", "w") as f:
+            f.write(f"Name,{','.join(str(x + 1) for x in range(limit))}\n")
+            for k, v in res_count.items():
+                f.write(k)
+                for sphere in v:
+                    s = ", ".join(f"{r} {c}" for r, c in sorted(sphere.items()))
+                    f.write(f",\"{s}\"")
+                f.write("\n")

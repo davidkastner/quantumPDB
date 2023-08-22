@@ -90,6 +90,7 @@ def cli(
         capping = int(click.prompt("> Capping (requires Protoss)\n   0: [None]\n   1: H\n   2: ACE/NME\n ", 
                                    type=click.Choice(["0", "1", "2"]), default="0", show_default=False))
         charge = click.confirm("> Compute charges (requires Protoss)")
+        count = click.confirm("> Count residues")
         if capping or charge:
             protoss = True
         click.echo("")
@@ -155,12 +156,14 @@ def cli(
                 path = mod_path
             if protoss:
                 path = f"{prot_path}/{pdb}_protoss.pdb"
-            charge_path = f"{o}/{pdb}/{pdb}_charge.csv" if charge else None
 
             try:
                 if protoss:
                     add_hydrogens.adjust_active_sites(path, metals)
-                clusters = coordination_spheres.extract_clusters(path, f"{o}/{pdb}", metals, limit, ligands, capping, charge_path)
+                clusters = coordination_spheres.extract_clusters(
+                    path, f"{o}/{pdb}", metals, 
+                    limit, ligands, capping, charge, count
+                )
             except (ValueError, PDBIOException):
                 click.secho("Residue or atom limit exceeded\n", italic=True, fg="red")
                 err["Other"].append(pdb)
@@ -172,9 +175,9 @@ def cli(
 
             if charge:
                 ligand_charge = add_hydrogens.compute_charge(f"{prot_path}/{pdb}_ligands.sdf")
-                with open(charge_path, "a") as f:
+                with open(f"{o}/{pdb}/charge.csv", "a") as f:
                     f.write("\n")
-                    for k, v in ligand_charge.items():
+                    for k, v in sorted(ligand_charge.items()):
                         f.write(f"{k},{v}\n")
         
         click.echo("")
