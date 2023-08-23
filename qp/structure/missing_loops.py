@@ -38,8 +38,8 @@ Optimization level (``optimize`` argument in ``missing_loops.build_model``):
 """
 
 import os
-from modeller import *
-from modeller.automodel import *
+from modeller import log, Environ
+from modeller.automodel import AutoModel
 
 
 log.none()

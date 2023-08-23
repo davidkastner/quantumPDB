@@ -6,8 +6,6 @@ dependencies:
   - pip
 
     # Package depends
-  - biopython
-  - click
   - matplotlib
   - numpy
   - pandas

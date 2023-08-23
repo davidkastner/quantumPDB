@@ -61,6 +61,7 @@ autoapi_type = "python"
 autoapi_dirs = ["../qp"]
 autoapi_ignore = ["*/tests/*", "*_version.py"]
 autodoc_member_order = "bysource"
+autodoc_mock_imports = ["modeller", "Bio", "click"]
 
 autoapi_options = [
     "members",
