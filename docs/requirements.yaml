@@ -1,6 +1,5 @@
 name: docs
 channels:
-  - salilab
 dependencies:
     # Base depends
   - python
@@ -10,7 +9,6 @@ dependencies:
   - biopython
   - click
   - matplotlib
-  - modeller
   - numpy
   - pandas
   - pytorch
