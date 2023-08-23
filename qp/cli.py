@@ -29,6 +29,7 @@ import click
 from qp.checks import fetch_pdb
 from Bio.PDB.PDBExceptions import PDBIOException
 
+
 @click.command()
 @click.option("-i", required=True, multiple=True, help="Input PDB code, PDB file, or batch file")
 @click.option("-o", required=True, type=click.Path(file_okay=False), help="Output directory")
@@ -37,14 +38,7 @@ from Bio.PDB.PDBExceptions import PDBIOException
 @click.option("--coordination", "-c", is_flag=True, help="Select the first, second, etc. coordination spheres")
 @click.option("--skip", "-s", type=click.Choice(["modeller", "protoss", "all"]), is_flag=False, flag_value="all",
                               help="Skips rerunning MODELLER or Protoss if an existing output file is found")
-def cli(
-    i,
-    o,
-    modeller,
-    protoss,
-    coordination,
-    skip
-    ):
+def cli(i, o, modeller, protoss, coordination, skip):
     """
     The overall command-line interface (CLI) entry point.
     The CLI interacts with the rest of the package.
@@ -57,7 +51,7 @@ def cli(
     """
     o = os.path.abspath(o)
 
-    # Store input PDBs as a tuple of 
+    # Store input PDBs as a tuple of
     #   parsed ID (PDB code or filename)
     #   path to PDB file (existing or to download)
     pdb_all = []
@@ -69,16 +63,23 @@ def cli(
                 pdb_all.append((pdb, p))
             else:
                 with open(p, "r") as f:
-                    pdb_all.extend([(pdb, f"{o}/{pdb}/{pdb}.pdb") 
-                                    for pdb in f.read().splitlines()])
+                    pdb_all.extend(
+                        [(pdb, f"{o}/{pdb}/{pdb}.pdb") for pdb in f.read().splitlines()]
+                    )
         else:
             pdb_all.append((p, f"{o}/{p}/{p}.pdb"))
 
     if modeller:
         from qp.structure import missing_loops
         click.echo("MODELLER parameters:")
-        optimize = int(click.prompt("> Optimize\n   0: None\n   1: [Missing]\n   2: All\n ", 
-                                    type=click.Choice(["0", "1", "2"]), default="1", show_default=False))
+        optimize = int(
+            click.prompt(
+                "> Optimize\n   0: None\n   1: [Missing]\n   2: All\n ",
+                type=click.Choice(["0", "1", "2"]),
+                default="1",
+                show_default=False,
+            )
+        )
         click.echo("")
 
     if coordination:
@@ -86,9 +87,17 @@ def cli(
         click.echo("Coordination sphere parameters:")
         metals = click.prompt("> Active site metals", default="FE FE2").split(" ")
         limit = click.prompt("> Number of spheres", default=2)
-        ligands = click.prompt("> Additional ligands [AAs and waters]", default=[], show_default=False)
-        capping = int(click.prompt("> Capping (requires Protoss)\n   0: [None]\n   1: H\n   2: ACE/NME\n ", 
-                                   type=click.Choice(["0", "1", "2"]), default="0", show_default=False))
+        ligands = click.prompt(
+            "> Additional ligands [AAs and waters]", default=[], show_default=False
+        )
+        capping = int(
+            click.prompt(
+                "> Capping (requires Protoss)\n   0: [None]\n   1: H\n   2: ACE/NME\n ",
+                type=click.Choice(["0", "1", "2"]),
+                default="0",
+                show_default=False,
+            )
+        )
         charge = click.confirm("> Compute charges (requires Protoss)")
         count = click.confirm("> Count residues")
         if capping or charge:
@@ -129,7 +138,7 @@ def cli(
                 missing_loops.build_model(residues, pdb, ali_path, mod_path, optimize)
 
         prot_path = f"{o}/{pdb}/Protoss"
-        if protoss: 
+        if protoss:
             if skip in ["protoss", "all"] and os.path.isfile(f"{prot_path}/{pdb}_protoss.pdb"):
                 click.echo("> Protoss file found")
             else:
@@ -141,7 +150,7 @@ def cli(
                 except ValueError:
                     click.secho("Error uploading PDB file\n", italic=True, fg="red")
                     # Occurs when uploading a PDB file > 4MB
-                    # TODO retry with parsed PDB code? Will raise Bio.PDB error if  
+                    # TODO retry with parsed PDB code? Will raise Bio.PDB error if
                     #      number of atoms in output exceeds 99999
                     err["Protoss"].append(pdb)
                     continue
@@ -149,7 +158,7 @@ def cli(
                 add_hydrogens.download(job, f"{prot_path}/{pdb}_protoss.pdb", "protein")
                 add_hydrogens.download(job, f"{prot_path}/{pdb}_ligands.sdf", "ligands")
                 add_hydrogens.download(job, f"{prot_path}/{pdb}_log.txt", "log")
-        
+
         if coordination:
             click.echo("> Extracting clusters")
             if modeller:
@@ -161,8 +170,7 @@ def cli(
                 if protoss:
                     add_hydrogens.adjust_active_sites(path, metals)
                 clusters = coordination_spheres.extract_clusters(
-                    path, f"{o}/{pdb}", metals, 
-                    limit, ligands, capping, charge, count
+                    path, f"{o}/{pdb}", metals, limit, ligands, capping, charge, count
                 )
             except (ValueError, PDBIOException):
                 click.secho("Residue or atom limit exceeded\n", italic=True, fg="red")
@@ -179,12 +187,13 @@ def cli(
                     f.write("\n")
                     for k, v in sorted(ligand_charge.items()):
                         f.write(f"{k},{v}\n")
-        
+
         click.echo("")
 
     for k, v in err.items():
         if v:
             click.echo(click.style(k + " errors: ", bold=True, fg="red") + ", ".join(v))
+
 
 if __name__ == "__main__":
     # Run the command-line interface when this script is executed

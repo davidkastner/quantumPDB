@@ -68,20 +68,20 @@ AA = {
     "GLU": "E",
     "TYR": "Y",
     "MET": "M",
-    "MSE": "M", # other non-standard residues not recognized by MODELLER
+    "MSE": "M",  # other non-standard residues not recognized by MODELLER
 }
 
 
 def get_residues(path):
     """
-    Extracts residues from a PDB file, filling in missing residues based on 
+    Extracts residues from a PDB file, filling in missing residues based on
     sequence number
 
     Parameters
     ----------
     path: str
         Path to PDB file
-    
+
     Returns
     -------
     residues: list of list
@@ -101,8 +101,8 @@ def get_residues(path):
     for line in p:
         if line.startswith("ENDMDL"):
             break
-        
-        elif line.startswith("REMARK 465   "): # missing residues
+
+        elif line.startswith("REMARK 465   "):  # missing residues
             res = line[15:18]
             if res in AA and (line[13] == " " or line[13] == "1"): # want only the first model
                 chain = line[19]
@@ -110,7 +110,7 @@ def get_residues(path):
                 ic = line[26]
                 missing.setdefault(chain, set()).add(((rid, ic), AA[res], "R"))
 
-        elif line.startswith("REMARK 470   "): # missing atoms
+        elif line.startswith("REMARK 470   "):  # missing atoms
             res = line[15:18]
             if res in AA and (line[13] == " " or line[13] == "1"):
                 chain = line[19]
@@ -132,9 +132,12 @@ def get_residues(path):
                 if chain not in seen:
                     seen[chain] = set()
                 cur = chain
-            
+
             if chain in missing:
-                while ind[chain] < len(missing[chain]) and (rid, ic) >= missing[chain][ind[chain]][0]:
+                while (
+                    ind[chain] < len(missing[chain])
+                    and (rid, ic) >= missing[chain][ind[chain]][0]
+                ):
                     residues[-1].append(missing[chain][ind[chain]])
                     ind[chain] += 1
                     seen[chain].add(residues[-1][-1][:2])
@@ -146,7 +149,7 @@ def get_residues(path):
             if ((rid, ic), resname) not in seen[chain]:
                 residues[-1].append(((rid, ic), resname, ""))
                 seen[chain].add(residues[-1][-1][:2])
-        
+
         elif line.startswith("TER"):
             chain = line[21]
             if chain in missing:
@@ -175,8 +178,9 @@ def write_alignment(residues, pdb, path, out):
     out: str
         Path to output file
     """
-    seq = "/".join("".join(res[1] if res[2] != "R" else "-" for res in chain)
-                   for chain in residues)
+    seq = "/".join(
+        "".join(res[1] if res[2] != "R" else "-" for res in chain) for chain in residues
+    )
     seq_fill = "/".join("".join(res[1] for res in chain) for chain in residues)
 
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
@@ -241,8 +245,10 @@ def build_model(residues, pdb, ali, out, optimize=1):
             missing.append((f"{ind}:{chain}", f"{len(c)}:{chain}"))
 
     if optimize == 1 and missing:
-        CustomModel.select_atoms = lambda self: Selection(*[self.residue_range(x, y) for x, y in missing])
-    
+        CustomModel.select_atoms = lambda self: Selection(
+            *[self.residue_range(x, y) for x, y in missing]
+        )
+
     a = CustomModel(e, alnfile=ali, knowns=pdb, sequence=f"{pdb}_fill")
     a.starting_model = 1
     a.ending_model = 1

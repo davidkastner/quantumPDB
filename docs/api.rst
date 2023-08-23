@@ -8,3 +8,4 @@ API Documentation
    qp.checks
    qp.structure
    qp.cluster
+   qp.cli

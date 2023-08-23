@@ -17,6 +17,7 @@ qp.cluster.coordination\_spheres
       compute_charge
       construct_heavy
       construct_hydrogen
+      count_residues
       extract_clusters
       get_next_neighbors
       scale_hydrogen

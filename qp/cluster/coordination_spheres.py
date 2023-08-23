@@ -35,7 +35,7 @@ def voronoi(model):
     ----------
     model: Bio.PDB.Model
         Protein structure model
-    
+
     Returns
     -------
     neighbors: dict
@@ -69,7 +69,7 @@ def get_next_neighbors(start, neighbors, limit, ligands):
         Adjacency list of neighboring atoms
     limit: int
         Number of spheres to extract
-    
+
     Returns
     -------
     metal_id: str
@@ -87,13 +87,15 @@ def get_next_neighbors(start, neighbors, limit, ligands):
             for atom in res.get_unpacked_list():
                 for n in neighbors[atom]:
                     par = n.get_parent()
-                    if (par not in seen and (Polypeptide.is_aa(par) or
-                        par.get_resname() == "HOH" or 
-                        par.get_resname() in ligands)):
+                    if par not in seen and (
+                        Polypeptide.is_aa(par)
+                        or par.get_resname() == "HOH"
+                        or par.get_resname() in ligands
+                    ):
                         nxt.add(par)
                         seen.add(par)
         spheres.append(nxt)
-    
+
     res_id = start.get_full_id()
     metal_id = res_id[2] + str(res_id[3][1])
     return metal_id, seen, spheres
@@ -111,7 +113,7 @@ def scale_hydrogen(a, b, scale):
         Bonded atom to replace
     scale: float
         Bond length scale
-    
+
     Returns
     -------
     pos: array of float
@@ -136,7 +138,7 @@ def construct_hydrogen(chain, parent, template, atom):
         Upstream or downstream residue
     atom: str
         Flag for adding to the 'N' or 'C' side of the residue
-    
+
     Returns
     -------
     res: Bio.PDB.Residue
@@ -171,7 +173,7 @@ def construct_heavy(chain, parent, template, atom):
         Upstream or downstream residue
     atom: str
         Flag for adding to the "N" (ACE) or "C" (NME) side of the residue
-    
+
     Returns
     -------
     res: Bio.PDB.Residue
@@ -225,11 +227,11 @@ def cap_chains(model, residues, capping):
         Set of residues
     capping: int
         Flag for capping group, H (1) or ACE/NME (2)
-    
+
     Returns
     -------
     cap_residues: set
-        Set of residues containing added groups 
+        Set of residues containing added groups
     """
     orig_chains = {}
     for chain in model:
@@ -245,20 +247,28 @@ def cap_chains(model, residues, capping):
         chain = model[res_id[2]]
         chain_list = orig_chains[chain.get_id()]
         ind = chain_list.index(res)
-        
+
         if ind > 0:
             pre = chain_list[ind - 1]
-            if (pre.get_id()[1] == res_id[3][1] - 1 and pre.get_id()[0] == " " and 
-                pre not in residues and Polypeptide.is_aa(pre)): # ignores hetero residues
+            if (
+                pre.get_id()[1] == res_id[3][1] - 1
+                and pre.get_id()[0] == " "
+                and pre not in residues
+                and Polypeptide.is_aa(pre)
+            ):  # ignores hetero residues
                 if capping == 1:
                     cap_residues.add(construct_hydrogen(chain, res, pre, "N"))
                 else:
                     cap_residues.add(construct_heavy(chain, res, pre, "N"))
-        
+
         if ind < len(chain_list) - 1:
             nxt = chain_list[ind + 1]
-            if (nxt.get_id()[1] == res_id[3][1] + 1 and nxt.get_id()[0] == " " and 
-                nxt not in residues and Polypeptide.is_aa(nxt)):
+            if (
+                nxt.get_id()[1] == res_id[3][1] + 1
+                and nxt.get_id()[0] == " "
+                and nxt not in residues
+                and Polypeptide.is_aa(nxt)
+            ):
                 if capping == 1:
                     cap_residues.add(construct_hydrogen(chain, res, nxt, "C"))
                 else:
@@ -280,10 +290,11 @@ def write_pdb(io, sphere, out):
     out: str
         Path to output PDB file
     """
+
     class ResSelect(Select):
         def accept_residue(self, residue):
             return residue in sphere
-    
+
     io.save(out, ResSelect())
 
 
@@ -302,15 +313,15 @@ def compute_charge(spheres):
         Total charge of AAs in each sphere
     """
     pos = {
-        'ARG': ['HE', 'HH11', 'HH12', 'HH21', 'HH22'],
-        'LYS': ['HZ1', 'HZ2', 'HZ3'],
-        'HIS': ['HD1', 'HD2', 'HE1', 'HE2'],
+        "ARG": ["HE", "HH11", "HH12", "HH21", "HH22"],
+        "LYS": ["HZ1", "HZ2", "HZ3"],
+        "HIS": ["HD1", "HD2", "HE1", "HE2"],
     }
     neg = {
-        'ASP': ['HD2'],
-        'GLU': ['HE2'],
-        'CYS': ['HG'],
-        'TYR': ['HH'],
+        "ASP": ["HD2"],
+        "GLU": ["HE2"],
+        "CYS": ["HG"],
+        "TYR": ["HH"],
     }
 
     charge = []
@@ -328,7 +339,7 @@ def compute_charge(spheres):
 
 def count_residues(spheres):
     """
-    Computes the frequency of coordinating residues
+    Counts the frequency of coordinating residues
 
     Parameters
     ----------
@@ -350,14 +361,7 @@ def count_residues(spheres):
 
 
 def extract_clusters(
-    path, 
-    out, 
-    metals, 
-    limit=2, 
-    ligands=[], 
-    capping=0, 
-    charge=False, 
-    count=False
+    path, out, metals, limit=2, ligands=[], capping=0, charge=False, count=False
 ):
     """
     Extract active site coordination spheres. Neighboring residues determined by
@@ -394,7 +398,9 @@ def extract_clusters(
     res_count = {}
     for res in model.get_residues():
         if res.get_resname() in metals:
-            metal_id, residues, spheres = get_next_neighbors(res, neighbors, limit, ligands)
+            metal_id, residues, spheres = get_next_neighbors(
+                res, neighbors, limit, ligands
+            )
             os.makedirs(f"{out}/{metal_id}", exist_ok=True)
 
             if charge:
@@ -416,7 +422,7 @@ def extract_clusters(
             f.write(f"Name,{','.join(str(x + 1) for x in range(limit))}\n")
             for k, v in aa_charge.items():
                 f.write(f"{k},{','.join(str(x) for x in v)}\n")
-    
+
     if count:
         with open(f"{out}/count.csv", "w") as f:
             f.write(f"Name,{','.join(str(x + 1) for x in range(limit))}\n")
@@ -424,5 +430,5 @@ def extract_clusters(
                 f.write(k)
                 for sphere in v:
                     s = ", ".join(f"{r} {c}" for r, c in sorted(sphere.items()))
-                    f.write(f",\"{s}\"")
+                    f.write(f',"{s}"')
                 f.write("\n")

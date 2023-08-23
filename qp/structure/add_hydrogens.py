@@ -44,14 +44,16 @@ def upload(path):
     ----------
     path: str
         Path to PDB file
-    
+
     Returns
     -------
     pid: str
         ProteinsPlus ID
     """
-    pp = requests.post("https://proteins.plus/api/pdb_files_rest", 
-                       files={"pdb_file[pathvar]": open(path, "rb")})
+    pp = requests.post(
+        "https://proteins.plus/api/pdb_files_rest",
+        files={"pdb_file[pathvar]": open(path, "rb")},
+    )
     if pp.status_code == 400:
         raise ValueError("Bad request")
     loc = json.loads(pp.text)["location"]
@@ -71,15 +73,17 @@ def submit(pid):
     ----------
     pid: str
         PDB code or ProteinsPlus ID
-    
+
     Returns
     -------
     job: str
         URL of the Protoss job location
     """
-    protoss = requests.post("https://proteins.plus/api/protoss_rest",
-                            json={"protoss": {"pdbCode": pid}},
-                            headers={"Accept": "application/json"})
+    protoss = requests.post(
+        "https://proteins.plus/api/protoss_rest",
+        json={"protoss": {"pdbCode": pid}},
+        headers={"Accept": "application/json"},
+    )
     if protoss.status_code == 400:
         raise ValueError("Invalid PDB code")
     return json.loads(protoss.text)["location"]
@@ -109,10 +113,10 @@ def download(job, out, key="protein"):
         f.write(protoss.text)
 
 
-def adjust_active_sites(path, metals): 
+def adjust_active_sites(path, metals):
     """
-    Deprotonates metal-coordinating residues that are (most likely) incorrectly 
-    protonated by Protoss. Removes hydrogens from coordinating tyrosines and 
+    Deprotonates metal-coordinating residues that are (most likely) incorrectly
+    protonated by Protoss. Removes hydrogens from coordinating tyrosines and
     cysteines, using a distance cutoff of 3 A.
 
     Parameters
@@ -138,7 +142,7 @@ def adjust_active_sites(path, metals):
                 coord = res["OH"]
             elif atom.get_name() == "HG" and res.get_resname() == "CYS":
                 coord = res["SG"]
-               
+
             if coord:
                 for p in points:
                     if p - coord < 3:
@@ -158,7 +162,7 @@ def compute_charge(path):
     ----------
     path: str
         Path to ligand SDF file
-    
+
     Returns
     -------
     charge: dict
@@ -166,8 +170,11 @@ def compute_charge(path):
     """
     with open(path, "r") as f:
         sdf = f.read()
-    ligands = [[t for t in s.splitlines() if t != ""] 
-               for s in sdf.split("$$$$") if s != "\n" and s != ""]
+    ligands = [
+        [t for t in s.splitlines() if t != ""]
+        for s in sdf.split("$$$$")
+        if s != "\n" and s != ""
+    ]
 
     charge = {}
     for l in ligands:
