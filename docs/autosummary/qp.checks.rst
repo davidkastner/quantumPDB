@@ -28,4 +28,5 @@
    :recursive:
 
    qp.checks.fetch_pdb
+   qp.checks.to_xyz
 

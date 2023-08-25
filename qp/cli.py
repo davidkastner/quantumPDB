@@ -100,6 +100,7 @@ def cli(i, o, modeller, protoss, coordination, skip):
         )
         charge = click.confirm("> Compute charges (requires Protoss)")
         count = click.confirm("> Count residues")
+        xyz = click.confirm("> Write XYZ files")
         if capping or charge:
             protoss = True
         click.echo("")
@@ -170,9 +171,10 @@ def cli(i, o, modeller, protoss, coordination, skip):
                 if protoss:
                     add_hydrogens.adjust_active_sites(path, metals)
                 clusters = coordination_spheres.extract_clusters(
-                    path, f"{o}/{pdb}", metals, limit, ligands, capping, charge, count
+                    path, f"{o}/{pdb}", metals,
+                    limit, ligands, capping, charge, count, xyz
                 )
-            except (ValueError, PDBIOException):
+            except (ValueError, PDBIOException):  # TODO add custom exceptions
                 click.secho("Residue or atom limit exceeded\n", italic=True, fg="red")
                 err["Other"].append(pdb)
                 continue

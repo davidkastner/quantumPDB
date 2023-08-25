@@ -43,10 +43,11 @@ from modeller.automodel import AutoModel
 
 
 log.none()
-e = Environ()
+e = Environ()  #: MODELLER environment
 e.io.hetatm = True
 e.io.water = True
 
+#: Amino acid 3 to 1 lookup table
 AA = {
     "CYS": "C",
     "ASP": "D",

@@ -25,6 +25,7 @@ from Bio.PDB import PDBParser, Polypeptide, PDBIO, Select
 from Bio.PDB.Atom import Atom
 from Bio.PDB.Residue import Residue
 from scipy.spatial import Voronoi
+from qp.checks import to_xyz
 
 
 def voronoi(model):
@@ -361,7 +362,15 @@ def count_residues(spheres):
 
 
 def extract_clusters(
-    path, out, metals, limit=2, ligands=[], capping=0, charge=False, count=False
+    path,
+    out,
+    metals,
+    limit=2,
+    ligands=[],
+    capping=0,
+    charge=False,
+    count=False,
+    xyz=False,
 ):
     """
     Extract active site coordination spheres. Neighboring residues determined by
@@ -385,6 +394,8 @@ def extract_clusters(
         If true, total charge of coordinating AAs will written to out/charge.csv
     count: bool
         If true, residue counts will be written to out/count.csv
+    xyz: bool
+        If true, XYZ files will be written according to the output PDBs
     """
     parser = PDBParser(QUIET=True)
     structure = parser.get_structure("PDB", path)
@@ -411,11 +422,15 @@ def extract_clusters(
                 cap_residues = cap_chains(model, residues, capping)
                 spheres[-1] |= cap_residues
 
+            sphere_paths = []
             for i in range(limit + 1):
-                write_pdb(io, spheres[i], f"{out}/{metal_id}/{i}.pdb")
+                sphere_paths.append(f"{out}/{metal_id}/{i}.pdb")
+                write_pdb(io, spheres[i], sphere_paths[i])
             if capping:
                 for cap in cap_residues:
                     cap.get_parent().detach_child(cap.get_id())
+            if xyz:
+                to_xyz(f"{out}/{metal_id}/{metal_id}.xyz", *sphere_paths)
 
     if charge:
         with open(f"{out}/charge.csv", "w") as f:

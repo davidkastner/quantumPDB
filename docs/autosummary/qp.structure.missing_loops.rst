@@ -1,9 +1,16 @@
-qp.structure.missing\_loops
+﻿qp.structure.missing\_loops
 ===========================
 
 .. automodule:: qp.structure.missing_loops
 
    
+   
+   .. rubric:: Module Attributes
+
+   .. autosummary::
+   
+      e
+      AA
    
    
 
