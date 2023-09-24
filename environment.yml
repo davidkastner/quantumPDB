@@ -6,19 +6,16 @@ channels:
 dependencies:
   - biopython
   - black
-  - cookiecutter
   - click
-  - jupyterlab
   - matplotlib
   - modeller
   - numpy
   - pandas
   - pip
   - requests
-  - scikit-learn
   - scipy
   - seaborn
-  - sphinx-autoapi
-  - sphinx_rtd_theme
   - pip:
-    - https://github.com/revitron/revitron-sphinx-theme/archive/master.zip
+      - sphinx_rtd_theme==0.5.2
+      - sphinx-autoapi
+      - https://github.com/revitron/revitron-sphinx-theme/archive/refs/tags/0.7.0.zip
