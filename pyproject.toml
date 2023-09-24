@@ -37,7 +37,7 @@ test = [
 
 # CLI entry point
 [project.scripts]
-qpdb = "qp.cli:cli"
+qp = "qp.cli:cli"
 
 [tool.setuptools]
 # This subkey is a beta stage development and keys may change in the future, see https://setuptools.pypa.io/en/latest/userguide/pyproject_config.html for more details
