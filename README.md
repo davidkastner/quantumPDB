@@ -7,8 +7,8 @@ QuantumPDB
 ## Table of Contents
 1. **Overview**
 2. **Installation**
+    * Download the package
     * Creating python environment
-    * Setup developing environment
     * Command-line interface
 3. **What is included?**
     * File structure
@@ -29,22 +29,22 @@ File Structure overview: [Miro Board](https://miro.com/app/board/uXjVPSPcRKQ=/?s
 ## 2. Installation
 Install the package by running the follow commands inside the repository. This will perform a developmental version install. It is good practice to do this inside of a virtual environment. A yaml environmental file has been created to automate the installation of dependencies.
 
-### Creating python environment
-All the dependencies can be loaded together using the prebuilt environment.yml file.
-Compatibility is automatically tested for python versions 3.8 and higher.
-If you are only going to be using the package run:
-```bash
-conda env create -f environment.yml
-source activate qp
-```
-
 ### Setup developing environment
 To begin working with quantumPDB, first clone the repo and then move into the top-level directory of the package.
 Then perform a developer install.
 Remember to update your GitHub [ssh keys](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account).
 ```bash
 git clone git@github.com:davidkastner/quantumPDB.git
+```
+
+### Creating python environment
+All the dependencies can be loaded together using the prebuilt environment.yml file.
+Compatibility is automatically tested for python versions 3.8 and higher.
+If you are only going to be using the package run:
+```bash
 cd quantumPDB
+conda env create -f environment.yml
+source activate qp
 python -m pip install -e .
 ```
 
