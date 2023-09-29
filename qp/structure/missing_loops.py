@@ -158,6 +158,13 @@ def get_residues(path):
                     residues[-1].append(missing[chain][ind[chain]])
                     ind[chain] += 1
 
+    # Remove N- and C-terminal missing residues
+    for chain_res in residues:
+        while chain_res and chain_res[0][2] == "R":
+            chain_res.pop(0)
+        while chain_res and chain_res[-1][2] == "R":
+            chain_res.pop()
+
     return residues
 
 
