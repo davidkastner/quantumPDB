@@ -58,7 +58,8 @@ def voronoi(model):
     return neighbors
 
 
-def get_next_neighbors(start, neighbors, limit, ligands):
+def get_next_neighbors(start, neighbors, limit, ligands, include_waters=False):
+
     """
     Iteratively determines spheres around a given starting atom
 
@@ -90,7 +91,7 @@ def get_next_neighbors(start, neighbors, limit, ligands):
                     par = n.get_parent()
                     if par not in seen and (
                         Polypeptide.is_aa(par)
-                        or par.get_resname() == "HOH"
+                        or (include_waters and par.get_resname() == "HOH")
                         or par.get_resname() in ligands
                     ):
                         nxt.add(par)
@@ -371,6 +372,7 @@ def extract_clusters(
     charge=False,
     count=False,
     xyz=False,
+    include_waters=False,
 ):
     """
     Extract active site coordination spheres. Neighboring residues determined by
@@ -410,8 +412,9 @@ def extract_clusters(
     for res in model.get_residues():
         if res.get_resname() in metals:
             metal_id, residues, spheres = get_next_neighbors(
-                res, neighbors, limit, ligands
+                res, neighbors, limit, ligands, include_waters
             )
+
             os.makedirs(f"{out}/{metal_id}", exist_ok=True)
 
             if charge:
