@@ -88,7 +88,7 @@ def cli(i, o, modeller, protoss, coordination, skip):
         metals = click.prompt("> Active site metals", default="FE FE2").split(" ")
         limit = click.prompt("> Number of spheres", default=2)
         ligands = click.prompt(
-            "> Additional ligands [AAs and waters]", default=[], show_default=False
+            "> Additional ligands [AAs]", default=[], show_default=False
         )
         capping = int(
             click.prompt(
