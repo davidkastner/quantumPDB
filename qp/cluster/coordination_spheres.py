@@ -81,26 +81,51 @@ def get_next_neighbors(start, neighbors, limit, ligands, include_waters=False):
     spheres: list of sets
         Sets of residues separated by spheres
     """
+
     seen = {start}
     spheres = [{start}]
+    
     for i in range(limit):
         nxt = set()
         for res in spheres[-1]:
             for atom in res.get_unpacked_list():
                 for n in neighbors[atom]:
                     par = n.get_parent()
-                    if par not in seen and (
-                        Polypeptide.is_aa(par)
-                        or (include_waters and par.get_resname() == "HOH")
-                        or par.get_resname() in ligands
-                    ):
+
+                    # ----- NEW CODE START (INCLUDE LIGAND) -----
+                    if i == 0:  # For the first coordination sphere
+                        condition = (
+                            not Polypeptide.is_aa(par)
+                            or (include_waters and par.get_resname() == "HOH")
+                            or True  # This ensures all ligands are included in the first coordination sphere
+                        )
+                    else:
+                        condition = (
+                            Polypeptide.is_aa(par)
+                            or (include_waters and par.get_resname() == "HOH")
+                            or par.get_resname() in ligands
+                        )
+                    # ----- END CODE START (INCLUDE LIGAND) -----
+
+                    # ----- ORIGINAL CODE START (EXCLUDE LIGAND) -----
+                    # condition = (
+                    #     Polypeptide.is_aa(par)
+                    #     or (include_waters and par.get_resname() == "HOH")
+                    #     or par.get_resname() in ligands
+                    # )
+                    # ----- ORIGINAL CODE END (EXCLUDE LIGAND) -----
+
+                    if par not in seen and condition:
                         nxt.add(par)
                         seen.add(par)
+
         spheres.append(nxt)
 
     res_id = start.get_full_id()
     metal_id = res_id[2] + str(res_id[3][1])
+    
     return metal_id, seen, spheres
+
 
 
 def scale_hydrogen(a, b, scale):
@@ -372,7 +397,7 @@ def extract_clusters(
     charge=False,
     count=False,
     xyz=False,
-    include_waters=False,
+    include_waters=True,
 ):
     """
     Extract active site coordination spheres. Neighboring residues determined by
