@@ -2,6 +2,8 @@
 
 from Bio.PDB import PDBParser
 
+def format_element(element):
+    return element[0].upper() + element[1:].lower()
 
 def to_xyz(out, *paths):
     """
@@ -24,4 +26,4 @@ def to_xyz(out, *paths):
     with open(out, "w") as f:
         f.write(f"{len(atoms)}\n\n")
         for element, (x, y, z) in atoms:
-            f.write(f"{element:>3}  {x:8.3f} {y:8.3f} {z:8.3f}\n")
+            f.write(f"{format_element(element):>3}  {x:8.3f} {y:8.3f} {z:8.3f}\n")
