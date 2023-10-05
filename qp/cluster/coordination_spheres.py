@@ -100,20 +100,12 @@ def get_next_neighbors(start, neighbors, limit, ligands, include_waters=False):
                             or True  # This ensures all ligands are included in the first coordination sphere
                         )
                     else:
+                    # ----- END CODE START (INCLUDE LIGAND) -----
                         condition = (
                             Polypeptide.is_aa(par)
                             or (include_waters and par.get_resname() == "HOH")
                             or par.get_resname() in ligands
                         )
-                    # ----- END CODE START (INCLUDE LIGAND) -----
-
-                    # ----- ORIGINAL CODE START (EXCLUDE LIGAND) -----
-                    # condition = (
-                    #     Polypeptide.is_aa(par)
-                    #     or (include_waters and par.get_resname() == "HOH")
-                    #     or par.get_resname() in ligands
-                    # )
-                    # ----- ORIGINAL CODE END (EXCLUDE LIGAND) -----
 
                     if par not in seen and condition:
                         nxt.add(par)
@@ -122,7 +114,9 @@ def get_next_neighbors(start, neighbors, limit, ligands, include_waters=False):
         spheres.append(nxt)
 
     res_id = start.get_full_id()
-    metal_id = res_id[2] + str(res_id[3][1])
+    chain_name = res_id[2]
+    metal_index = str(res_id[3][1])
+    metal_id = chain_name + metal_index
     
     return metal_id, seen, spheres
 
@@ -346,7 +340,7 @@ def compute_charge(spheres):
     }
     neg = {
         "ASP": ["HD2"],
-        "GLU": ["HE2"],
+        "GLU": ["HE2", "HOE1"],
         "CYS": ["HG"],
         "TYR": ["HH"],
     }
@@ -359,6 +353,9 @@ def compute_charge(spheres):
             if resname in pos and all(res.has_id(h) for h in pos[resname]):
                 c += 1
             elif resname in neg and all(not res.has_id(h) for h in neg[resname]):
+                c -= 1
+            # Check for C-terminus
+            if res.has_id("OXT"):
                 c -= 1
         charge.append(c)
     return charge
