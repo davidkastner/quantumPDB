@@ -40,6 +40,8 @@ Optimization level (``optimize`` argument in ``missing_loops.build_model``):
 import os
 from modeller import log, Environ, Selection
 from modeller.automodel import AutoModel
+from modeller import alignment, model
+
 
 
 log.none()
@@ -268,5 +270,17 @@ def build_model(residues, pdb, ali, out, optimize=1):
         a.make()
         for ext in ["ini", "rsr", "sch", "D00000001", "V99990001"]:
             os.remove(f"{pdb}_fill.{ext}")
+
+        # Transfer residue numbers and chain ids from reference model to the built model.
+        # Read the alignment for the transfer
+        aln = alignment(e, file=ali)
+
+        # Read the template and target models:
+        mdl_reference = model(e, file=pdb)  # Assuming 'pdb' is the reference pdb file
+        mdl_built = model(e, file=os.path.basename(out))
+
+        # Transfer the residue and chain ids and write out the modified MODEL:
+        mdl_built.res_num_from(mdl_reference, aln)
+        mdl_built.write(file=os.path.basename(out))
 
     os.chdir(cwd)

@@ -343,6 +343,7 @@ def compute_charge(spheres):
         "GLU": ["HE2", "HOE1"],
         "CYS": ["HG"],
         "TYR": ["HH"],
+        "OCS": []
     }
 
     charge = []
