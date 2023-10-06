@@ -71,7 +71,7 @@ AA = {
     "GLU": "E",
     "TYR": "Y",
     "MET": "M",
-    "MSE": "M",  # other non-standard residues not recognized by MODELLER
+    "MSE": "M",
 }
 
 
@@ -164,7 +164,8 @@ def get_residues(path):
     for chain_res in residues:
         while chain_res and chain_res[0][2] == "R":
             chain_res.pop(0)
-        while chain_res and chain_res[-1][2] == "R":
+        # Now, check for unresolved residues
+        while chain_res and chain_res[-1][2] == "R" and chain_res[-1][1] in AA.values():
             chain_res.pop()
 
     return residues
@@ -197,6 +198,42 @@ def write_alignment(residues, pdb, path, out):
     with open(out, "w") as f:
         f.write(f">P1;{pdb}\nstructureX:{path}:FIRST:@ END::::::\n{seq}*\n")
         f.write(f">P1;{pdb}_fill\nsequence:::::::::\n{seq_fill}*\n")
+
+
+def fix_pdb_numbering(pdb_content):
+    """Handles insertion codes from Modeller."""
+
+    lines = pdb_content.split('\n')
+    new_lines = []
+
+    prev_chain = None
+    prev_residue_number = None
+    seen_residues = set()
+
+    for line in lines:
+        if line.startswith("ATOM") or line.startswith("HETATM"):
+            current_chain = line[21]
+            residue_number_with_letter = line[22:27].strip()  # Residue number along with potential insertion code
+            has_char = line[26] != ' '
+
+            # If we encounter a new chain or a residue we haven't seen, reset/update values
+            if current_chain != prev_chain or residue_number_with_letter not in seen_residues:
+                prev_chain = current_chain
+                if has_char:
+                    prev_residue_number = prev_residue_number + 1 if prev_residue_number else int(residue_number_with_letter[:-1])
+                else:
+                    prev_residue_number = int(residue_number_with_letter)
+                seen_residues.add(residue_number_with_letter)
+
+            # If there's an insertion code, replace the residue number and remove the insertion code
+            if has_char:
+                line = line[:22] + f"{prev_residue_number:4} " + line[27:]
+
+            new_lines.append(line)
+        else:
+            new_lines.append(line)
+
+    return '\n'.join(new_lines)
 
 
 def build_model(residues, pdb, ali, out, optimize=1):
@@ -281,6 +318,15 @@ def build_model(residues, pdb, ali, out, optimize=1):
 
         # Transfer the residue and chain ids and write out the modified MODEL:
         mdl_built.res_num_from(mdl_reference, aln)
-        mdl_built.write(file=os.path.basename(out))
+        file=os.path.basename(out)
+        mdl_built.write(file)
+
+        # Example usage:
+        with open(file, 'r') as f:
+            content = f.read()
+
+        corrected_content = fix_pdb_numbering(content)
+        with open(file, 'w') as f:
+            f.write(corrected_content)
 
     os.chdir(cwd)
