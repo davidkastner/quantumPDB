@@ -98,9 +98,9 @@ def cli(i, o, modeller, protoss, coordination, skip):
                 show_default=False,
             )
         )
-        charge = click.confirm("> Compute charges (requires Protoss)")
-        count = click.confirm("> Count residues")
-        xyz = click.confirm("> Write XYZ files")
+        charge = click.confirm("> Compute charges (requires Protoss)", default=True)
+        count = click.confirm("> Count residues", default=True)
+        xyz = click.confirm("> Write XYZ files", default=True)
         if capping or charge:
             protoss = True
         click.echo("")
@@ -170,6 +170,7 @@ def cli(i, o, modeller, protoss, coordination, skip):
             try:
                 if protoss:
                     add_hydrogens.adjust_active_sites(path, metals)
+                    add_hydrogens.rename_nterminal(path)
                 clusters = coordination_spheres.extract_clusters(
                     path, f"{o}/{pdb}", metals,
                     limit, ligands, capping, charge, count, xyz

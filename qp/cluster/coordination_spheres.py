@@ -343,7 +343,7 @@ def compute_charge(spheres):
         "GLU": ["HE2", "HOE1"],
         "CYS": ["HG"],
         "TYR": ["HH"],
-        "OCS": []
+        "OCS": [],
     }
 
     charge = []
@@ -358,6 +358,9 @@ def compute_charge(spheres):
             # Check for C-terminus
             if res.has_id("OXT"):
                 c -= 1
+            # Check for N-terminus
+            if res.has_id("NT"):
+                c += 1
         charge.append(c)
     return charge
 
