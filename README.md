@@ -90,6 +90,7 @@ make html
 
 ### GitHub refresher
 #### Push new changes
+Use this Git sequence to make a quick push.
 
 ```
 git status
@@ -100,6 +101,9 @@ git push -u origin main
 ```
 
 #### Making a pull request
+Use this Git sequence to make a branch and make a pull request.
+Recommend for significant changes.
+
 ```
 git checkout main
 git pull
