@@ -160,13 +160,28 @@ def get_residues(path):
                     residues[-1].append(missing[chain][ind[chain]])
                     ind[chain] += 1
 
-    # Remove N- and C-terminal missing residues
+    # Clean the C-terminus
     for chain_res in residues:
-        while chain_res and chain_res[0][2] == "R":
+        # Check from the end
+        i = len(chain_res) - 1
+        while i >= 0:
+            # If not an amino acid
+            if chain_res[i][1] not in AA.values():
+                i -= 1
+                continue
+            
+            # If it's an amino acid but not a missing residue
+            if chain_res[i][2] != "R":
+                break
+            
+            # If it's an amino acid and a missing residue
+            if chain_res[i][2] == "R":
+                chain_res.pop(i)
+                i -= 1
+
+        # Handle N-terminal unresolved amino acids (existing logic)
+        while chain_res and chain_res[0][2] == "R" and chain_res[0][1] in AA.values():
             chain_res.pop(0)
-        # Now, check for unresolved residues
-        while chain_res and chain_res[-1][2] == "R" and chain_res[-1][1] in AA.values():
-            chain_res.pop()
 
     return residues
 
@@ -295,6 +310,8 @@ def build_model(residues, pdb, ali, out, optimize=1):
         CustomModel.select_atoms = lambda self: Selection(
             *[self.residue_range(x, y) for x, y in missing]
         )
+
+    print("missing", missing)
 
     a = CustomModel(e, alnfile=ali, knowns=pdb, sequence=f"{pdb}_fill")
     a.starting_model = 1

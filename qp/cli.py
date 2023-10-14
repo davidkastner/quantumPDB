@@ -179,8 +179,8 @@ def cli(i, o, modeller, protoss, coordination, skip):
                 click.secho("Residue or atom limit exceeded\n", italic=True, fg="red")
                 err["Other"].append(pdb)
                 continue
-            except KeyError:
-                click.secho("Missing template atoms for capping\n", italic=True, fg="red")
+            except KeyError as e:
+                click.secho(f"Missing template atoms for capping {e}\n", italic=True, fg="red")
                 err["Coordination sphere"].append(pdb)
                 continue
 

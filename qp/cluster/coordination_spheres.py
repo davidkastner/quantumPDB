@@ -200,6 +200,7 @@ def construct_heavy(chain, parent, template, atom):
     res: Bio.PDB.Residue
         Residue containing added group
     """
+
     pos = {"CH3": template["CA"].get_coord()}
     if template.get_resname() == "GLY":
         pos["HH31"] = template["HA2"].get_coord()
