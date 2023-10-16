@@ -311,8 +311,6 @@ def build_model(residues, pdb, ali, out, optimize=1):
             *[self.residue_range(x, y) for x, y in missing]
         )
 
-    print("missing", missing)
-
     a = CustomModel(e, alnfile=ali, knowns=pdb, sequence=f"{pdb}_fill")
     a.starting_model = 1
     a.ending_model = 1
