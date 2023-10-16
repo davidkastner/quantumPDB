@@ -50,24 +50,7 @@ def cli(i, o, modeller, protoss, coordination, skip):
 
     """
     o = os.path.abspath(o)
-
-    # Store input PDBs as a tuple of
-    #   parsed ID (PDB code or filename)
-    #   path to PDB file (existing or to download)
-    pdb_all = []
-    for p in i:
-        if os.path.isfile(p):
-            pdb, ext = os.path.splitext(os.path.basename(p))
-            pdb = pdb.replace(".", "_")
-            if ext == ".pdb":
-                pdb_all.append((pdb, p))
-            else:
-                with open(p, "r") as f:
-                    pdb_all.extend(
-                        [(pdb, f"{o}/{pdb}/{pdb}.pdb") for pdb in f.read().splitlines()]
-                    )
-        else:
-            pdb_all.append((p, f"{o}/{p}/{p}.pdb"))
+    pdb_all = fetch_pdb.parse_input(i, o)
 
     if modeller:
         from qp.structure import missing_loops
@@ -121,7 +104,7 @@ def cli(i, o, modeller, protoss, coordination, skip):
         if not os.path.isfile(path):
             click.echo(f"> Fetching PDB file")
             try:
-                fetch_pdb(pdb, path)
+                fetch_pdb.fetch_pdb(pdb, path)
             except ValueError:
                 click.secho("Error fetching PDB file\n", italic=True, fg="red")
                 err["PDB"].append(pdb)
