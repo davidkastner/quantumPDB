@@ -116,7 +116,9 @@ def cli(i, o, modeller, protoss, coordination, skip):
                 click.echo("> MODELLER file found")
             else:
                 click.echo("> Building model")
-                residues = missing_loops.get_residues(path)
+                AA = missing_loops.define_residues()
+                residues = missing_loops.get_residues(path, AA)
+                residues = missing_loops.clean_termini(residues, AA)
                 ali_path = f"{o}/{pdb}/{pdb}.ali"
                 missing_loops.write_alignment(residues, pdb, path, ali_path)
                 missing_loops.build_model(residues, pdb, ali_path, mod_path, optimize)
@@ -152,7 +154,7 @@ def cli(i, o, modeller, protoss, coordination, skip):
 
             try:
                 if protoss:
-                    add_hydrogens.adjust_active_sites(path, metals)
+                    add_hydrogens.adjust_activesites(path, metals)
                     add_hydrogens.rename_nterminal(path)
                 clusters = coordination_spheres.extract_clusters(
                     path, f"{o}/{pdb}", metals,

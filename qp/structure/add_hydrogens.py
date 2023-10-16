@@ -25,7 +25,7 @@ Protoss automatically removes alternative conformations and overlapping entries.
 Download the log file (``key="log"`` in ``add_hydrogens.download``) to see affected atoms. 
 
 Some metal-coordinating residues may be incorrectly protonated. Use 
-``add_hydrogens.adjust_active_sites(path, metals)`` with the metal IDs to deprotonate
+``add_hydrogens.adjust_activesites(path, metals)`` with the metal IDs to deprotonate
 these residues. 
 """
 
@@ -113,7 +113,7 @@ def download(job, out, key="protein"):
         f.write(protoss.text)
 
 
-def adjust_active_sites(path, metals):
+def adjust_activesites(path, metals):
     """
     Deprotonates metal-coordinating residues that are (most likely) incorrectly
     protonated by Protoss. Removes hydrogens from coordinating tyrosines and

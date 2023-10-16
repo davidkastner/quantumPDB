@@ -50,32 +50,43 @@ e.io.hetatm = True
 e.io.water = True
 
 #: Amino acid 3 to 1 lookup table
-AA = {
-    "CYS": "C",
-    "ASP": "D",
-    "SER": "S",
-    "GLN": "Q",
-    "LYS": "K",
-    "ILE": "I",
-    "PRO": "P",
-    "THR": "T",
-    "PHE": "F",
-    "ASN": "N",
-    "GLY": "G",
-    "HIS": "H",
-    "LEU": "L",
-    "ARG": "R",
-    "TRP": "W",
-    "ALA": "A",
-    "VAL": "V",
-    "GLU": "E",
-    "TYR": "Y",
-    "MET": "M",
-    "MSE": "M",
-}
+def define_residues():
+    """
+    Access a look up table of standard and non-standard amino acids.
+
+    Returns
+    -------
+    AA: dict
+        Dictionary of standard and non-standard amino acids.
+    """
+    AA = {
+        "CYS": "C",
+        "ASP": "D",
+        "SER": "S",
+        "GLN": "Q",
+        "LYS": "K",
+        "ILE": "I",
+        "PRO": "P",
+        "THR": "T",
+        "PHE": "F",
+        "ASN": "N",
+        "GLY": "G",
+        "HIS": "H",
+        "LEU": "L",
+        "ARG": "R",
+        "TRP": "W",
+        "ALA": "A",
+        "VAL": "V",
+        "GLU": "E",
+        "TYR": "Y",
+        "MET": "M",
+        "MSE": "M",
+    }
+
+    return AA
 
 
-def get_residues(path):
+def get_residues(path, AA):
     """
     Extracts residues from a PDB file, filling in missing residues based on
     sequence number
@@ -160,6 +171,23 @@ def get_residues(path):
                     residues[-1].append(missing[chain][ind[chain]])
                     ind[chain] += 1
 
+    return residues
+
+
+def clean_termini(residues, AA):
+    """
+    Remove unresolve amino acids from the N- and C-termini
+
+    Parameters
+    ----------
+    residues: list of list
+        Residues by chain. Stored as a tuple
+    
+    Returns
+    -------
+    residues: list of list
+        Residues by chain. Stored as a tuple without unresolved termini
+    """
     # Clean the C-terminus
     for chain_res in residues:
         # Check from the end
@@ -182,7 +210,7 @@ def get_residues(path):
         # Handle N-terminal unresolved amino acids (existing logic)
         while chain_res and chain_res[0][2] == "R" and chain_res[0][1] in AA.values():
             chain_res.pop(0)
-
+    
     return residues
 
 
