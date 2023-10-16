@@ -215,7 +215,7 @@ def write_alignment(residues, pdb, path, out):
         f.write(f">P1;{pdb}_fill\nsequence:::::::::\n{seq_fill}*\n")
 
 
-def fix_pdb_numbering(pdb_content):
+def fix_numbering(pdb_content):
     """Handles insertion codes from Modeller."""
 
     lines = pdb_content.split('\n')
@@ -340,7 +340,7 @@ def build_model(residues, pdb, ali, out, optimize=1):
         with open(file, 'r') as f:
             content = f.read()
 
-        corrected_content = fix_pdb_numbering(content)
+        corrected_content = fix_numbering(content)
         with open(file, 'w') as f:
             f.write(corrected_content)
 
