@@ -145,7 +145,7 @@ def scale_hydrogen(a, b, scale):
     return scale * (q - p) + p
 
 
-def construct_hydrogen(chain, parent, template, atom):
+def build_hydrogen(chain, parent, template, atom):
     """
     Cap with hydrogen, building based on the upstream or downstream residue
 
@@ -180,7 +180,7 @@ def construct_hydrogen(chain, parent, template, atom):
     return chain[res_id]
 
 
-def construct_heavy(chain, parent, template, atom):
+def build_heavy(chain, parent, template, atom):
     """
     Cap with ACE/NME, building based on the upstream or downstream residue
 
@@ -279,9 +279,9 @@ def cap_chains(model, residues, capping):
                 and Polypeptide.is_aa(pre)
             ):  # ignores hetero residues
                 if capping == 1:
-                    cap_residues.add(construct_hydrogen(chain, res, pre, "N"))
+                    cap_residues.add(build_hydrogen(chain, res, pre, "N"))
                 else:
-                    cap_residues.add(construct_heavy(chain, res, pre, "N"))
+                    cap_residues.add(build_heavy(chain, res, pre, "N"))
 
         if ind < len(chain_list) - 1:
             nxt = chain_list[ind + 1]
@@ -292,9 +292,9 @@ def cap_chains(model, residues, capping):
                 and Polypeptide.is_aa(nxt)
             ):
                 if capping == 1:
-                    cap_residues.add(construct_hydrogen(chain, res, nxt, "C"))
+                    cap_residues.add(build_hydrogen(chain, res, nxt, "C"))
                 else:
-                    cap_residues.add(construct_heavy(chain, res, nxt, "C"))
+                    cap_residues.add(build_heavy(chain, res, nxt, "C"))
 
     return cap_residues
 
