@@ -244,7 +244,18 @@ def write_alignment(residues, pdb, path, out):
 
 
 def fix_numbering(pdb_content):
-    """Handles insertion codes from Modeller."""
+    """Handles insertion codes from Modeller.
+    
+    Parameters
+    ----------
+    pdb_content : str
+        Contents of a PDB as a str with line breaks.
+
+    Returns
+    -------
+    pdb_content :str
+        Contents of a PDB as a str with line breaks.
+    """
 
     lines = pdb_content.split('\n')
     new_lines = []
@@ -275,8 +286,9 @@ def fix_numbering(pdb_content):
             new_lines.append(line)
         else:
             new_lines.append(line)
-
-    return '\n'.join(new_lines)
+    
+    pdb_content = '\n'.join(new_lines)
+    return pdb_content
 
 
 def build_model(residues, pdb, ali, out, optimize=1):
