@@ -133,7 +133,7 @@ git stash drop
 git pull
 ```
 ## 6. Areas of active development
-Currently working on handling all edge cases, including non-canonical amino acids. Additionally, support for mmCIFs will eventually needed to be added to work with newer and larger PDBs. 
+Currently working on handling all edge cases, including non-canonical amino acids. Additionally, support for mmCIFs will eventually needed to be added to work with newer and larger PDBs. Documentation is present for all functions in the code, but should be added with external examples for use. 
 
 ### Copyright
 
