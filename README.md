@@ -17,6 +17,7 @@ QuantumPDB
     * Examples
 5. **Developer Guide**
     * GitHub refresher
+6. **Areas of Active Development**    
 
 
 ## 1. Overview
@@ -131,7 +132,8 @@ git stash push --include-untracked
 git stash drop
 git pull
 ```
-
+## 6. Areas of active development
+Currently working on handling all edge cases, including non-canonical amino acids. Additionally, support for mmCIFs will eventually needed to be added to work with newer and larger PDBs. 
 
 ### Copyright
 
