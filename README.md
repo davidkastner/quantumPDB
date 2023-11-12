@@ -28,7 +28,7 @@ File Structure overview: [Miro Board](https://miro.com/app/board/uXjVPSPcRKQ=/?s
 ![Software Diagram](https://raw.githubusercontent.com/davidkastner/quantumPDB/main/docs/_static/QuantumPDB.png)
 
 ## 2. Installation
-Install the package by running the follow commands inside the repository. This will perform a developmental version install. It is good practice to do this inside of a virtual environment. A yaml environmental file has been created to automate the installation of dependencies.
+Install the package by running the follow commands inside the repository. This will perform a developmental version install. It is good practice to do this inside of a virtual environment. A yaml environmental file has been created to facilitate the installation of dependencies.
 
 ### Setup developing environment
 To begin working with quantumPDB, first clone the repo and then move into the top-level directory of the package.
