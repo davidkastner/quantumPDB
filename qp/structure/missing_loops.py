@@ -187,8 +187,14 @@ def clean_termini(residues, AA):
     -------
     residues: list of list
         Residues by chain. Stored as a tuple without unresolved termini
+
+    Notes
+    -----
+    Currently not being used because it does not work and broke the package.
+    Leaving it here for troubleshooting purposes.
+
     """
-    # Clean the C-terminus
+    # Loop over chains
     for chain_res in residues:
         # Check from the end
         i = len(chain_res) - 1
@@ -385,3 +391,7 @@ def build_model(residues, pdb, ali, out, optimize=1):
             f.write(corrected_content)
 
     os.chdir(cwd)
+
+# def strip_ends_from_ali(ali_path):
+    
+    
