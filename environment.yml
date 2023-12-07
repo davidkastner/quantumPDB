@@ -4,6 +4,7 @@ channels:
   - salilab
   - defaults
 dependencies:
+  - adjusttext
   - biopython
   - black
   - click
@@ -13,8 +14,10 @@ dependencies:
   - pandas
   - pip
   - requests
+  - scikit-learn
   - scipy
   - seaborn
+  - tqdm
   - pip:
       - sphinx_rtd_theme==0.5.2
       - sphinx-autoapi

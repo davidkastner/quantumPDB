@@ -25,6 +25,7 @@ print("GitHub: https://github.com/davidkastner/quantumpdb")
 print("Documenation: https://quantumpdb.readthedocs.io\n")
 
 import os
+import sys
 import click
 from Bio.PDB.PDBExceptions import PDBIOException
 
@@ -37,7 +38,13 @@ from Bio.PDB.PDBExceptions import PDBIOException
 @click.option("--coordination", "-c", is_flag=True, help="Select the first, second, etc. coordination spheres")
 @click.option("--skip", "-s", type=click.Choice(["modeller", "protoss", "all"]), is_flag=False, flag_value="all",
                               help="Skips rerunning MODELLER or Protoss if an existing output file is found")
-def cli(i, o, modeller, protoss, coordination, skip):
+def cli(i,
+        o,
+        modeller,
+        protoss,
+        coordination,
+        skip,
+        charge_pca,):
     """
     The overall command-line interface (CLI) entry point.
     The CLI interacts with the rest of the package.
@@ -48,6 +55,7 @@ def cli(i, o, modeller, protoss, coordination, skip):
     It also improves long-term maintainability and readability.
 
     """
+
     from qp.checks import fetch_pdb
     o = os.path.abspath(o)
     pdb_all = fetch_pdb.parse_input(i, o)
@@ -182,7 +190,6 @@ def cli(i, o, modeller, protoss, coordination, skip):
     for k, v in err.items():
         if v:
             click.echo(click.style(k + " errors: ", bold=True, fg="red") + ", ".join(v))
-
 
 if __name__ == "__main__":
     # Run the command-line interface when this script is executed
