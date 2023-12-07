@@ -193,7 +193,8 @@ def caclulate_pca(csv_name):
     # Selecting all features except the first two columns
     features = data.columns[2:]
     x = data.loc[:, features].values
-    pdb_ids = data.iloc[:, 0].values  # Adjust the index if 'pdb_id' is not the first column
+    pdb_ids = data.iloc[:, 0].values  # Assumed first column
+    chains = data.iloc[:, 1].values  # Assumed second column
 
     # Standardizing the features
     x = StandardScaler().fit_transform(x)
@@ -202,6 +203,12 @@ def caclulate_pca(csv_name):
     pca = PCA(n_components=2)
     principalComponents = pca.fit_transform(x)
     principalDf = pd.DataFrame(data=principalComponents, columns=['PC1', 'PC2'])
+    
+    # Save out the PCA analysis as a csv
+    principalDf.insert(0, 'Chain', chains)
+    principalDf.insert(0, 'PDB_ID', pdb_ids)
+    principalDf.to_csv('charge_pca.csv', index=False)
+
 
     # Print the composition of principal components with feature names
     print("PCA Component 1:")
