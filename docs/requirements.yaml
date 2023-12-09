@@ -4,12 +4,9 @@ dependencies:
     # Base depends
   - python
   - pip
-
-    # Package depends
   - matplotlib
   - numpy
   - pandas
-  - pytorch
   - seaborn
   - scikit-learn
 
