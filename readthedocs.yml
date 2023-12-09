@@ -7,11 +7,5 @@ build:
   tools:
     python: "3.8"
 
-python:
-  version: 3.8
-  install:
-    - method: pip
-      path: .
-
 conda:
   environment: docs/requirements.yaml
