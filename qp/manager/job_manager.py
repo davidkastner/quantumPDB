@@ -1,4 +1,4 @@
-"""Submits DFT single point calcultions."""
+"""Manager for submitting DFT single point calcultions."""
 
 import os
 import glob
@@ -86,66 +86,6 @@ def get_charge():
     
     return charge
 
-def write_scripts(coordinate_file,
-                  basis, 
-                  method, 
-                  charge, 
-                  multiplicity,
-                  guess, 
-                  constraint_freeze, 
-                  job_name,
-                  gpus,
-                  memory):
-    """Generate TeraChem submission scripts."""
-
-    qmscript_content = f"""levelshift yes
-levelshiftvala 1.0
-levelshiftvalb 0.1
-new_minimizer yes
-run minimize
-coordinates {coordinate_file}
-basis {basis}
-method {method}
-charge {charge}
-spinmult {multiplicity}
-guess {guess}
-maxit 500 
-dftd d3
-scrdir ./scr
-pcm cosmo
-epsilon 10
-pcm_matrix no
-scf diis+a
-pcm_radii read
-pcm_radii_file /home/kastner/reference/pcm_radii
-ml_prop yes
-end
-
-{constraint_freeze}
-"""
-
-    # jobscript.sh
-    jobscript_content = f"""#!/bin/bash
-#$ -N Z{job_name}
-#$ -cwd
-#$ -l h_rt=300:00:00
-#$ -l h_rss={memory}
-#$ -q (gpusnew|gpus|gpusbig)
-#$ -l gpus=1
-#$ -pe smp {gpus}
-# -fin qmscript.in
-# -fin *.xyz
-# -fout scr/
-
-module load cuda/10.0
-module load terachem/071920-cuda10.0-intel16
-module load intel/16.0.109
-export OMP_NUM_THREADS={gpus}
-terachem qmscript.in > $SGE_O_WORKDIR/qmscript.out
-"""
-
-    return jobscript_content, qmscript_content
-
 
 def submit_jobs(job_count, basis, method, guess, ions, constraint_freeze, gpus, memory):
     """Generate and submit jobs to queueing system."""
@@ -185,6 +125,8 @@ def submit_jobs(job_count, basis, method, guess, ions, constraint_freeze, gpus, 
                 if constraint_freeze:
                     heavy_list = find_heavy()
                     constraint_freeze = f"$constraint_freeze\n{heavy_list}\n$end"
+                else:
+                    constraint_freeze = ""
 
                 os.chdir(current_directory)
                 
@@ -197,29 +139,90 @@ def submit_jobs(job_count, basis, method, guess, ions, constraint_freeze, gpus, 
                 pdb_name = os.path.basename(pdb)
                 structure_name = os.path.basename(structure)
                 job_name = f"{ion}{pdb_name}{structure_name}"
-                jobscript, qmscript = write_scripts(coord_name,
-                                                    basis, 
-                                                    method, 
-                                                    charge, 
-                                                    multiplicity,
-                                                    guess, 
-                                                    constraint_freeze, 
-                                                    job_name,
-                                                    gpus,
-                                                    memory)
+                qmscript = write_qmscript(coord_name,
+                                          basis, 
+                                          method, 
+                                          charge, 
+                                          multiplicity,
+                                          guess, 
+                                          constraint_freeze)
+
+                jobscript = write_jobscript(job_name,
+                                            gpus,
+                                            memory)
   
                 with open(os.path.join(ion_path, 'qmscript.in'), 'w') as f:
                     f.write(qmscript)
                 with open(os.path.join(ion_path, 'jobscript.sh'), 'w') as f:
                     f.write(jobscript)
-
-                # Submit the job
                 os.system(f'cd {ion_path} && qsub jobscript.sh')
 
                 job_count -= 1
                 if job_count <= 0:
                     return
 
+def write_qmscript(coordinate_file,
+                  basis, 
+                  method, 
+                  charge, 
+                  multiplicity,
+                  guess, 
+                  constraint_freeze):
+    """Generate TeraChem job submission scripts."""
+
+    qmscript_content = f"""levelshift yes
+levelshiftvala 1.0
+levelshiftvalb 0.1
+new_minimizer yes
+run minimize
+coordinates {coordinate_file}
+basis {basis}
+method {method}
+charge {charge}
+spinmult {multiplicity}
+guess {guess}
+maxit 500 
+dftd d3
+scrdir ./scr
+pcm cosmo
+epsilon 10
+pcm_matrix no
+scf diis+a
+pcm_radii read
+pcm_radii_file /home/kastner/reference/pcm_radii
+ml_prop yes
+end
+
+{constraint_freeze}
+"""
+
+    return qmscript_content
+
+def write_jobscript(job_name,
+                  gpus,
+                  memory):
+    """Generate bash submission scripts."""
+
+    jobscript_content = f"""#!/bin/bash
+#$ -N Z{job_name}
+#$ -cwd
+#$ -l h_rt=300:00:00
+#$ -l h_rss={memory}
+#$ -q (gpusnew|gpus|gpusbig)
+#$ -l gpus=1
+#$ -pe smp {gpus}
+# -fin qmscript.in
+# -fin *.xyz
+# -fout scr/
+
+module load cuda/10.0
+module load terachem/071920-cuda10.0-intel16
+module load intel/16.0.109
+export OMP_NUM_THREADS={gpus}
+terachem qmscript.in > $SGE_O_WORKDIR/qmscript.out
+"""
+
+    return jobscript_content
 
 if __name__ == '__main__':
 
@@ -230,14 +233,14 @@ if __name__ == '__main__':
         basis = "lacvps_ecp"
         guess = "generate"
         ions = ['Fe2','Fe3']
-        constraint_freeze = ""
+        constraint_freeze = False
         gpus = 2
         memory = "16G"
     elif method == "ugfn2xtb":
         basis = "gfn2xtb"
         guess = "hcore"
         ions = ['Fe2','Fe3']
-        constraint_freeze = ""
+        constraint_freeze = False
         gpus = 1
         memory = "8G"
     elif method == "gfn2xtb":
