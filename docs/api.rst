@@ -9,3 +9,4 @@ API Documentation
    qp.structure
    qp.cluster
    qp.cli
+   qp.manager
