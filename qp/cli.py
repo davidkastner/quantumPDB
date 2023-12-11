@@ -34,7 +34,7 @@ def cli():
     print("Submit QM calculations: qp submit -j\n")
 
 
-@click.command()
+@cli.command()
 @click.option("-i", required=True, multiple=True, help="Input PDB code, PDB file, or batch file")
 @click.option("-o", required=True, type=click.Path(file_okay=False), help="Output directory")
 @click.option("--modeller", "-m", is_flag=True, help="Use MODELLER to add missing loops")
@@ -188,12 +188,13 @@ def run(i,
 
 @cli.command()
 @click.option("--job_manager", "-j", is_flag=True, help="Submit qp generated QM jobs")
+@click.option("--find_incomplete", "-f", is_flag=True, help="Find failed structures")
 def submit(job_manager,
-        ):
+           find_incomplete,):
     """Handles the submission of jobs for the quantumPDB."""
-    from qp.manager import job_manager
 
     if job_manager:
+        from qp.manager import job_manager
         job_count = int(input("   > Jobs count to be submitted in this batch: "))
         method = input("   > Requested functional (e.g. uwpbeh): ").lower()
 
@@ -220,6 +221,10 @@ def submit(job_manager,
             memory = "8G"
 
         job_manager.submit_jobs(job_count, basis, method, guess, ions, constraint_freeze, gpus, memory)
+
+        if find_incomplete:
+            from qp.manager import find_incomplete
+            find_incomplete.find()
 
 
 
