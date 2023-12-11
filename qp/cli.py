@@ -16,18 +16,22 @@ Options:
 
 """
 
-# Print first to welcome the user while it waits to load the modules
-print("\n.-------------------------------.")
-print("| WELCOME TO THE QUANTUMPDB CLI |")
-print(".-------------------------------.")
-print("Default programmed actions for the quantumPDB package.")
-print("GitHub: https://github.com/davidkastner/quantumpdb")
-print("Documenation: https://quantumpdb.readthedocs.io\n")
-
 import os
 import sys
 import click
 from Bio.PDB.PDBExceptions import PDBIOException
+
+@click.group()
+def cli():
+    # Print first to welcome the user while it waits to load the modules
+    print("\n.-------------------------------.")
+    print("| WELCOME TO THE QUANTUMPDB CLI |")
+    print(".-------------------------------.")
+    print("Default programmed actions for the quantumPDB package.")
+    print("GitHub: https://github.com/davidkastner/quantumpdb")
+    print("Documenation: https://quantumpdb.readthedocs.io\n")
+    print("Run the workflow: qp run -i pdbs.txt -o datasets/ -m -p -c")
+    print("Submit QM calculations: qp submit -j\n")
 
 
 @click.command()
@@ -38,23 +42,13 @@ from Bio.PDB.PDBExceptions import PDBIOException
 @click.option("--coordination", "-c", is_flag=True, help="Select the first, second, etc. coordination spheres")
 @click.option("--skip", "-s", type=click.Choice(["modeller", "protoss", "all"]), is_flag=False, flag_value="all",
                               help="Skips rerunning MODELLER or Protoss if an existing output file is found")
-def cli(i,
+def run(i,
         o,
         modeller,
         protoss,
         coordination,
-        skip,
-        charge_pca,):
-    """
-    The overall command-line interface (CLI) entry point.
-    The CLI interacts with the rest of the package.
-
-    A complete reference of quantumPDB functionality.
-    This is advantagous because it quickly introduces the package.
-    Specifically, to the complete scope of available functionality.
-    It also improves long-term maintainability and readability.
-
-    """
+        skip,):
+    """Generates quantumPDB structures and files."""
 
     from qp.checks import fetch_pdb
     o = os.path.abspath(o)
@@ -190,6 +184,44 @@ def cli(i,
     for k, v in err.items():
         if v:
             click.echo(click.style(k + " errors: ", bold=True, fg="red") + ", ".join(v))
+
+
+@cli.command()
+@click.option("--job_manager", "-j", is_flag=True, help="Submit qp generated QM jobs")
+def submit(job_manager,
+        ):
+    """Handles the submission of jobs for the quantumPDB."""
+    from qp.manager import job_manager
+
+    if job_manager:
+        job_count = int(input("Enter the number of jobs to be submitted simultaneously: "))
+        method = input("What functional would you like to use (e.g. uwpbeh)? ").lower()
+
+        if method == "uwpbeh":
+            basis = "lacvps_ecp"
+            guess = "generate"
+            ions = ['Fe2','Fe3']
+            constraint_freeze = ""
+            gpus = 2
+            memory = "16G"
+        elif method == "ugfn2xtb":
+            basis = "gfn2xtb"
+            guess = "hcore"
+            ions = ['Fe2','Fe3']
+            constraint_freeze = ""
+            gpus = 1
+            memory = "8G"
+        elif method == "gfn2xtb":
+            basis = "gfn2xtb"
+            guess = "hcore"
+            ions = ['Fe2']
+            constraint_freeze = True
+            gpus = 1
+            memory = "8G"
+
+        job_manager.submit_jobs(job_count, basis, method, guess, ions, constraint_freeze, gpus, memory)
+
+
 
 if __name__ == "__main__":
     # Run the command-line interface when this script is executed
