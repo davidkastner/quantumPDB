@@ -194,8 +194,8 @@ def submit(job_manager,
     from qp.manager import job_manager
 
     if job_manager:
-        job_count = int(input("Enter the number of jobs to be submitted simultaneously: "))
-        method = input("What functional would you like to use (e.g. uwpbeh)? ").lower()
+        job_count = int(input("   > Jobs count to be submitted in this batch: "))
+        method = input("   > Requested functional (e.g. uwpbeh): ").lower()
 
         if method == "uwpbeh":
             basis = "lacvps_ecp"
