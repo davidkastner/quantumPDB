@@ -196,31 +196,30 @@ def submit(job_manager,
     if job_manager:
         from qp.manager import job_manager
         job_count = int(input("   > Jobs count to be submitted in this batch: "))
-        method = input("   > Requested functional (e.g. uwpbeh): ").lower()
+        method = input("   > Requested functional [uwpbeh]: ").lower() or "uwpbeh"
 
         if method == "uwpbeh":
             basis = "lacvps_ecp"
             guess = "generate"
-            ions = ['Fe2','Fe3']
             constraint_freeze = ""
             gpus = 2
             memory = "16G"
         elif method == "ugfn2xtb":
             basis = "gfn2xtb"
             guess = "hcore"
-            ions = ['Fe2','Fe3']
             constraint_freeze = ""
             gpus = 1
             memory = "8G"
         elif method == "gfn2xtb":
             basis = "gfn2xtb"
             guess = "hcore"
-            ions = ['Fe2']
             constraint_freeze = True
             gpus = 1
             memory = "8G"
+        else:
+            print("We don't have defaults for that method yet.")
 
-        job_manager.submit_jobs(job_count, basis, method, guess, ions, constraint_freeze, gpus, memory)
+        job_manager.submit_jobs(job_count, basis, method, guess,constraint_freeze, gpus, memory)
 
         if find_incomplete:
             from qp.manager import find_incomplete

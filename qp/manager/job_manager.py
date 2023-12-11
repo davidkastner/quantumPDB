@@ -3,6 +3,9 @@
 import os
 import glob
 import shutil
+import requests
+import pandas as pd
+from io import StringIO
 from itertools import groupby
 from operator import itemgetter
 
@@ -42,17 +45,40 @@ def residue_exists(first_sphere_path, ligand_name):
                 return True
     return False
 
-def get_charge():
+
+def get_oxidation(pdb_id):
+    """Query the local pdb master list CSV file."""
+
+    path_to_master_list = "/home/kastner/projects/quantumPDB/protein_master_list.csv"
+    try:
+        # Read the data into a DataFrame
+        df = pd.read_csv(path_to_master_list)
+
+        # Check if the row with the matching pdb_id exists
+        row = df[df['pdb_id'] == pdb_id]
+        if row.empty:
+            print(f"No data found for pdb_id: {pdb_id}")
+            return None
+
+        # Check for a value in the 'literature_oxidation' column, if not found, use 'pdb_oxidation'
+        if not pd.isna(row['literature_oxidation'].iloc[0]) and row['literature_oxidation'].iloc[0] != '':
+            return int(row['literature_oxidation'].iloc[0])
+        else:
+            return int(row['pdb_oxidation'].iloc[0])
+    except Exception as e:
+        print(f"Error: {e}")
+        return None
+
+
+def get_charge(oxidation):
     """Extract the charge values from charge.csv"""
     current_dir = os.getcwd()
     
     # Calculate relative paths
-    charge_dir = os.path.abspath(os.path.join(current_dir, "../../../"))
-    structure_dir = os.path.abspath(os.path.join(current_dir, "../../"))
+    charge_dir = os.path.abspath(os.path.join(current_dir, "../../"))
+    structure_dir = os.path.abspath(os.path.join(current_dir, "../"))
     charge_csv_path = os.path.join(charge_dir, "charge.csv")
-    metal_path = os.path.join(structure_dir, "0.pdb")
     first_sphere_path = os.path.join(structure_dir, "1.pdb")
-    fe_dir = current_dir.split("/")[-1] # Determine if it is Fe2 or Fe3
     
     charge = 0
     section = 1
@@ -81,13 +107,13 @@ def get_charge():
                 if residue_exists(first_sphere_path, ligand.split('_')[0]):
                     charge += int(value)
     
-    # Add the Fe directory value
-    charge += int(fe_dir[-1])
+    # Add the in the metal oxidation state
+    charge += oxidation
     
     return charge
 
 
-def submit_jobs(job_count, basis, method, guess, ions, constraint_freeze, gpus, memory):
+def submit_jobs(job_count, basis, method, guess, constraint_freeze, gpus, memory):
     """Generate and submit jobs to queueing system."""
 
     pdb_dirs = sorted([d for d in os.listdir() if os.path.isdir(d) and not d == 'Protoss'])
@@ -99,67 +125,70 @@ def submit_jobs(job_count, basis, method, guess, ions, constraint_freeze, gpus, 
             qm_path = os.path.join(structure, method)
             os.makedirs(qm_path, exist_ok=True)
 
-            for ion in ions:
-                ion_path = os.path.join(qm_path, ion)
-                os.makedirs(ion_path, exist_ok=True)
-                if os.path.exists(os.path.join(ion_path, 'qmscript.out')):
-                    continue
-                
-                # Remove the log files
-                for file in glob.glob(os.path.join(ion_path, 'Z*')):
-                    os.remove(file)
+            # Check to see if a job has already been run here
+            if os.path.exists(os.path.join(qm_path, 'qmscript.out')):
+                continue
+            
+            # Remove previous slurm log files
+            for file in glob.glob(os.path.join(qm_path, 'Z*')):
+                os.remove(file)
 
-                # Move the xyz file into the QM job directory
-                xyz_files = glob.glob(os.path.join(structure, '*.xyz'))
-                if len(xyz_files) != 1:
-                    print(f"Error: Expected 1 xyz file in {structure}, found {len(xyz_files)}")
-                    continue
-                coord_file = os.path.join(ion_path, os.path.basename(xyz_files[0]))
-                shutil.copy(xyz_files[0], coord_file)
+            # Move the xyz file into the QM job directory
+            xyz_files = glob.glob(os.path.join(structure, '*.xyz'))
+            if len(xyz_files) != 1:
+                print(f"Error: Expected 1 xyz file in {structure}, found {len(xyz_files)}")
+                continue
+            coord_file = os.path.join(qm_path, os.path.basename(xyz_files[0]))
+            shutil.copy(xyz_files[0], coord_file)
 
-                # Get total charge
-                current_directory = os.getcwd()
-                os.chdir(ion_path)
-                charge = get_charge()
+            # Get total charge
+            current_directory = os.getcwd()
+            os.chdir(qm_path)
 
-                if constraint_freeze:
-                    heavy_list = find_heavy()
-                    constraint_freeze = f"$constraint_freeze\n{heavy_list}\n$end"
-                else:
-                    constraint_freeze = ""
+            oxidation = get_oxidation(pdb.lower())
+            charge = get_charge(oxidation)
 
-                os.chdir(current_directory)
-                
-                if method[0] == "u":
-                    multiplicity = 5 if ion == 'Fe2' else 6
-                else:
-                    multiplicity = 1
+            # Get atoms to restrain if requested
+            if constraint_freeze:
+                heavy_list = find_heavy()
+                constraint_freeze = f"$constraint_freeze\n{heavy_list}\n$end"
+            else:
+                constraint_freeze = ""
 
-                coord_name = os.path.basename(coord_file)
-                pdb_name = os.path.basename(pdb)
-                structure_name = os.path.basename(structure)
-                job_name = f"{ion}{pdb_name}{structure_name}"
-                qmscript = write_qmscript(coord_name,
-                                          basis, 
-                                          method, 
-                                          charge, 
-                                          multiplicity,
-                                          guess, 
-                                          constraint_freeze)
+            # Determine multiplicity
+            os.chdir(current_directory)
+            if method[0] == "u":
+                multiplicity = 5 if oxidation == 2 else 6
+            else:
+                multiplicity = 1
 
-                jobscript = write_jobscript(job_name,
-                                            gpus,
-                                            memory)
-  
-                with open(os.path.join(ion_path, 'qmscript.in'), 'w') as f:
-                    f.write(qmscript)
-                with open(os.path.join(ion_path, 'jobscript.sh'), 'w') as f:
-                    f.write(jobscript)
-                os.system(f'cd {ion_path} && qsub jobscript.sh')
+            coord_name = os.path.basename(coord_file)
+            pdb_name = os.path.basename(pdb)
+            structure_name = os.path.basename(structure)
+            job_name = f"{pdb_name}{structure_name}"
+            
+            # Generate TeraChem job script contents
+            qmscript = write_qmscript(coord_name,
+                                        basis, 
+                                        method, 
+                                        charge, 
+                                        multiplicity,
+                                        guess, 
+                                        constraint_freeze)
 
-                job_count -= 1
-                if job_count <= 0:
-                    return
+            jobscript = write_jobscript(job_name,
+                                        gpus,
+                                        memory)
+
+            with open(os.path.join(qm_path, 'qmscript.in'), 'w') as f:
+                f.write(qmscript)
+            with open(os.path.join(qm_path, 'jobscript.sh'), 'w') as f:
+                f.write(jobscript)
+            os.system(f'cd {qm_path} && qsub jobscript.sh')
+
+            job_count -= 1
+            if job_count <= 0:
+                return
 
 def write_qmscript(coordinate_file,
                   basis, 
@@ -232,23 +261,22 @@ if __name__ == '__main__':
     if method == "uwpbeh":
         basis = "lacvps_ecp"
         guess = "generate"
-        ions = ['Fe2','Fe3']
         constraint_freeze = False
-        gpus = 2
+        gpus = 1
         memory = "16G"
     elif method == "ugfn2xtb":
         basis = "gfn2xtb"
         guess = "hcore"
-        ions = ['Fe2','Fe3']
         constraint_freeze = False
         gpus = 1
         memory = "8G"
     elif method == "gfn2xtb":
         basis = "gfn2xtb"
         guess = "hcore"
-        ions = ['Fe2']
         constraint_freeze = True
         gpus = 1
         memory = "8G"
 
-    submit_jobs(job_count, basis, method, guess, ions, constraint_freeze, gpus, memory)
+    submit_jobs(job_count, basis, method, guess, constraint_freeze, gpus, memory)
+
+
