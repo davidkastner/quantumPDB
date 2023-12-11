@@ -195,15 +195,24 @@ def submit(job_manager,
 
     if job_manager:
         from qp.manager import job_manager
-        job_count = int(input("   > Jobs count to be submitted in this batch: "))
-        method = input("   > Requested functional [uwpbeh]: ").lower() or "uwpbeh"
+        job_count = click.prompt("> Jobs count to be submitted in this batch", default=80)
+        
+        # Get the users perferred functional
+        choice_map = {"0": "uwpbeh", "1": "ugfn2xtb", "2": "gfn2xtb"}
+        method_number = click.prompt(
+            "> Requested functional:\n   0: [uwpbeh]\n   1: ugfn2xtb\n   2: gfn2xtb\n ",
+            type=click.Choice(["0", "1", "2"]),
+            default="0",
+            show_default=False)
+        method = choice_map[method_number]
+        click.echo("")
 
         if method == "uwpbeh":
             basis = "lacvps_ecp"
             guess = "generate"
             constraint_freeze = ""
-            gpus = 2
-            memory = "16G"
+            gpus = 1
+            memory = "8G"
         elif method == "ugfn2xtb":
             basis = "gfn2xtb"
             guess = "hcore"
@@ -216,8 +225,6 @@ def submit(job_manager,
             constraint_freeze = True
             gpus = 1
             memory = "8G"
-        else:
-            print("We don't have defaults for that method yet.")
 
         job_manager.submit_jobs(job_count, basis, method, guess,constraint_freeze, gpus, memory)
 
