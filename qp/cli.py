@@ -16,10 +16,7 @@ Options:
 
 """
 
-import os
-import sys
 import click
-from Bio.PDB.PDBExceptions import PDBIOException
 
 @click.group()
 def cli():
@@ -49,8 +46,11 @@ def run(i,
         coordination,
         skip,):
     """Generates quantumPDB structures and files."""
-
+    
+    import os
+    from Bio.PDB.PDBExceptions import PDBIOException
     from qp.checks import fetch_pdb
+
     o = os.path.abspath(o)
     pdb_all = fetch_pdb.parse_input(i, o)
 
@@ -195,6 +195,7 @@ def submit(job_manager,
 
     if job_manager:
         from qp.manager import job_manager
+        
         job_count = click.prompt("> Jobs count to be submitted in this batch", default=80)
         
         # Get the users perferred functional
