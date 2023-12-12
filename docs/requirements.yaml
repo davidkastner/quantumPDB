@@ -7,11 +7,11 @@ dependencies:
   - matplotlib
   - numpy
   - pandas
-  - seaborn
   - scikit-learn
 
     # Pip-only installs
   - pip:
-    - sphinx==6.0.0
-    - sphinx-autoapi
+    - sphinx==5.3.0
+    - sphinx-rtd-theme==0.5.2
+    - sphinx-autoapi==2.1.1
     - https://github.com/revitron/revitron-sphinx-theme/archive/master.zip
