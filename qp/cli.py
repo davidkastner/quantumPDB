@@ -26,10 +26,10 @@ def cli():
     print(".-------------------------------.")
     print("Default programmed actions for the quantumPDB package.")
     print("GitHub: https://github.com/davidkastner/quantumpdb")
-    print("Documenation: https://quantumpdb.readthedocs.io\n")
-    print("Run the workflow: qp run -i pdbs.txt -o datasets/ -m -p -c")
-    print("Submit QM calculations: qp submit -j\n")
-
+    print("Documenation: https://quantumpdb.readthedocs.io")
+    print("Generate new structure: qp run -i pdbs.txt -o datasets/ -m -p -c")
+    print("Submit QM for generate structures: qp submit -j")
+    print("Defaults are indicated with parentheses []\n")
 
 @cli.command()
 @click.option("-i", required=True, multiple=True, help="Input PDB code, PDB file, or batch file")
@@ -197,7 +197,17 @@ def submit(job_manager,
         from qp.manager import job_manager
         
         job_count = click.prompt("> Jobs count to be submitted in this batch", default=80)
-        
+
+        # Single point or geometry optimization
+        choice_map = {"0": False, "1": True}
+        calculation_type = click.prompt(
+            "> Calculation type:\n   0: [single point]\n   1: geometry optimization\n",
+            type=click.Choice(["0", "1"]),
+            default="0",
+            show_default=False)
+        minimization = choice_map[calculation_type]
+        click.echo("")
+
         # Get the users perferred functional
         choice_map = {"0": "uwpbeh", "1": "ugfn2xtb", "2": "gfn2xtb"}
         method_number = click.prompt(
@@ -211,23 +221,20 @@ def submit(job_manager,
         if method == "uwpbeh":
             basis = "lacvps_ecp"
             guess = "generate"
-            constraint_freeze = ""
             gpus = 1
             memory = "8G"
         elif method == "ugfn2xtb":
             basis = "gfn2xtb"
             guess = "hcore"
-            constraint_freeze = ""
             gpus = 1
             memory = "8G"
         elif method == "gfn2xtb":
             basis = "gfn2xtb"
             guess = "hcore"
-            constraint_freeze = True
             gpus = 1
             memory = "8G"
 
-        job_manager.submit_jobs(job_count, basis, method, guess,constraint_freeze, gpus, memory)
+        job_manager.submit_jobs(job_count, minimization, basis, method, guess, gpus, memory)
 
         if find_incomplete:
             from qp.manager import find_incomplete
