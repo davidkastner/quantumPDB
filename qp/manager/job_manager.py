@@ -113,7 +113,7 @@ def get_charge(oxidation):
     return charge
 
 
-def submit_jobs(job_count, basis, method, guess, constraint_freeze, gpus, memory):
+def submit_jobs(job_count, minimization, basis, method, guess, gpus, memory):
     """Generate and submit jobs to queueing system."""
 
     pdb_dirs = sorted([d for d in os.listdir() if os.path.isdir(d) and not d == 'Protoss'])
@@ -149,7 +149,7 @@ def submit_jobs(job_count, basis, method, guess, constraint_freeze, gpus, memory
             charge = get_charge(oxidation)
 
             # Get atoms to restrain if requested
-            if constraint_freeze:
+            if minimization:
                 heavy_list = find_heavy()
                 constraint_freeze = f"$constraint_freeze\n{heavy_list}\n$end"
             else:
@@ -168,17 +168,18 @@ def submit_jobs(job_count, basis, method, guess, constraint_freeze, gpus, memory
             job_name = f"{pdb_name}{structure_name}"
             
             # Generate TeraChem job script contents
-            qmscript = write_qmscript(coord_name,
-                                        basis, 
-                                        method, 
-                                        charge, 
-                                        multiplicity,
-                                        guess, 
-                                        constraint_freeze)
+            qmscript = write_qmscript(minimization,
+                                      coord_name,
+                                      basis, 
+                                      method, 
+                                      charge, 
+                                      multiplicity,
+                                      guess, 
+                                      constraint_freeze,)
 
             jobscript = write_jobscript(job_name,
                                         gpus,
-                                        memory)
+                                        memory,)
 
             with open(os.path.join(qm_path, 'qmscript.in'), 'w') as f:
                 f.write(qmscript)
@@ -190,7 +191,8 @@ def submit_jobs(job_count, basis, method, guess, constraint_freeze, gpus, memory
             if job_count <= 0:
                 return
 
-def write_qmscript(coordinate_file,
+def write_qmscript(minimzation,
+                  coordinate_file,
                   basis, 
                   method, 
                   charge, 
@@ -199,12 +201,11 @@ def write_qmscript(coordinate_file,
                   constraint_freeze):
     """Generate TeraChem job submission scripts."""
 
+    minimization_keywords = """new_minimizer yes\nrun minimize\n""" if minimzation == True else ""
     qmscript_content = f"""levelshift yes
-levelshiftvala 1.0
-levelshiftvalb 0.1
-new_minimizer yes
-run minimize
-coordinates {coordinate_file}
+levelshiftvala 0.25
+levelshiftvalb 0.25
+{minimization_keywords}coordinates {coordinate_file}
 basis {basis}
 method {method}
 charge {charge}
@@ -257,26 +258,22 @@ if __name__ == '__main__':
 
     job_count = int(input("Enter the number of jobs to be submitted simultaneously: "))
     method = input("What functional would you like to use (e.g. uwpbeh)? ").lower()
+    minimization = False
 
     if method == "uwpbeh":
         basis = "lacvps_ecp"
         guess = "generate"
-        constraint_freeze = False
         gpus = 1
         memory = "16G"
     elif method == "ugfn2xtb":
         basis = "gfn2xtb"
         guess = "hcore"
-        constraint_freeze = False
         gpus = 1
         memory = "8G"
     elif method == "gfn2xtb":
         basis = "gfn2xtb"
         guess = "hcore"
-        constraint_freeze = True
         gpus = 1
         memory = "8G"
 
-    submit_jobs(job_count, basis, method, guess, constraint_freeze, gpus, memory)
-
-
+    submit_jobs(job_count, minimization, basis, method, guess, gpus, memory)
