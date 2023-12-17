@@ -188,9 +188,9 @@ def run(i,
 
 @cli.command()
 @click.option("--job_manager", "-j", is_flag=True, help="Submit qp generated QM jobs")
-@click.option("--find_incomplete", "-f", is_flag=True, help="Find failed structures")
+@click.option("--failure_checkup", "-f", is_flag=True, help="Find failed structures")
 def submit(job_manager,
-           find_incomplete,):
+           failure_checkup,):
     """Handles the submission of jobs for the quantumPDB."""
 
     if job_manager:
@@ -236,9 +236,9 @@ def submit(job_manager,
 
         job_manager.submit_jobs(job_count, minimization, basis, method, guess, gpus, memory)
 
-        if find_incomplete:
-            from qp.manager import find_incomplete
-            find_incomplete.find()
+    if failure_checkup:
+        from qp.manager import failure_checkup
+        failure_checkup.main()
 
 
 
