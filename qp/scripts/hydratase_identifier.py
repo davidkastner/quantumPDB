@@ -5,6 +5,7 @@ import warnings
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
 from Bio.PDB import PDBParser, calc_dihedral
 from Bio.PDB.PDBExceptions import PDBConstructionWarning
 
@@ -70,12 +71,12 @@ def print_extremes(all_data, start_time, plot_name):
     print(
         f"""
         ------------------------------RESULTS-------------------------------
-        RESULT: Highest distance: {round(highest_distance["Distance"], 2)} Å from {highest_distance["Filename"]} -> {highest_distance["Residue"]}
-                Lowest distance: {round(lowest_distance["Distance"], 2)} Å from {lowest_distance["Filename"]} -> {lowest_distance["Residue"]}
-                Highest dihedral: {round(highest_dihedral["Dihedral"], 2)}° from {highest_dihedral["Filename"]} -> {highest_dihedral["Residue"]}
-                Lowest dihedral: {round(lowest_dihedral["Dihedral"], 2)}° from {lowest_dihedral["Filename"]} -> {lowest_dihedral["Residue"]}
-        OUTPUT: Generated a plot {plot_name}.
-        TIME: Total execution time: {total_time} seconds.
+        RESULT:  Highest distance: {round(highest_distance["Distance"], 2)} Å from {highest_distance["Filename"]} -> {highest_distance["Residue"]}
+                 Lowest distance: {round(lowest_distance["Distance"], 2)} Å from {lowest_distance["Filename"]} -> {lowest_distance["Residue"]}
+                 Highest dihedral: {round(highest_dihedral["Dihedral"], 2)}° from {highest_dihedral["Filename"]} -> {highest_dihedral["Residue"]}
+                 Lowest dihedral: {round(lowest_dihedral["Dihedral"], 2)}° from {lowest_dihedral["Filename"]} -> {lowest_dihedral["Residue"]}
+        OUTPUT:  Generated a plot {plot_name}.
+        TIME:    Total execution time: {total_time} seconds.
         --------------------------------------------------------------------\n
         """
     )
@@ -84,7 +85,8 @@ def get_kde_plot(all_data, plot_name):
     """Generate and save a KDE plot of the data."""
     df = pd.DataFrame(all_data, columns=['Distance', 'Dihedral', 'Filename', 'Residue'])
     plt.figure(figsize=(5, 4))
-    sns.kdeplot(data=df, x='Distance', y='Dihedral', cmap="bone_r", fill=True, bw_adjust=0.6)
+    cmap = LinearSegmentedColormap.from_list('custom_cmap', ["#F1F8FF", "#002349"])
+    sns.kdeplot(data=df, x='Distance', y='Dihedral', cmap=cmap, fill=True, bw_adjust=.5, cbar=True)
     plt.xlabel('distance (Å)', fontsize=12, fontweight='bold')
     plt.ylabel('dihedral angle (°)', fontsize=12, fontweight='bold')
     plt.savefig(plot_name, bbox_inches="tight", format="png", dpi=600)
