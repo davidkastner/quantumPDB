@@ -72,10 +72,13 @@ After performing the developer install, the CLI can be called from anywhere usin
     │   ├── missing_loops          # Use modeller to add missing loops
     │   ├── protoss_upload         # Upload a PDB to Protoss to add hydrogens
     │   └── protoss_download       # Get the structure with hydrogens
-    └── clusters                   # Generalizable plotting and vizualization
-        ├── find_metal             # Identify the metal center
-        └── coordination_shells    # Select the first, second, etc. spheres
-
+    ├── clusters                   # Generalizable plotting and vizualization
+    │   ├── find_metal             # Identify the metal center
+    │   └── coordination_shells    # Select the first, second, etc. spheres
+    └── manager  
+        ├── failure_checkup
+        ├── find_incomplete
+        └── job_manager
 ```
 
 
