@@ -63,18 +63,12 @@ After performing the developer install, the CLI can be called from anywhere usin
     |── cli.py                     # Command-line interface entry point
     ├── checks                     # Perform quality and structural checks
     │   ├── fetch_pdb              # Get a PDB
-    │   ├── check_edia             # Check the quality of each chain
-    │   ├── choose_conformer       # Choose the best conformer
-    │   ├── to_pdb                 # Save structure to a new PDB
     │   └── to_xyz                 # Save structure to a new XYZ
     ├── structure                  # Correct the PDB structure
-    │   ├── missing_hetatoms       # Add any missing heteroatoms
     │   ├── missing_loops          # Use modeller to add missing loops
-    │   ├── protoss_upload         # Upload a PDB to Protoss to add hydrogens
-    │   └── protoss_download       # Get the structure with hydrogens
+    │   └── add_hydrogens          # Get the structure with hydrogens
     ├── clusters                   # Generalizable plotting and vizualization
-    │   ├── find_metal             # Identify the metal center
-    │   └── coordination_shells    # Select the first, second, etc. spheres
+    │   └── coordination_spheres   # Select the first, second, etc. spheres
     └── manager  
         ├── failure_checkup
         ├── find_incomplete
