@@ -7,10 +7,10 @@ Options:
 ==================== =====
 -i                   Input PDB code, PDB file, or batch file [required]
 -o                   Output directory  [required]
--m, -\-modeller      Use MODELLER to add missing loops 
--p, -\-protoss       Use Protoss to add hydrogens
--c, -\-coordination  Select the first, second, etc. coordination spheres
--s, -\-skip          Skips rerunning MODELLER or Protoss if an
+-m, --modeller       Use MODELLER to add missing loops 
+-p, --protoss        Use Protoss to add hydrogens
+-c, --coordination   Select the first, second, etc. coordination spheres
+-s, --skip           Skips rerunning MODELLER or Protoss if an
                      existing output file is found
 ==================== =====
 
