@@ -20,7 +20,8 @@ import click
 
 @click.group()
 def cli():
-    # Print first to welcome the user while it waits to load the modules
+    """Print first to welcome the user while it waits to load the modules"""
+    
     print("\n.-------------------------------.")
     print("| WELCOME TO THE QUANTUMPDB CLI |")
     print(".-------------------------------.")
