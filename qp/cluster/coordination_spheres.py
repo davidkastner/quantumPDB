@@ -99,19 +99,18 @@ def get_next_neighbors(start, neighbors, limit, ligands, include_waters=False):
                     ## Added to include ligands in the first coordination sphere
                     ## Produced unweildy clusters as some ligands are large
                     ## Potentially useful in the future
-                    # if i == 0:  # For the first coordination sphere
-                    #     condition = (
-                    #         not Polypeptide.is_aa(par)
-                    #         or (include_waters and par.get_resname() == "HOH")
-                    #         or True  # This ensures all ligands are included in the first coordination sphere
-                    #     )
-                    # else:
-
-                    condition = (
-                        Polypeptide.is_aa(par)
-                        or (include_waters and par.get_resname() == "HOH")
-                        or par.get_resname() in ligands
-                    )
+                    if i == 0:  # For the first coordination sphere
+                        condition = (
+                            not Polypeptide.is_aa(par)
+                            or (include_waters and par.get_resname() == "HOH")
+                            or True  # This ensures all ligands are included in the first coordination sphere
+                        )
+                    else:
+                        condition = (
+                            Polypeptide.is_aa(par)
+                            or (include_waters and par.get_resname() == "HOH")
+                            or par.get_resname() in ligands
+                        )
 
                     if par not in seen and condition:
                         nxt.add(par)
