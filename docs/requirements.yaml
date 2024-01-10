@@ -9,8 +9,9 @@ dependencies:
   - pandas
   - scikit-learn
 
-    # Pip-only installs
   - pip:
+    # Pip-only installs
     - sphinx==6.2.1
     - sphinx-autoapi==3.0.0
     - https://github.com/revitron/revitron-sphinx-theme/archive/refs/tags/0.7.0.zip
+
