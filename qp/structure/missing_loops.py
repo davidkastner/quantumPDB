@@ -173,73 +173,40 @@ def get_residues(path, AA):
 
     return residues
 
-
-def process_chain(chain):
-        """
-        Process a single chain to find indices of hyphens to remove.
-
-        Missing residues are indicated with hyphens, chain breaks with /,
-        and non-standard residues with ., and waters with a w.
-
-        See Also
-        --------
-        strip_alignment_file()
-
-        Parameters
-        ----------
-        chain: str
-            Chain sequence
-    
-        """
-        start = 0
-        end = len(chain)
-        while start < end and chain[start] == '-':
-            start += 1
-        while end > start and chain[end-1] == '-':
-            end -= 1
-        return start, end
-
-
-def strip_alignment_file(file_path):
+def clean_termini(residues):
     """
-    Remove missing residues from the ends of all chains in an alignment file.
+    Remove unresolve amino acids from the N- and C-termini.
+
+    Most proteins will have long sequences of missing residues at the ends.
+    Adding these with Modeller is unreliable and are removed with this function.
 
     Parameters
     ----------
-    file_path: str
-        Path to alignment file
+    residues: list of lists of tuples
+        Residues by chain [[((),)],[((),)]]
+    
+    Returns
+    -------
+    residues: list of lists of tuples
+        Residues by chain. Stored as a tuple without unresolved termini
 
     """
+    stripped_residues = []
+    for chain in residues:
+        # Strip 'R' tuples from the beginning of the chain
+        while chain and chain[0][-1] == 'R':
+            chain.pop(0)
 
-    with open(file_path, 'r') as file:
-        lines = file.readlines()
+        # Strip 'R' tuples from the end of the chain
+        while chain and chain[-1][-1] == 'R':
+            chain.pop()
 
-    # Process the third line
-    third_line_chains = lines[2].strip().split('/')
-    processed_third_line = []
-    trim_positions = []
+        # Add the processed chain to the stripped protein
+        if chain:  # Only add non-empty chains
+            stripped_residues.append(chain)
 
-    for chain in third_line_chains:
-        start, end = process_chain(chain)
-        processed_third_line.append(chain[start:end])
-        trim_positions.append((start, end))
-
-    lines[2] = '/'.join(processed_third_line) + '\n'
-
-    # Apply the same trimming to the sixth line
-    sixth_line_chains = lines[5].strip().split('/')
-    processed_sixth_line = []
-    for i, chain in enumerate(sixth_line_chains):
-        start, end = trim_positions[i]
-        processed_sixth_line.append(chain[start:end])
-
-    lines[5] = '/'.join(processed_sixth_line) + '\n'
-
-    # Write the modified content back to the file
-    with open(file_path, 'w') as file:
-        file.writelines(lines)
+    return stripped_residues
     
-
 
 def write_alignment(residues, pdb, path, out):
     """
@@ -413,6 +380,3 @@ def build_model(residues, pdb, ali, out, optimize=1):
 
     os.chdir(cwd)
 
-# def strip_ends_from_ali(ali_path):
-    
-    
