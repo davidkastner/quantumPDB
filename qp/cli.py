@@ -121,10 +121,11 @@ def run(i,
                 click.echo("> Building model")
                 AA = missing_loops.define_residues()
                 residues = missing_loops.get_residues(path, AA)
-                # residues = missing_loops.clean_termini(residues, AA)
                 ali_path = f"{o}/{pdb}/{pdb}.ali"
                 missing_loops.write_alignment(residues, pdb, path, ali_path)
-                # missing_loops.strip_ends_from_ali(ali_path)
+                
+                # Remove trailing missing residues from the ends of all chains
+                missing_loops.strip_alignment_file(ali_path)
                 missing_loops.build_model(residues, pdb, ali_path, mod_path, optimize)
 
         prot_path = f"{o}/{pdb}/Protoss"

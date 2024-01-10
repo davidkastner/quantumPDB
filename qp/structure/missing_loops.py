@@ -174,50 +174,71 @@ def get_residues(path, AA):
     return residues
 
 
-def clean_termini(residues, AA):
+def process_chain(chain):
+        """
+        Process a single chain to find indices of hyphens to remove.
+
+        Missing residues are indicated with hyphens, chain breaks with /,
+        and non-standard residues with ., and waters with a w.
+
+        See Also
+        --------
+        strip_alignment_file()
+
+        Parameters
+        ----------
+        chain: str
+            Chain sequence
+    
+        """
+        start = 0
+        end = len(chain)
+        while start < end and chain[start] == '-':
+            start += 1
+        while end > start and chain[end-1] == '-':
+            end -= 1
+        return start, end
+
+
+def strip_alignment_file(file_path):
     """
-    Remove unresolve amino acids from the N- and C-termini
+    Remove missing residues from the ends of all chains in an alignment file.
 
     Parameters
     ----------
-    residues: list of list
-        Residues by chain. Stored as a tuple
-    
-    Returns
-    -------
-    residues: list of list
-        Residues by chain. Stored as a tuple without unresolved termini
-
-    Notes
-    -----
-    Currently not being used because it does not work and broke the package.
-    Leaving it here for troubleshooting purposes.
+    file_path: str
+        Path to alignment file
 
     """
-    # Loop over chains
-    for chain_res in residues:
-        # Check from the end
-        i = len(chain_res) - 1
-        while i >= 0:
-            # If not an amino acid
-            if chain_res[i][1] not in AA.values():
-                i -= 1
-                continue
-            
-            # If it's an amino acid but not a missing residue
-            if chain_res[i][2] != "R":
-                break
-            
-            # If it's an amino acid and a missing residue
-            if chain_res[i][2] == "R":
-                chain_res.pop(i)
-                i -= 1
 
-        # Handle N-terminal unresolved amino acids (existing logic)
-        while chain_res and chain_res[0][2] == "R" and chain_res[0][1] in AA.values():
-            chain_res.pop(0)
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+
+    # Process the third line
+    third_line_chains = lines[2].strip().split('/')
+    processed_third_line = []
+    trim_positions = []
+
+    for chain in third_line_chains:
+        start, end = process_chain(chain)
+        processed_third_line.append(chain[start:end])
+        trim_positions.append((start, end))
+
+    lines[2] = '/'.join(processed_third_line) + '\n'
+
+    # Apply the same trimming to the sixth line
+    sixth_line_chains = lines[5].strip().split('/')
+    processed_sixth_line = []
+    for i, chain in enumerate(sixth_line_chains):
+        start, end = trim_positions[i]
+        processed_sixth_line.append(chain[start:end])
+
+    lines[5] = '/'.join(processed_sixth_line) + '\n'
+
+    # Write the modified content back to the file
+    with open(file_path, 'w') as file:
+        file.writelines(lines)
     
-    return residues
 
 
 def write_alignment(residues, pdb, path, out):
