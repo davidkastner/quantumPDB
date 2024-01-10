@@ -71,6 +71,10 @@ def get_next_neighbors(start, neighbors, limit, ligands, include_waters=False):
         Adjacency list of neighboring atoms
     limit: int
         Number of spheres to extract
+    ligands:
+        A list of ligands to include
+    include_waters: bool
+        Whether to include waters in the calculations of spheres
 
     Returns
     -------
@@ -91,21 +95,23 @@ def get_next_neighbors(start, neighbors, limit, ligands, include_waters=False):
             for atom in res.get_unpacked_list():
                 for n in neighbors[atom]:
                     par = n.get_parent()
+                    
+                    ## Added to include ligands in the first coordination sphere
+                    ## Produced unweildy clusters as some ligands are large
+                    ## Potentially useful in the future
+                    # if i == 0:  # For the first coordination sphere
+                    #     condition = (
+                    #         not Polypeptide.is_aa(par)
+                    #         or (include_waters and par.get_resname() == "HOH")
+                    #         or True  # This ensures all ligands are included in the first coordination sphere
+                    #     )
+                    # else:
 
-                    # ----- NEW CODE START (INCLUDE LIGAND) -----
-                    if i == 0:  # For the first coordination sphere
-                        condition = (
-                            not Polypeptide.is_aa(par)
-                            or (include_waters and par.get_resname() == "HOH")
-                            or True  # This ensures all ligands are included in the first coordination sphere
-                        )
-                    else:
-                    # ----- END CODE START (INCLUDE LIGAND) -----
-                        condition = (
-                            Polypeptide.is_aa(par)
-                            or (include_waters and par.get_resname() == "HOH")
-                            or par.get_resname() in ligands
-                        )
+                    condition = (
+                        Polypeptide.is_aa(par)
+                        or (include_waters and par.get_resname() == "HOH")
+                        or par.get_resname() in ligands
+                    )
 
                     if par not in seen and condition:
                         nxt.add(par)
@@ -400,7 +406,7 @@ def extract_clusters(
     charge=False,
     count=False,
     xyz=False,
-    include_waters=True,
+    include_waters=False,
 ):
     """
     Extract active site coordination spheres. Neighboring residues determined by

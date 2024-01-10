@@ -78,9 +78,9 @@ def run(i,
         )
         capping = int(
             click.prompt(
-                "> Capping (requires Protoss)\n   0: [None]\n   1: H\n   2: ACE/NME\n ",
+                "> Capping (requires Protoss)\n   0: None\n   1: [H]\n   2: ACE/NME\n ",
                 type=click.Choice(["0", "1", "2"]),
-                default="0",
+                default="1",
                 show_default=False,
             )
         )
