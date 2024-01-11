@@ -88,9 +88,11 @@ def get_next_neighbors(start, neighbors, limit, ligands, include_waters=False):
 
     seen = {start}
     spheres = [{start}]
+    lig_adds = [set()]
     
     for i in range(limit):
         nxt = set()
+        lig_add = set()
         for res in spheres[-1]:
             for atom in res.get_unpacked_list():
                 for n in neighbors[atom]:
@@ -100,28 +102,30 @@ def get_next_neighbors(start, neighbors, limit, ligands, include_waters=False):
                     ## Produced unweildy clusters as some ligands are large
                     ## Potentially useful in the future
                     if i == 0:  # For the first coordination sphere
-                        condition = (
-                            not Polypeptide.is_aa(par)
-                            or (include_waters and par.get_resname() == "HOH")
-                            or True  # This ensures all ligands are included in the first coordination sphere
-                        )
+                        if par not in seen:
+                            if not Polypeptide.is_aa(par) or (include_waters and par.get_resname() == "HOH"):
+                                lig_add.add(par)
+                            else:
+                                nxt.add(par)
+                            seen.add(par)
                     else:
-                        condition = (
-                            Polypeptide.is_aa(par)
-                            or (include_waters and par.get_resname() == "HOH")
-                            or par.get_resname() in ligands
-                        )
-
-                    if par not in seen and condition:
-                        nxt.add(par)
-                        seen.add(par)
+                        if par not in seen:
+                            if Polypeptide.is_aa(par):
+                                nxt.add(par)
+                                seen.add(par)
+                            elif (include_waters and par.get_resname() == "HOH") or par.get_resname() in ligands:
+                                lig_add.add(par)
+                                seen.add(par)
 
         spheres.append(nxt)
+        lig_adds.append(lig_add)
 
     res_id = start.get_full_id()
     chain_name = res_id[2]
     metal_index = str(res_id[3][1])
     metal_id = chain_name + metal_index
+    for i in range(len(spheres)):
+        spheres[i] = spheres[i] | lig_adds[i]
     
     return metal_id, seen, spheres
 

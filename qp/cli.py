@@ -87,6 +87,7 @@ def run(i,
         charge = click.confirm("> Compute charges (requires Protoss)", default=True)
         count = click.confirm("> Count residues", default=True)
         xyz = click.confirm("> Write XYZ files", default=True)
+        include_waters = click.confirm("> Include water molecules", default=False)
         if capping or charge:
             protoss = True
         click.echo("")
@@ -163,7 +164,7 @@ def run(i,
                     add_hydrogens.rename_nterminal(path)
                 clusters = coordination_spheres.extract_clusters(
                     path, f"{o}/{pdb}", metals,
-                    limit, ligands, capping, charge, count, xyz
+                    limit, ligands, capping, charge, count, xyz, include_waters
                 )
             except (ValueError, PDBIOException):  # TODO add custom exceptions
                 click.secho("Residue or atom limit exceeded\n", italic=True, fg="red")
