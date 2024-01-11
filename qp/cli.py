@@ -72,7 +72,7 @@ def run(i,
         from qp.cluster import coordination_spheres
         click.echo("Coordination sphere parameters:")
         metals = click.prompt("> Active site metals", default="FE FE2").split(" ")
-        limit = click.prompt("> Number of spheres", default=2)
+        limit = click.prompt("> Number of spheres", default=3)
         ligands = click.prompt(
             "> Additional ligands [AAs]", default=[], show_default=False
         )
