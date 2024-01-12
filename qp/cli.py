@@ -40,12 +40,15 @@ def cli():
 @click.option("--coordination", "-c", is_flag=True, help="Select the first, second, etc. coordination spheres")
 @click.option("--skip", "-s", type=click.Choice(["modeller", "protoss", "all"]), is_flag=False, flag_value="all",
                               help="Skips rerunning MODELLER or Protoss if an existing output file is found")
+@click.option("--smooth", type=click.Choice(["box_plot", "dbscan", "dummy_atom"]), is_flag=False, flag_value="box_plot",
+                              help="Coordination sphere smoothing method")
 def run(i,
         o,
         modeller,
         protoss,
         coordination,
-        skip,):
+        skip,
+        smooth):
     """Generates quantumPDB structures and files."""
     
     import os
@@ -162,12 +165,17 @@ def run(i,
             if protoss:
                 add_hydrogens.adjust_activesites(path, metals)
                 add_hydrogens.rename_nterminal(path)
+            if smooth == "dbscan":
+                smooth_params = {"eps": 6, "min_samples": 3}
+            elif smooth == "dummy_atom":
+                smooth_params = {"mean_distance": 3}
+            else:
+                smooth_params = {}
             clusters = coordination_spheres.extract_clusters(
                 path, f"{o}/{pdb}", metals,
                 limit, ligands, capping, charge, count, xyz, include_waters,
-                smooth_method="dbscan",
-                eps=6,
-                min_samples=3
+                smooth_method=smooth,
+                **smooth_params
             )
             # except (ValueError, PDBIOException):  # TODO add custom exceptions
             #     click.secho("Residue or atom limit exceeded\n", italic=True, fg="red")

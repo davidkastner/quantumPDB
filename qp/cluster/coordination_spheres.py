@@ -472,7 +472,7 @@ def extract_clusters(
     count=False,
     xyz=False,
     include_waters=False,
-    smooth_method="dbscan",
+    smooth_method="box_plot",
     **smooth_params
 ):
     """
