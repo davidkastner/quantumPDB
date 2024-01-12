@@ -27,13 +27,42 @@ from Bio.PDB.Atom import Atom
 from Bio.PDB.Residue import Residue
 from scipy.spatial import Voronoi
 from qp.checks import to_xyz
-from sklearn.cluster import DBSCAN, OPTICS
+from sklearn.cluster import DBSCAN
 
 
-SMOOTH_METHOD = "dbscan" # box_plot, dbscan, optics, dummy_atom, node_prune
+def get_grid_coord_idx(coord, coord_min, mean_distance):
+    return int((coord - coord_min + mean_distance * 0.5) // mean_distance)
 
 
-def voronoi(model):
+def get_grid(coords, mean_distance):
+    coord_min, coord_max = coords.min() - mean_distance, coords.max() + mean_distance
+    npoints = get_grid_coord_idx(coord_max, coord_min, mean_distance)
+    return coord_min, coord_max, coord_min + np.linspace(0, npoints - 1, npoints) * mean_distance
+
+
+def fill_dummy(points, mean_distance=3):
+    conf = np.stack(points, axis=0)
+    grids = []
+    x_min, _, x_grids = get_grid(conf[:,0], mean_distance)
+    y_min, _, y_grids = get_grid(conf[:,1], mean_distance)
+    z_min, _, z_grids = get_grid(conf[:,2], mean_distance)
+    flags = np.ones((len(x_grids), len(y_grids), len(z_grids)), dtype=bool)
+    for point in points:
+        x, y, z = point
+        flags[
+            get_grid_coord_idx(x, x_min, mean_distance),
+            get_grid_coord_idx(y, y_min, mean_distance), 
+            get_grid_coord_idx(z, z_min, mean_distance)
+        ] = False
+    flags = flags.flatten()
+    noise = mean_distance * 0.2 * (np.random.rand(len(x_grids), len(y_grids), len(z_grids), 3) - 0.5)
+    dummy = np.stack(np.meshgrid(x_grids, y_grids, z_grids, indexing="ij"), axis=-1)
+    dummy = (dummy + noise).reshape(-1, 3)
+    dummy = dummy[flags, :]
+    return np.concatenate([points, dummy], axis=0)
+
+
+def voronoi(model, smooth_method, **smooth_params):
     """
     Computes the Voronoi tessellation of a protein structure.
 
@@ -54,14 +83,20 @@ def voronoi(model):
             atoms.append(atom)
             points.append(atom.get_coord())
 
-    vor = Voronoi(points)
+    points_count = len(points)
+    if smooth_method == "dummy_atom":
+        new_points = fill_dummy(points, **smooth_params)
+        vor = Voronoi(new_points)
+    else:
+        vor = Voronoi(points)
 
     calc_dist = lambda point_a, point_b: np.linalg.norm(point_a - point_b)
     neighbors = {}
     for a, b in vor.ridge_points:
-        dist = calc_dist(points[a], points[b])
-        neighbors.setdefault(atoms[a], []).append((atoms[b], dist))
-        neighbors.setdefault(atoms[b], []).append((atoms[a], dist))
+        if a < points_count and b < points_count:
+            dist = calc_dist(points[a], points[b])
+            neighbors.setdefault(atoms[a], []).append((atoms[b], dist))
+            neighbors.setdefault(atoms[b], []).append((atoms[a], dist))
     return neighbors
 
 
@@ -156,7 +191,6 @@ def get_next_neighbors(start, neighbors, limit, ligands, include_waters=False, s
         spheres[i] = spheres[i] | lig_adds[i]
     
     return metal_id, seen, spheres
-
 
 
 def scale_hydrogen(a, b, scale):
@@ -472,7 +506,7 @@ def extract_clusters(
     io.set_structure(structure)
 
     model = structure[0]
-    neighbors = voronoi(model)
+    neighbors = voronoi(model, smooth_method, **smooth_params)
 
     aa_charge = {}
     res_count = {}

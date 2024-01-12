@@ -158,25 +158,26 @@ def run(i,
             if protoss:
                 path = f"{prot_path}/{pdb}_protoss.pdb"
 
-            try:
-                if protoss:
-                    add_hydrogens.adjust_activesites(path, metals)
-                    add_hydrogens.rename_nterminal(path)
-                clusters = coordination_spheres.extract_clusters(
-                    path, f"{o}/{pdb}", metals,
-                    limit, ligands, capping, charge, count, xyz, include_waters,
-                    smooth_method="dbscan",
-                    eps=6,
-                    min_samples=3
-                )
-            except (ValueError, PDBIOException):  # TODO add custom exceptions
-                click.secho("Residue or atom limit exceeded\n", italic=True, fg="red")
-                err["Other"].append(pdb)
-                continue
-            except KeyError as e:
-                click.secho(f"Missing template atoms for capping {e}\n", italic=True, fg="red")
-                err["Coordination sphere"].append(pdb)
-                continue
+            # try:
+            if protoss:
+                add_hydrogens.adjust_activesites(path, metals)
+                add_hydrogens.rename_nterminal(path)
+            clusters = coordination_spheres.extract_clusters(
+                path, f"{o}/{pdb}", metals,
+                limit, ligands, capping, charge, count, xyz, include_waters,
+                smooth_method="dbscan",
+                eps=6,
+                min_samples=3
+            )
+            # except (ValueError, PDBIOException):  # TODO add custom exceptions
+            #     click.secho("Residue or atom limit exceeded\n", italic=True, fg="red")
+            #     err["Other"].append(pdb)
+            #     continue
+            # except KeyError as e:
+            #     raise e
+            #     click.secho(f"Missing template atoms for capping {e}\n", italic=True, fg="red")
+            #     err["Coordination sphere"].append(pdb)
+            #     continue
 
             if charge:
                 ligand_charge = add_hydrogens.compute_charge(f"{prot_path}/{pdb}_ligands.sdf")
