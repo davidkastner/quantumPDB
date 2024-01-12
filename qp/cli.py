@@ -164,7 +164,10 @@ def run(i,
                     add_hydrogens.rename_nterminal(path)
                 clusters = coordination_spheres.extract_clusters(
                     path, f"{o}/{pdb}", metals,
-                    limit, ligands, capping, charge, count, xyz, include_waters
+                    limit, ligands, capping, charge, count, xyz, include_waters,
+                    smooth_method="dbscan",
+                    eps=6,
+                    min_samples=3
                 )
             except (ValueError, PDBIOException):  # TODO add custom exceptions
                 click.secho("Residue or atom limit exceeded\n", italic=True, fg="red")

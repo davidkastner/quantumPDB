@@ -27,6 +27,10 @@ from Bio.PDB.Atom import Atom
 from Bio.PDB.Residue import Residue
 from scipy.spatial import Voronoi
 from qp.checks import to_xyz
+from sklearn.cluster import DBSCAN, OPTICS
+
+
+SMOOTH_METHOD = "dbscan" # box_plot, dbscan, optics, dummy_atom, node_prune
 
 
 def voronoi(model):
@@ -68,7 +72,7 @@ def box_outlier_thres(data, coeff=1.5):
     return Q1 - coeff * IQR, Q3 + coeff * IQR
 
 
-def get_next_neighbors(start, neighbors, limit, ligands, include_waters=False):
+def get_next_neighbors(start, neighbors, limit, ligands, include_waters=False, smooth_method="boxplot", **smooth_params):
 
     """
     Iteratively determines spheres around a given starting atom
@@ -101,40 +105,45 @@ def get_next_neighbors(start, neighbors, limit, ligands, include_waters=False):
     lig_adds = [set()]
     
     for i in range(limit):
-        nxt = set()
-        lig_add = set()
-        # statistics on the neighbors' distance
-        dist_data = []
-        for res in spheres[-1]:
-            for atom in res.get_unpacked_list():
-                for n, dist in neighbors[atom]:
-                    dist_data.append(dist)
-        lb, ub = box_outlier_thres(dist_data)
-        
-        # build the new sphere
+        # get candidate atoms in the new sphere
+        candidates = []
         for res in spheres[-1]:
             for atom in res.get_unpacked_list():
                 for n, dist in neighbors[atom]:
                     par = n.get_parent()
-                    if dist < ub:
-                        ## Added to include ligands in the first coordination sphere
-                        ## Produced unweildy clusters as some ligands are large
-                        ## Potentially useful in the future
-                        if i == 0:  # For the first coordination sphere
-                            if par not in seen:
-                                if not Polypeptide.is_aa(par) or (include_waters and par.get_resname() == "HOH"):
-                                    lig_add.add(par)
-                                else:
-                                    nxt.add(par)
-                                seen.add(par)
-                        else:
-                            if par not in seen:
-                                if Polypeptide.is_aa(par):
-                                    nxt.add(par)
-                                    seen.add(par)
-                                elif (include_waters and par.get_resname() == "HOH") or par.get_resname() in ligands:
-                                    lig_add.add(par)
-                                    seen.add(par)
+                    candidates.append((n, dist, par))
+
+        # screen candidates
+        if smooth_method == "box_plot":
+            dist_data = [dist for n, dist, par in candidates]
+            lb, ub = box_outlier_thres(dist_data, **smooth_params)
+            screened_candidates = [par for n, dist, par in candidates if dist < ub]
+        elif smooth_method == "dbscan":
+            optics = DBSCAN(**smooth_params)
+            X = [n.get_coord() for n, dist, par in candidates]
+            for res in spheres[-1]:
+                for atom in res.get_unpacked_list():
+                    X.append(atom.get_coord())
+            cluster_idx = optics.fit_predict(X) + 1
+            largest_idx = np.bincount(cluster_idx).argmax()
+            screened_candidates = [par for i, (n, dist, par) in enumerate(candidates) if cluster_idx[i] == largest_idx]
+        else:
+            screened_candidates = [par for n, dist, par in candidates]
+
+        nxt = set()
+        lig_add = set()
+        # build the new sphere
+        for par in screened_candidates:
+            if par not in seen:
+                seen.add(par)
+            ## Added to include ligands in the first coordination sphere
+            ## Produced unweildy clusters as some ligands are large
+            ## Potentially useful in the future
+                if Polypeptide.is_aa(par):
+                    nxt.add(par)
+                else:
+                    if par.get_resname() in ligands or (include_waters and par.get_resname() == "HOH") or i == 0:
+                        lig_add.add(par)
 
         spheres.append(nxt)
         lig_adds.append(lig_add)
@@ -429,6 +438,8 @@ def extract_clusters(
     count=False,
     xyz=False,
     include_waters=False,
+    smooth_method="dbscan",
+    **smooth_params
 ):
     """
     Extract active site coordination spheres. Neighboring residues determined by
@@ -468,7 +479,7 @@ def extract_clusters(
     for res in model.get_residues():
         if res.get_resname() in metals:
             metal_id, residues, spheres = get_next_neighbors(
-                res, neighbors, limit, ligands, include_waters
+                res, neighbors, limit, ligands, include_waters, smooth_method, **smooth_params
             )
 
             os.makedirs(f"{out}/{metal_id}", exist_ok=True)
