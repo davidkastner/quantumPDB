@@ -21,14 +21,48 @@ performed by specifying ``capping`` in ``coordination_spheres.extract_clusters``
 """
 
 import os
+import numpy as np
 from Bio.PDB import PDBParser, Polypeptide, PDBIO, Select
 from Bio.PDB.Atom import Atom
 from Bio.PDB.Residue import Residue
 from scipy.spatial import Voronoi
 from qp.checks import to_xyz
+from sklearn.cluster import DBSCAN
 
 
-def voronoi(model):
+def get_grid_coord_idx(coord, coord_min, mean_distance):
+    return int((coord - coord_min + mean_distance * 0.5) // mean_distance)
+
+
+def get_grid(coords, mean_distance):
+    coord_min, coord_max = coords.min() - mean_distance, coords.max() + mean_distance
+    npoints = get_grid_coord_idx(coord_max, coord_min, mean_distance)
+    return coord_min, coord_max, coord_min + np.linspace(0, npoints - 1, npoints) * mean_distance
+
+
+def fill_dummy(points, mean_distance=3):
+    conf = np.stack(points, axis=0)
+    grids = []
+    x_min, _, x_grids = get_grid(conf[:,0], mean_distance)
+    y_min, _, y_grids = get_grid(conf[:,1], mean_distance)
+    z_min, _, z_grids = get_grid(conf[:,2], mean_distance)
+    flags = np.ones((len(x_grids), len(y_grids), len(z_grids)), dtype=bool)
+    for point in points:
+        x, y, z = point
+        flags[
+            get_grid_coord_idx(x, x_min, mean_distance),
+            get_grid_coord_idx(y, y_min, mean_distance), 
+            get_grid_coord_idx(z, z_min, mean_distance)
+        ] = False
+    flags = flags.flatten()
+    noise = mean_distance * 0.2 * (np.random.rand(len(x_grids), len(y_grids), len(z_grids), 3) - 0.5)
+    dummy = np.stack(np.meshgrid(x_grids, y_grids, z_grids, indexing="ij"), axis=-1)
+    dummy = (dummy + noise).reshape(-1, 3)
+    dummy = dummy[flags, :]
+    return np.concatenate([points, dummy], axis=0)
+
+
+def voronoi(model, smooth_method, **smooth_params):
     """
     Computes the Voronoi tessellation of a protein structure.
 
@@ -49,16 +83,31 @@ def voronoi(model):
             atoms.append(atom)
             points.append(atom.get_coord())
 
-    vor = Voronoi(points)
+    points_count = len(points)
+    if smooth_method == "dummy_atom":
+        new_points = fill_dummy(points, **smooth_params)
+        vor = Voronoi(new_points)
+    else:
+        vor = Voronoi(points)
 
+    calc_dist = lambda point_a, point_b: np.linalg.norm(point_a - point_b)
     neighbors = {}
     for a, b in vor.ridge_points:
-        neighbors.setdefault(atoms[a], []).append(atoms[b])
-        neighbors.setdefault(atoms[b], []).append(atoms[a])
+        if a < points_count and b < points_count:
+            dist = calc_dist(points[a], points[b])
+            neighbors.setdefault(atoms[a], []).append((atoms[b], dist))
+            neighbors.setdefault(atoms[b], []).append((atoms[a], dist))
     return neighbors
 
 
-def get_next_neighbors(start, neighbors, limit, ligands, include_waters=False):
+def box_outlier_thres(data, coeff=1.5):
+    Q3 = np.quantile(data, 0.75)
+    Q1 = np.quantile(data, 0.25)
+    IQR = Q3 - Q1
+    return Q1 - coeff * IQR, Q3 + coeff * IQR
+
+
+def get_next_neighbors(start, neighbors, limit, ligands, include_waters=False, smooth_method="boxplot", **smooth_params):
 
     """
     Iteratively determines spheres around a given starting atom
@@ -91,31 +140,45 @@ def get_next_neighbors(start, neighbors, limit, ligands, include_waters=False):
     lig_adds = [set()]
     
     for i in range(limit):
-        nxt = set()
-        lig_add = set()
+        # get candidate atoms in the new sphere
+        candidates = []
         for res in spheres[-1]:
             for atom in res.get_unpacked_list():
-                for n in neighbors[atom]:
+                for n, dist in neighbors[atom]:
                     par = n.get_parent()
-                    
-                    ## Added to include ligands in the first coordination sphere
-                    ## Produced unweildy clusters as some ligands are large
-                    ## Potentially useful in the future
-                    if i == 0:  # For the first coordination sphere
-                        if par not in seen:
-                            if not Polypeptide.is_aa(par) or (include_waters and par.get_resname() == "HOH"):
-                                lig_add.add(par)
-                            else:
-                                nxt.add(par)
-                            seen.add(par)
-                    else:
-                        if par not in seen:
-                            if Polypeptide.is_aa(par):
-                                nxt.add(par)
-                                seen.add(par)
-                            elif (include_waters and par.get_resname() == "HOH") or par.get_resname() in ligands:
-                                lig_add.add(par)
-                                seen.add(par)
+                    candidates.append((n, dist, par))
+
+        # screen candidates
+        if smooth_method == "box_plot":
+            dist_data = [dist for n, dist, par in candidates]
+            lb, ub = box_outlier_thres(dist_data, **smooth_params)
+            screened_candidates = [par for n, dist, par in candidates if dist < ub]
+        elif smooth_method == "dbscan":
+            optics = DBSCAN(**smooth_params)
+            X = [n.get_coord() for n, dist, par in candidates]
+            for res in spheres[-1]:
+                for atom in res.get_unpacked_list():
+                    X.append(atom.get_coord())
+            cluster_idx = optics.fit_predict(X) + 1
+            largest_idx = np.bincount(cluster_idx).argmax()
+            screened_candidates = [par for i, (n, dist, par) in enumerate(candidates) if cluster_idx[i] == largest_idx]
+        else:
+            screened_candidates = [par for n, dist, par in candidates]
+
+        nxt = set()
+        lig_add = set()
+        # build the new sphere
+        for par in screened_candidates:
+            if par not in seen:
+                seen.add(par)
+            ## Added to include ligands in the first coordination sphere
+            ## Produced unweildy clusters as some ligands are large
+            ## Potentially useful in the future
+                if Polypeptide.is_aa(par):
+                    nxt.add(par)
+                else:
+                    if par.get_resname() in ligands or (include_waters and par.get_resname() == "HOH") or i == 0:
+                        lig_add.add(par)
 
         spheres.append(nxt)
         lig_adds.append(lig_add)
@@ -128,7 +191,6 @@ def get_next_neighbors(start, neighbors, limit, ligands, include_waters=False):
         spheres[i] = spheres[i] | lig_adds[i]
     
     return metal_id, seen, spheres
-
 
 
 def scale_hydrogen(a, b, scale):
@@ -410,6 +472,8 @@ def extract_clusters(
     count=False,
     xyz=False,
     include_waters=False,
+    smooth_method="box_plot",
+    **smooth_params
 ):
     """
     Extract active site coordination spheres. Neighboring residues determined by
@@ -442,14 +506,14 @@ def extract_clusters(
     io.set_structure(structure)
 
     model = structure[0]
-    neighbors = voronoi(model)
+    neighbors = voronoi(model, smooth_method, **smooth_params)
 
     aa_charge = {}
     res_count = {}
     for res in model.get_residues():
         if res.get_resname() in metals:
             metal_id, residues, spheres = get_next_neighbors(
-                res, neighbors, limit, ligands, include_waters
+                res, neighbors, limit, ligands, include_waters, smooth_method, **smooth_params
             )
 
             os.makedirs(f"{out}/{metal_id}", exist_ok=True)
