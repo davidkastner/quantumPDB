@@ -21,21 +21,23 @@ import click
 def welcome():
     """Print first to welcome the user while it waits to load the modules"""
     
-    print("\n.-------------------------------.")
-    print("|           __________          |")
-    print("|         / ____/\____ \        |")
-    print("|        < <_|  ||  |_> >       |")
-    print("|         \__   ||   __/        |")
-    print("|            |__||__|           |")
-    print("|                               |")
-    print("|     WELCOME TO QUANTUMPDB     |")
-    print(".-------------------------------.")
+    print("\n        ╔═══════════════════════════════╗")
+    print("        ║ .---------------------------. ║")
+    print("        ║ |         __________        | ║")
+    print("        ║ |       / ____/\____ \      | ║")
+    print("        ║ |      < <_|  ||  |_> >     | ║")
+    print("        ║ |       \__   ||   __/      | ║")
+    print("        ║ |          |__||__|         | ║")
+    print("        ║ |                           | ║")
+    print("        ║ |   WELCOME TO QUANTUMPDB   | ║")
+    print("        ║ '---------------------------' ║")
+    print("        ╚═══════════════════════════════╝\n")
+
     print("GitHub: https://github.com/davidkastner/quantumpdb")
     print("Documenation: https://quantumpdb.readthedocs.io")
     print("• Flags: -m (modeller) -p (protoss) -c (spheres) -s (use previous modeller/protoss)")
     print("• Generate structures: qp run -i pdbs.txt -o datasets/ -m -p -c")
-    print("• Submit QM: qp submit -j\n\n")
-
+    print("• Submit QM: qp submit -j\n")
 
 # Welcome even if no flags
 welcome()
@@ -53,15 +55,12 @@ def cli():
 @click.option("--coordination", "-c", is_flag=True, help="Select the first, second, etc. coordination spheres")
 @click.option("--skip", "-s", type=click.Choice(["modeller", "protoss", "all"]), is_flag=False, flag_value="all",
                               help="Skips rerunning MODELLER or Protoss if an existing output file is found")
-@click.option("--smooth", type=click.Choice(["box_plot", "dbscan", "dummy_atom"]), is_flag=False, flag_value="box_plot",
-                              help="Coordination sphere smoothing method")
 def run(i,
         o,
         modeller,
         protoss,
         coordination,
-        skip,
-        smooth):
+        skip,):
     """Generates quantumPDB structures and files."""
     
     import os
@@ -76,7 +75,7 @@ def run(i,
         click.echo("MODELLER parameters:")
         optimize = int(
             click.prompt(
-                "> Optimize\n   0: None\n   1: [Missing]\n   2: All\n ",
+                "> Optimize select residues\n   0: None\n   1: [Missing]\n   2: All\n ",
                 type=click.Choice(["0", "1", "2"]),
                 default="1",
                 show_default=False,
@@ -89,9 +88,7 @@ def run(i,
         click.echo("Coordination sphere parameters:")
         metals = click.prompt("> Active site metals", default="FE FE2").split(" ")
         limit = click.prompt("> Number of spheres", default=3)
-        ligands = click.prompt(
-            "> Additional ligands [AAs]", default=[], show_default=False
-        )
+        ligands = click.prompt("> Additional ligands [AAs]", default=[], show_default=False)
         capping = int(
             click.prompt(
                 "> Capping (requires Protoss)\n   0: None\n   1: [H]\n   2: ACE/NME\n ",
@@ -100,10 +97,23 @@ def run(i,
                 show_default=False,
             )
         )
+
+        # Prompt user for their preferred cluster smoothing method
+        choice = click.prompt(
+            "> Smoothing method\n   0: [Box plot]\n   1: DBSCAN\n   2: Dummy Atom\n   3: None\n",
+            type=click.Choice(["0", "1", "2", "3"]),
+            default="0",
+            show_default=False,)
+        smooth_options = {"0": {}, "1": {"eps": 6, "min_samples": 3}, "2": {"mean_distance": 3}, "3": {}}
+        smooth_method_options = {"0": "box_plot", "1": "dbscan", "2": "dummy_atom", "3": False}
+        smooth_params = smooth_options[choice]
+        smooth_method = smooth_method_options[choice]
+
         charge = click.confirm("> Compute charges (requires Protoss)", default=True)
         count = click.confirm("> Count residues", default=True)
         xyz = click.confirm("> Write XYZ files", default=True)
         include_waters = click.confirm("> Include water molecules", default=False)
+
         if capping or charge:
             protoss = True
         click.echo("")
@@ -177,17 +187,11 @@ def run(i,
             # try:
             if protoss:
                 add_hydrogens.adjust_activesites(path, metals)
-                add_hydrogens.rename_nterminal(path)
-            if smooth == "dbscan":
-                smooth_params = {"eps": 6, "min_samples": 3}
-            elif smooth == "dummy_atom":
-                smooth_params = {"mean_distance": 3}
-            else:
-                smooth_params = {}
+
             clusters = coordination_spheres.extract_clusters(
                 path, f"{o}/{pdb}", metals,
                 limit, ligands, capping, charge, count, xyz, include_waters,
-                smooth_method=smooth,
+                smooth_method=smooth_method,
                 **smooth_params
             )
             # except (ValueError, PDBIOException):  # TODO add custom exceptions

@@ -154,33 +154,6 @@ def adjust_activesites(path, metals):
     io.save(path, AtomSelect())
 
 
-def rename_nterminal(path):
-    """Changes N-terminal nitrogen atom name to NT in the PDB file."""
-    
-    with open(path, 'r') as f:
-        pdb_content = f.read()
-
-    lines = pdb_content.split('\n')
-    new_lines = []
-
-    seen_chains = set()
-
-    for line in lines:
-        if line.startswith("ATOM") or line.startswith("HETATM"):
-            current_chain = line[21]
-            atom_name = line[12:16].strip()  # Extracts the atom name
-
-            # Rename N-terminal nitrogen
-            if current_chain not in seen_chains and atom_name == "N":
-                line = line[:12] + " NT " + line[16:]
-                seen_chains.add(current_chain)
-
-        new_lines.append(line)
-
-    with open(path, 'w') as f:
-        f.write('\n'.join(new_lines))
-
-
 def compute_charge(path):
     """
     Computes the total charge of each ligand
