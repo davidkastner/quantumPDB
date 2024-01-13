@@ -237,6 +237,40 @@ def write_alignment(residues, pdb, path, out):
         f.write(f">P1;{pdb}_fill\nsequence:::::::::\n{seq_fill}*\n")
 
 
+def transfer_numbering(e, ali, pdb, out):
+        """
+        Transfer residue numbers and chain ids from reference model to the built model.
+
+        By default, Modeller will restart the number at 1 and rename the chains.
+        This function, we transfer the numbering over from the template PDB.
+        However, it can cause some issues with the numbering in some cases.
+        We use fix_numbering() to fix those issues.
+
+        See Also
+        --------
+        qp.structure.missing_loops.fix_numbering()
+
+        """
+        # Read the alignment for the transfer
+        aln = alignment(e, file=ali)
+
+        # Read the template and target models:
+        mdl_reference = model(e, file=pdb)  # Assuming 'pdb' is the reference pdb file
+        mdl_built = model(e, file=os.path.basename(out))
+
+        # Transfer the residue and chain ids and write out the modified MODEL:
+        mdl_built.res_num_from(mdl_reference, aln)
+        file=os.path.basename(out)
+        mdl_built.write(file)
+
+        with open(file, 'r') as f:
+            content = f.read()
+
+        corrected_content = fix_numbering(content)
+        with open(file, 'w') as f:
+            f.write(corrected_content)
+
+
 def fix_numbering(pdb_content):
     """Handles insertion codes from Modeller.
     
@@ -352,31 +386,12 @@ def build_model(residues, pdb, ali, out, optimize=1):
     if not optimize or (optimize == 1 and not missing):
         a.make(exit_stage=2)
         os.rename(f"{pdb}_fill.ini", os.path.basename(out))
+        transfer_numbering(e, ali, pdb, out)
     else:
         a.make()
         for ext in ["ini", "rsr", "sch", "D00000001", "V99990001"]:
             os.remove(f"{pdb}_fill.{ext}")
-
-        # Transfer residue numbers and chain ids from reference model to the built model.
-        # Read the alignment for the transfer
-        aln = alignment(e, file=ali)
-
-        # Read the template and target models:
-        mdl_reference = model(e, file=pdb)  # Assuming 'pdb' is the reference pdb file
-        mdl_built = model(e, file=os.path.basename(out))
-
-        # Transfer the residue and chain ids and write out the modified MODEL:
-        mdl_built.res_num_from(mdl_reference, aln)
-        file=os.path.basename(out)
-        mdl_built.write(file)
-
-        # Example usage:
-        with open(file, 'r') as f:
-            content = f.read()
-
-        corrected_content = fix_numbering(content)
-        with open(file, 'w') as f:
-            f.write(corrected_content)
+        transfer_numbering(e, ali, pdb, out)
 
     os.chdir(cwd)
 

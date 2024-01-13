@@ -391,7 +391,7 @@ def write_pdb(io, sphere, out):
     io.save(out, ResSelect())
 
 
-def compute_charge(spheres):
+def compute_charge(spheres, structure):
     """
     Computes the total charge of coordinating AAs
 
@@ -399,12 +399,24 @@ def compute_charge(spheres):
     ----------
     spheres: list of sets
         Sets of residues separated by spheres
+    structure: Bio.PDB.Structure
+        The protein structure
 
     Returns
     -------
     charge: list
         Total charge of AAs in each sphere
     """
+    # Identifying N-terminal and C-terminal residues for each chain
+    n_terminals = set()
+    c_terminals = set()
+    # Loop over the residues to get first and last as indices may be different
+    for chain in structure.get_chains():
+        chain_residues = list(chain.get_residues())
+        if chain_residues:
+            n_terminals.add(chain_residues[0].get_full_id())
+            c_terminals.add(chain_residues[-1].get_full_id())
+
     pos = {
         "ARG": ["HE", "HH11", "HH12", "HH21", "HH22"],
         "LYS": ["HZ1", "HZ2", "HZ3"],
@@ -423,17 +435,21 @@ def compute_charge(spheres):
     for s in spheres[1:]:
         c = 0
         for res in s:
+            res_id = res.get_full_id()
             resname = res.get_resname()
             if resname in pos and all(res.has_id(h) for h in pos[resname]):
                 c += 1
             elif resname in neg and all(not res.has_id(h) for h in neg[resname]):
                 c -= 1
-            # Check for C-terminus
-            if res.has_id("OXT"):
-                c -= 1
-            # Check for N-terminus
-            if res.has_id("NT"):
+
+            # Check for charged N-terminus
+            if res_id in n_terminals:
                 c += 1
+
+            # Check for charged C-terminus
+            if res_id in c_terminals and res.has_id("OXT"):
+                c -= 1
+
         charge.append(c)
     return charge
 
@@ -519,7 +535,7 @@ def extract_clusters(
             os.makedirs(f"{out}/{metal_id}", exist_ok=True)
 
             if charge:
-                aa_charge[metal_id] = compute_charge(spheres)
+                aa_charge[metal_id] = compute_charge(spheres, structure)
             if count:
                 res_count[metal_id] = count_residues(spheres)
             if capping:
