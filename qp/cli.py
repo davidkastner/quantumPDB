@@ -18,19 +18,32 @@ Options:
 
 import click
 
-@click.group()
-def cli():
+def welcome():
     """Print first to welcome the user while it waits to load the modules"""
     
     print("\n.-------------------------------.")
-    print("| WELCOME TO THE QUANTUMPDB CLI |")
+    print("|           __________          |")
+    print("|         / ____/\____ \        |")
+    print("|        < <_|  ||  |_> >       |")
+    print("|         \__   ||   __/        |")
+    print("|            |__||__|           |")
+    print("|                               |")
+    print("|     WELCOME TO QUANTUMPDB     |")
     print(".-------------------------------.")
-    print("Default programmed actions for the quantumPDB package.")
     print("GitHub: https://github.com/davidkastner/quantumpdb")
     print("Documenation: https://quantumpdb.readthedocs.io")
-    print("Generate new structure: qp run -i pdbs.txt -o datasets/ -m -p -c")
-    print("Submit QM for generate structures: qp submit -j")
-    print("Defaults are indicated with parentheses []\n")
+    print("• Flags: -m (modeller) -p (protoss) -c (spheres) -s (use previous modeller/protoss)")
+    print("• Generate structures: qp run -i pdbs.txt -o datasets/ -m -p -c")
+    print("• Submit QM: qp submit -j\n\n")
+
+
+# Welcome even if no flags
+welcome()
+
+@click.group()
+def cli():
+    """CLI entry point"""
+    pass
 
 @cli.command()
 @click.option("-i", required=True, multiple=True, help="Input PDB code, PDB file, or batch file")
@@ -244,7 +257,7 @@ def submit(job_manager,
         failure_checkup.main()
 
 
-
 if __name__ == "__main__":
     # Run the command-line interface when this script is executed
+    welcome()
     cli()
