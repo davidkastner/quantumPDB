@@ -134,8 +134,7 @@ Currently working on handling all edge cases, including non-canonical amino acid
 
 ### Copyright
 
-Copyright (c) 2023, David W. Kastner, Clorice R. Reinhardt and Wilson Ho
-
+Copyright (c) 2023, Kulik Group MIT
 
 #### Acknowledgements
  
