@@ -134,7 +134,7 @@ Currently working on handling all edge cases, including non-canonical amino acid
 
 ### Copyright
 
-Copyright (c) 2023, Kulik Group MIT
+Copyright (c) 2024, Kulik Group MIT
 
 #### Acknowledgements
  
