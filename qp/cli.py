@@ -88,7 +88,10 @@ def run(i,
         click.echo("Coordination sphere parameters:")
         metals = click.prompt("> Active site metals", default="FE FE2").split(" ")
         limit = click.prompt("> Number of spheres", default=3)
-        ligands = click.prompt("> Additional ligands [AAs]", default=[], show_default=False)
+        first_sphere_radius = click.prompt("> Radius of first spheres", type=float, default=4.0)
+        include_ligands = click.confirm("> Include ligands [unnatural AAs] in the first coordination sphere", default=True)
+        ligands = click.prompt("> Additional ligands [unnatural AAs] in outer coordination spheres", default=[], show_default=False)
+        include_waters = click.confirm("> Include water molecules in outer coordination spheres", default=False)
         capping = int(
             click.prompt(
                 "> Capping (requires Protoss)\n   0: None\n   1: [H]\n   2: ACE/NME\n ",
@@ -100,9 +103,9 @@ def run(i,
 
         # Prompt user for their preferred cluster smoothing method
         choice = click.prompt(
-            "> Smoothing method\n   0: [Box plot]\n   1: DBSCAN\n   2: Dummy Atom\n   3: None\n",
+            "> Smoothing method\n   0: Box plot\n   1: DBSCAN\n   2: [Dummy Atom]\n   3: None\n",
             type=click.Choice(["0", "1", "2", "3"]),
-            default="0",
+            default="2",
             show_default=False,)
         smooth_options = {"0": {}, "1": {"eps": 6, "min_samples": 3}, "2": {"mean_distance": 3}, "3": {}}
         smooth_method_options = {"0": "box_plot", "1": "dbscan", "2": "dummy_atom", "3": False}
@@ -112,7 +115,6 @@ def run(i,
         charge = click.confirm("> Compute charges (requires Protoss)", default=True)
         count = click.confirm("> Count residues", default=True)
         xyz = click.confirm("> Write XYZ files", default=True)
-        include_waters = click.confirm("> Include water molecules", default=False)
 
         if capping or charge:
             protoss = True
@@ -190,7 +192,7 @@ def run(i,
 
             clusters = coordination_spheres.extract_clusters(
                 path, f"{o}/{pdb}", metals,
-                limit, ligands, capping, charge, count, xyz, include_waters,
+                limit, ligands, capping, charge, count, xyz, include_waters, include_ligands, first_sphere_radius,
                 smooth_method=smooth_method,
                 **smooth_params
             )
