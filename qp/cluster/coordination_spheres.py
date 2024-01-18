@@ -32,10 +32,46 @@ from sklearn.cluster import DBSCAN
 
 
 def get_grid_coord_idx(coord, coord_min, mean_distance):
+    """
+    Compute a point's position in a 1D grid
+    
+    Parameters
+    ----------
+    coord: float
+        One coordinate of a point
+    coord_min: float
+        The minimum coordinate of the grid
+    mean_distance: float
+        The distance between neighbors in the grid
+
+    Returns
+    -------
+    idx: int
+        The idx of the point in the grid
+    """
     return int((coord - coord_min + mean_distance * 0.5) // mean_distance)
 
 
 def get_grid(coords, mean_distance):
+    """
+    Compute the grid's parameter for a given 1D point list
+
+    Parameters
+    ----------
+    coords: numpy.array
+        The coordinates of the 1D point list
+    mean_distance: float
+        The distance between neighbors in the grid
+    
+    Returns
+    -------
+    coord_min: float
+        The minimum coordinate of the grid
+    coord_max: float
+        The maximum coordinate of the grid
+    grid: numpy.array
+        The 1D grid
+    """
     coord_min, coord_max = coords.min() - mean_distance, coords.max() + mean_distance
     npoints = get_grid_coord_idx(coord_max, coord_min, mean_distance)
     return coord_min, coord_max, coord_min + np.linspace(0, npoints - 1, npoints) * mean_distance
@@ -50,6 +86,23 @@ def _visualize_dummy(dummy, path):
 
 
 def fill_dummy(points, mean_distance=3, noise_amp=0.2):
+    """
+    Fill dummy atoms in a point cloud
+
+    Parameters
+    ----------
+    points: numpy.array
+        The 3D coordinates of the point cloud
+    mean_distance: float
+        The distance between neighbors in the grid
+    noise_amp: float
+        The amplitude of the noise of dummy atoms' position
+    
+    Returns
+    -------
+    points:
+        The 3D coordinates of the point cloud filled with dummy atoms
+    """
     conf = np.stack(points, axis=0)
     x_min, _, x_grids = get_grid(conf[:,0], mean_distance)
     y_min, _, y_grids = get_grid(conf[:,1], mean_distance)
@@ -112,6 +165,24 @@ def voronoi(model, metals, ligands, smooth_method, **smooth_params):
 
 
 def box_outlier_thres(data, coeff=1.5):
+    """
+    Compute the threshold for the boxplot outlier detection method
+
+    Parameters
+    ----------
+    data: list
+        The data for the boxplot statistics
+    coeff: float
+        The coefficient for the outlier criterion from quartiles of the data
+
+    Returns
+    -------
+    lb: float
+        the lower bound of non-outliers
+    ub: float
+        the upper bound of non-outliers
+
+    """
     Q3 = np.quantile(data, 0.75)
     Q1 = np.quantile(data, 0.25)
     IQR = Q3 - Q1
