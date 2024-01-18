@@ -90,7 +90,6 @@ def run(i,
         limit = click.prompt("> Number of spheres", default=3)
         first_sphere_radius = click.prompt("> Radius of first spheres", type=float, default=4.0)
         ligands = click.prompt("> Additional ligands [unnatural AAs] in outer coordination spheres", default=[], show_default=False)
-        include_waters = click.confirm("> Include water molecules in outer coordination spheres", default=False)
         capping = int(
             click.prompt(
                 "> Capping (requires Protoss)\n   0: None\n   1: [H]\n   2: ACE/NME\n ",
@@ -191,7 +190,7 @@ def run(i,
 
             clusters = coordination_spheres.extract_clusters(
                 path, f"{o}/{pdb}", metals,
-                limit, ligands, capping, charge, count, xyz, include_waters, first_sphere_radius,
+                limit, ligands, capping, charge, count, xyz, first_sphere_radius,
                 smooth_method=smooth_method,
                 **smooth_params
             )

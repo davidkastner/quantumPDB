@@ -70,7 +70,7 @@ def fill_dummy(points, mean_distance=3, noise_amp=0.2):
     return np.concatenate([points, dummy], axis=0)
 
 
-def voronoi(model, metals, ligands, include_waters, smooth_method, **smooth_params):
+def voronoi(model, metals, ligands, smooth_method, **smooth_params):
     """
     Computes the Voronoi tessellation of a protein structure.
 
@@ -89,8 +89,7 @@ def voronoi(model, metals, ligands, include_waters, smooth_method, **smooth_para
     for res in model.get_residues():
         if Polypeptide.is_aa(res) or \
             res.get_resname() in metals or \
-            (res.get_resname() in ligands) or \
-            (include_waters and res.get_resname() == "HOH"):
+            (res.get_resname() in ligands):
             for atom in res.get_unpacked_list(): # includes atoms from multiple conformations
                 atoms.append(atom)
                 points.append(atom.get_coord())
@@ -120,8 +119,7 @@ def box_outlier_thres(data, coeff=1.5):
 
 
 def get_next_neighbors(
-    start, neighbors, limit, ligands, 
-    include_waters=False,
+    start, neighbors, limit, ligands,
     first_sphere_radius=3,
     smooth_method="boxplot", 
     **smooth_params):
@@ -138,8 +136,6 @@ def get_next_neighbors(
         Number of spheres to extract
     ligands:
         A list of ligands to include
-    include_waters: bool
-        Whether to include waters in the calculations of spheres
 
     Returns
     -------
@@ -205,7 +201,7 @@ def get_next_neighbors(
                     if Polypeptide.is_aa(par):
                         nxt.add(par)
                     else:
-                        if par.get_resname() in ligands or (include_waters and par.get_resname() == "HOH") or i == 0:
+                        if par.get_resname() in ligands or i == 0:
                             lig_add.add(par)
 
         spheres.append(nxt)
@@ -515,7 +511,6 @@ def extract_clusters(
     charge=False,
     count=False,
     xyz=False,
-    include_waters=False,
     first_sphere_radius=3.0,
     smooth_method="box_plot",
     **smooth_params
@@ -551,14 +546,14 @@ def extract_clusters(
     io.set_structure(structure)
 
     model = structure[0]
-    neighbors = voronoi(model, metals, ligands, include_waters, smooth_method, **smooth_params)
+    neighbors = voronoi(model, metals, ligands, smooth_method, **smooth_params)
 
     aa_charge = {}
     res_count = {}
     for res in model.get_residues():
         if res.get_resname() in metals:
             metal_id, residues, spheres = get_next_neighbors(
-                res, neighbors, limit, ligands, include_waters, first_sphere_radius, smooth_method, **smooth_params
+                res, neighbors, limit, ligands, first_sphere_radius, smooth_method, **smooth_params
             )
 
             os.makedirs(f"{out}/{metal_id}", exist_ok=True)
