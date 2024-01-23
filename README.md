@@ -51,7 +51,7 @@ python -m pip install -e .
 
 ### Command-line interface
 All of the functionality of quantumPDB has been organized into a command-line interface (CLI).
-After performing the developer install, the CLI can be called from anywhere using `qpdb`.
+After performing the developer install, the CLI can be called from anywhere using `qp`.
 
 
 ## 3. What is included?
