@@ -123,6 +123,26 @@ def fill_dummy(points, mean_distance=3, noise_amp=0.2):
     return np.concatenate([points, dummy], axis=0)
 
 
+def calc_dist(point_a, point_b):
+    """
+    Calculate the Euclidean distance between two points
+
+    Parameters
+    ----------
+    point_a: numpy.array
+        Point A
+    point_b: numpy.array
+        Point B
+
+    Returns
+    -------
+    dist: float
+        The Euclidean distance between Point A and Point B    
+
+    """
+    return np.linalg.norm(point_a - point_b)
+
+
 def voronoi(model, metals, ligands, smooth_method, **smooth_params):
     """
     Computes the Voronoi tessellation of a protein structure.
@@ -154,7 +174,6 @@ def voronoi(model, metals, ligands, smooth_method, **smooth_params):
     else:
         vor = Voronoi(points)
 
-    calc_dist = lambda point_a, point_b: np.linalg.norm(point_a - point_b)
     neighbors = {}
     for a, b in vor.ridge_points:
         if a < points_count and b < points_count:
@@ -187,6 +206,37 @@ def box_outlier_thres(data, coeff=1.5):
     Q1 = np.quantile(data, 0.25)
     IQR = Q3 - Q1
     return Q1 - coeff * IQR, Q3 + coeff * IQR
+
+
+def check_nitrogen(atom, metal):
+    """
+    Check if a nitrogen atom in the first sphere is coordinated.
+
+    If the nitrogen atom is in the backbone, or it's the nearest atom to the metal
+    among all atoms in its residue, it's considered coordinated.
+
+    Parameters
+    ----------
+    atom: Bio.PDB.Atom
+        The nitrogen atom to be checked
+    metal:
+        The metal atom (coordination center)
+
+    Returns
+    -------
+    flag: bool
+        Whether the atom is coordinated or not
+    """
+    if atom.get_name() == "N":
+        # TODO: check special coordinated nitrogens in the backbone
+        return True
+    else:
+        ref_dist = calc_dist(atom.get_coord(), metal.get_coord())
+        res = atom.get_parent()
+        for atom in res.get_unpacked_list():
+            if calc_dist(atom.get_coord(), metal.get_coord()) < ref_dist:
+                return False
+        return True
 
 
 def get_next_neighbors(
@@ -227,13 +277,17 @@ def get_next_neighbors(
         if i == 0 and first_sphere_radius > 0:
             metal = start.get_unpacked_list()[0]
             search = NeighborSearch([atom for atom in start.get_parent().get_parent().get_atoms() if atom.element != "H" and atom != metal])
-            first_sphere = search.search(center=metal.get_coord(), radius=first_sphere_radius, level="R")
-            for res in first_sphere:
-                seen.add(res)
-                if Polypeptide.is_aa(res):
-                    nxt.add(res)
-                else:
-                    lig_add.add(res)
+            first_sphere = search.search(center=metal.get_coord(), radius=first_sphere_radius, level="A")
+            for atom in first_sphere:
+                element = atom.element
+                if element in "OS" or (element == "N" and check_nitrogen(atom, metal)):
+                    # only consider coordinated atoms
+                    res = atom.get_parent()
+                    seen.add(res)
+                    if Polypeptide.is_aa(res):
+                        nxt.add(res)
+                    else:
+                        lig_add.add(res)
         else:
             candidates = []
             frontiers = spheres[-1] if spheres[-1] else spheres[0]
