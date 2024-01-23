@@ -25,24 +25,85 @@ import numpy as np
 from Bio.PDB import PDBParser, Polypeptide, PDBIO, Select
 from Bio.PDB.Atom import Atom
 from Bio.PDB.Residue import Residue
+from Bio.PDB.NeighborSearch import NeighborSearch
 from scipy.spatial import Voronoi
 from qp.checks import to_xyz
 from sklearn.cluster import DBSCAN
 
 
 def get_grid_coord_idx(coord, coord_min, mean_distance):
+    """
+    Compute a point's position in a 1D grid
+    
+    Parameters
+    ----------
+    coord: float
+        One coordinate of a point
+    coord_min: float
+        The minimum coordinate of the grid
+    mean_distance: float
+        The distance between neighbors in the grid
+
+    Returns
+    -------
+    idx: int
+        The idx of the point in the grid
+    """
     return int((coord - coord_min + mean_distance * 0.5) // mean_distance)
 
 
 def get_grid(coords, mean_distance):
+    """
+    Compute the grid's parameter for a given 1D point list
+
+    Parameters
+    ----------
+    coords: numpy.array
+        The coordinates of the 1D point list
+    mean_distance: float
+        The distance between neighbors in the grid
+    
+    Returns
+    -------
+    coord_min: float
+        The minimum coordinate of the grid
+    coord_max: float
+        The maximum coordinate of the grid
+    grid: numpy.array
+        The 1D grid
+    """
     coord_min, coord_max = coords.min() - mean_distance, coords.max() + mean_distance
     npoints = get_grid_coord_idx(coord_max, coord_min, mean_distance)
     return coord_min, coord_max, coord_min + np.linspace(0, npoints - 1, npoints) * mean_distance
 
 
-def fill_dummy(points, mean_distance=3):
+def _visualize_dummy(dummy, path):
+    # debug function
+    with open(path + "/dummy.xyz", "w") as f:
+        f.write(f"{len(dummy)}\n\n")
+        for coord in dummy:
+            f.write(f"He {coord[0]} {coord[1]} {coord[2]}\n")
+
+
+def fill_dummy(points, mean_distance=3, noise_amp=0.2):
+    """
+    Fill dummy atoms in a point cloud
+
+    Parameters
+    ----------
+    points: numpy.array
+        The 3D coordinates of the point cloud
+    mean_distance: float
+        The distance between neighbors in the grid
+    noise_amp: float
+        The amplitude of the noise of dummy atoms' position
+    
+    Returns
+    -------
+    points:
+        The 3D coordinates of the point cloud filled with dummy atoms
+    """
     conf = np.stack(points, axis=0)
-    grids = []
     x_min, _, x_grids = get_grid(conf[:,0], mean_distance)
     y_min, _, y_grids = get_grid(conf[:,1], mean_distance)
     z_min, _, z_grids = get_grid(conf[:,2], mean_distance)
@@ -55,14 +116,34 @@ def fill_dummy(points, mean_distance=3):
             get_grid_coord_idx(z, z_min, mean_distance)
         ] = False
     flags = flags.flatten()
-    noise = mean_distance * 0.2 * (np.random.rand(len(x_grids), len(y_grids), len(z_grids), 3) - 0.5)
+    noise = mean_distance * noise_amp * (np.random.rand(len(x_grids), len(y_grids), len(z_grids), 3) - 0.5)
     dummy = np.stack(np.meshgrid(x_grids, y_grids, z_grids, indexing="ij"), axis=-1)
     dummy = (dummy + noise).reshape(-1, 3)
     dummy = dummy[flags, :]
     return np.concatenate([points, dummy], axis=0)
 
 
-def voronoi(model, smooth_method, **smooth_params):
+def calc_dist(point_a, point_b):
+    """
+    Calculate the Euclidean distance between two points
+
+    Parameters
+    ----------
+    point_a: numpy.array
+        Point A
+    point_b: numpy.array
+        Point B
+
+    Returns
+    -------
+    dist: float
+        The Euclidean distance between Point A and Point B    
+
+    """
+    return np.linalg.norm(point_a - point_b)
+
+
+def voronoi(model, metals, ligands, smooth_method, **smooth_params):
     """
     Computes the Voronoi tessellation of a protein structure.
 
@@ -79,9 +160,12 @@ def voronoi(model, smooth_method, **smooth_params):
     atoms = []
     points = []
     for res in model.get_residues():
-        for atom in res.get_unpacked_list(): # includes atoms from multiple conformations
-            atoms.append(atom)
-            points.append(atom.get_coord())
+        if Polypeptide.is_aa(res) or \
+            res.get_resname() in metals or \
+            (res.get_resname() in ligands):
+            for atom in res.get_unpacked_list(): # includes atoms from multiple conformations
+                atoms.append(atom)
+                points.append(atom.get_coord())
 
     points_count = len(points)
     if smooth_method == "dummy_atom":
@@ -90,7 +174,6 @@ def voronoi(model, smooth_method, **smooth_params):
     else:
         vor = Voronoi(points)
 
-    calc_dist = lambda point_a, point_b: np.linalg.norm(point_a - point_b)
     neighbors = {}
     for a, b in vor.ridge_points:
         if a < points_count and b < points_count:
@@ -101,14 +184,66 @@ def voronoi(model, smooth_method, **smooth_params):
 
 
 def box_outlier_thres(data, coeff=1.5):
+    """
+    Compute the threshold for the boxplot outlier detection method
+
+    Parameters
+    ----------
+    data: list
+        The data for the boxplot statistics
+    coeff: float
+        The coefficient for the outlier criterion from quartiles of the data
+
+    Returns
+    -------
+    lb: float
+        the lower bound of non-outliers
+    ub: float
+        the upper bound of non-outliers
+
+    """
     Q3 = np.quantile(data, 0.75)
     Q1 = np.quantile(data, 0.25)
     IQR = Q3 - Q1
     return Q1 - coeff * IQR, Q3 + coeff * IQR
 
 
-def get_next_neighbors(start, neighbors, limit, ligands, include_waters=False, smooth_method="boxplot", **smooth_params):
+def check_nitrogen(atom, metal):
+    """
+    Check if a nitrogen atom in the first sphere is coordinated.
 
+    If the nitrogen atom is in the backbone, or it's the nearest atom to the metal
+    among all atoms in its residue, it's considered coordinated.
+
+    Parameters
+    ----------
+    atom: Bio.PDB.Atom
+        The nitrogen atom to be checked
+    metal:
+        The metal atom (coordination center)
+
+    Returns
+    -------
+    flag: bool
+        Whether the atom is coordinated or not
+    """
+    if atom.get_name() == "N":
+        # TODO: check special coordinated nitrogens in the backbone
+        return True
+    else:
+        ref_dist = calc_dist(atom.get_coord(), metal.get_coord())
+        res = atom.get_parent()
+        for atom in res.get_unpacked_list():
+            if calc_dist(atom.get_coord(), metal.get_coord()) < ref_dist:
+                return False
+        return True
+
+
+def get_next_neighbors(
+    start, neighbors, limit, ligands,
+    first_sphere_radius=3,
+    smooth_method="boxplot", 
+    **smooth_params):
     """
     Iteratively determines spheres around a given starting atom
 
@@ -122,8 +257,6 @@ def get_next_neighbors(start, neighbors, limit, ligands, include_waters=False, s
         Number of spheres to extract
     ligands:
         A list of ligands to include
-    include_waters: bool
-        Whether to include waters in the calculations of spheres
 
     Returns
     -------
@@ -134,51 +267,67 @@ def get_next_neighbors(start, neighbors, limit, ligands, include_waters=False, s
     spheres: list of sets
         Sets of residues separated by spheres
     """
-
     seen = {start}
     spheres = [{start}]
     lig_adds = [set()]
-    
-    for i in range(limit):
+    for i in range(0, limit):
         # get candidate atoms in the new sphere
-        candidates = []
-        for res in spheres[-1]:
-            for atom in res.get_unpacked_list():
-                for n, dist in neighbors[atom]:
-                    par = n.get_parent()
-                    candidates.append((n, dist, par))
-
-        # screen candidates
-        if smooth_method == "box_plot":
-            dist_data = [dist for n, dist, par in candidates]
-            lb, ub = box_outlier_thres(dist_data, **smooth_params)
-            screened_candidates = [par for n, dist, par in candidates if dist < ub]
-        elif smooth_method == "dbscan":
-            optics = DBSCAN(**smooth_params)
-            X = [n.get_coord() for n, dist, par in candidates]
-            for res in spheres[-1]:
-                for atom in res.get_unpacked_list():
-                    X.append(atom.get_coord())
-            cluster_idx = optics.fit_predict(X) + 1
-            largest_idx = np.bincount(cluster_idx).argmax()
-            screened_candidates = [par for i, (n, dist, par) in enumerate(candidates) if cluster_idx[i] == largest_idx]
-        else:
-            screened_candidates = [par for n, dist, par in candidates]
-
         nxt = set()
         lig_add = set()
-        # build the new sphere
-        for par in screened_candidates:
-            if par not in seen:
-                seen.add(par)
-            ## Added to include ligands in the first coordination sphere
-            ## Produced unweildy clusters as some ligands are large
-            ## Potentially useful in the future
-                if Polypeptide.is_aa(par):
-                    nxt.add(par)
-                else:
-                    if par.get_resname() in ligands or (include_waters and par.get_resname() == "HOH") or i == 0:
-                        lig_add.add(par)
+        if i == 0 and first_sphere_radius > 0:
+            metal = start.get_unpacked_list()[0]
+            search = NeighborSearch([atom for atom in start.get_parent().get_parent().get_atoms() if atom.element != "H" and atom != metal])
+            first_sphere = search.search(center=metal.get_coord(), radius=first_sphere_radius, level="A")
+            for atom in first_sphere:
+                element = atom.element
+                if element in "OS" or (element == "N" and check_nitrogen(atom, metal)):
+                    # only consider coordinated atoms
+                    res = atom.get_parent()
+                    seen.add(res)
+                    if Polypeptide.is_aa(res):
+                        nxt.add(res)
+                    else:
+                        lig_add.add(res)
+        else:
+            candidates = []
+            frontiers = spheres[-1] if spheres[-1] else spheres[0]
+            for res in frontiers:
+                for atom in res.get_unpacked_list():
+                    for n, dist in neighbors[atom]:
+                        par = n.get_parent()
+                        candidates.append((n, dist, par))
+
+            # screen candidates
+            if smooth_method == "box_plot":
+                dist_data = [dist for n, dist, par in candidates]
+                lb, ub = box_outlier_thres(dist_data, **smooth_params)
+                screened_candidates = [(dist, par) for n, dist, par in candidates if dist < ub]
+            elif smooth_method == "dbscan":
+                optics = DBSCAN(**smooth_params)
+                X = [n.get_coord() for n, dist, par in candidates]
+                for res in spheres[-1]:
+                    for atom in res.get_unpacked_list():
+                        X.append(atom.get_coord())
+                cluster_idx = optics.fit_predict(X) + 1
+                largest_idx = np.bincount(cluster_idx).argmax()
+                screened_candidates = [(dist, par) for i, (n, dist, par) in enumerate(candidates) if cluster_idx[i] == largest_idx]
+            else:
+                screened_candidates = [(dist, par) for n, dist, par in candidates]
+
+            screened_candidates = [par for dist, par in screened_candidates if i != 0 or dist < 2.7]
+
+            # build the new sphere
+            for par in screened_candidates:
+                if par not in seen:
+                    seen.add(par)
+                ## Added to include ligands in the first coordination sphere
+                ## Produced unweildy clusters as some ligands are large
+                ## Potentially useful in the future
+                    if Polypeptide.is_aa(par):
+                        nxt.add(par)
+                    else:
+                        if par.get_resname() in ligands or i == 0:
+                            lig_add.add(par)
 
         spheres.append(nxt)
         lig_adds.append(lig_add)
@@ -487,7 +636,7 @@ def extract_clusters(
     charge=False,
     count=False,
     xyz=False,
-    include_waters=False,
+    first_sphere_radius=3.0,
     smooth_method="box_plot",
     **smooth_params
 ):
@@ -522,14 +671,14 @@ def extract_clusters(
     io.set_structure(structure)
 
     model = structure[0]
-    neighbors = voronoi(model, smooth_method, **smooth_params)
+    neighbors = voronoi(model, metals, ligands, smooth_method, **smooth_params)
 
     aa_charge = {}
     res_count = {}
     for res in model.get_residues():
         if res.get_resname() in metals:
             metal_id, residues, spheres = get_next_neighbors(
-                res, neighbors, limit, ligands, include_waters, smooth_method, **smooth_params
+                res, neighbors, limit, ligands, first_sphere_radius, smooth_method, **smooth_params
             )
 
             os.makedirs(f"{out}/{metal_id}", exist_ok=True)
@@ -544,8 +693,10 @@ def extract_clusters(
 
             sphere_paths = []
             for i in range(limit + 1):
-                sphere_paths.append(f"{out}/{metal_id}/{i}.pdb")
-                write_pdb(io, spheres[i], sphere_paths[i])
+                if spheres[i]:
+                    sphere_path = f"{out}/{metal_id}/{i}.pdb"
+                    sphere_paths.append(sphere_path)
+                    write_pdb(io, spheres[i], sphere_path)
             if capping:
                 for cap in cap_residues:
                     cap.get_parent().detach_child(cap.get_id())
