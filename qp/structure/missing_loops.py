@@ -299,10 +299,13 @@ def fix_numbering(pdb_content):
             has_char = line[26] != ' '
 
             # If we encounter a new chain or a residue we haven't seen, reset/update values
-            if current_chain != prev_chain or residue_number_with_letter not in seen_residues:
+            if current_chain != prev_chain:
                 prev_chain = current_chain
+                prev_residue_number = None
+                seen_residues = set()
+            if residue_number_with_letter not in seen_residues:
                 if has_char:
-                    prev_residue_number = prev_residue_number + 1 if prev_residue_number else int(residue_number_with_letter[:-1])
+                    prev_residue_number = prev_residue_number + 1 if prev_residue_number is not None else int(residue_number_with_letter[:-1])
                 else:
                     prev_residue_number = int(residue_number_with_letter)
                 seen_residues.add(residue_number_with_letter)
@@ -389,8 +392,8 @@ def build_model(residues, pdb, ali, out, optimize=1):
         transfer_numbering(e, ali, pdb, out)
     else:
         a.make()
-        for ext in ["ini", "rsr", "sch", "D00000001", "V99990001"]:
-            os.remove(f"{pdb}_fill.{ext}")
+        # for ext in ["ini", "rsr", "sch", "D00000001", "V99990001"]:
+        #     os.remove(f"{pdb}_fill.{ext}")
         transfer_numbering(e, ali, pdb, out)
 
     os.chdir(cwd)
