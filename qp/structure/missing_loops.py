@@ -272,8 +272,15 @@ def transfer_numbering(e, ali, pdb, out):
 
 
 def fix_numbering(pdb_content):
-    """Handles insertion codes from Modeller.
-    
+    """
+    Handles insertion codes from Modeller.
+
+    Modeller resets the residue indices, which we fix with transfer_numbering().
+    However, transfer_numbering() names residues with insertion codes.
+    For example, 5,5A,5B,5C instead of 5,6,7,8.
+    This function fixes is residue numbering behavior.
+    Takes the generated PDB, fixes the residue numbers and overwrites the PDB.
+
     Parameters
     ----------
     pdb_content : str
