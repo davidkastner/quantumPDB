@@ -701,7 +701,7 @@ def extract_clusters(
                 for cap in cap_residues:
                     cap.get_parent().detach_child(cap.get_id())
             if xyz:
-                to_xyz.to_xyz(f"{out}/{metal_id}/{metal_id}.xyz", *sphere_paths)
+                to_xyz.to_xyz(f"{out}/{metal_id}/{metal_id}", sphere_paths)
 
     if charge:
         with open(f"{out}/charge.csv", "w") as f:
