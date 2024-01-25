@@ -1,11 +1,13 @@
 """Manager for submitting DFT single point calcultions."""
 
 import os
+import sys
 import glob
 import shutil
 import requests
 import pandas as pd
 from io import StringIO
+from qp.checks import to_xyz
 from itertools import groupby
 from operator import itemgetter
 
@@ -46,14 +48,12 @@ def residue_exists(first_sphere_path, ligand_name):
     return False
 
 
-def get_oxidation(pdb_id):
+def get_electronic(pdb_id):
     """Query the local pdb master list CSV file."""
 
-    path_to_master_list = "/home/kastner/projects/quantumPDB/protein_master_list.csv"
+    path_to_master_list = "master_list.csv"
     try:
-        # Read the data into a DataFrame
         df = pd.read_csv(path_to_master_list)
-
         # Check if the row with the matching pdb_id exists
         row = df[df['pdb_id'] == pdb_id]
         if row.empty:
@@ -62,9 +62,25 @@ def get_oxidation(pdb_id):
 
         # Check for a value in the 'literature_oxidation' column, if not found, use 'pdb_oxidation'
         if not pd.isna(row['literature_oxidation'].iloc[0]) and row['literature_oxidation'].iloc[0] != '':
-            return int(row['literature_oxidation'].iloc[0])
+            oxidation = int(row['literature_oxidation'].iloc[0])
         else:
-            return int(row['pdb_oxidation'].iloc[0])
+            oxidation = int(row['pdb_oxidation'].iloc[0])
+
+        # Determine the multiplicity
+        spin = row['spin'].iloc[0]
+        if oxidation == 2 and spin == "high":
+            multiplicity = 5
+        elif oxidation == 2 and spin == "low":
+            multiplicity = 1
+        elif oxidation == 3 and spin == "high":
+            multiplicity = 6
+        elif oxidation == 3 and spin == "low":
+            multiplicity = 2
+        else:
+            print(f"\033[93mWARNING: Spin {spin} and oxidation {oxidation} are not supported for {pdb_id}.\033[0m")
+
+        return oxidation, multiplicity
+
     except Exception as e:
         print(f"Error: {e}")
         return None
@@ -112,85 +128,6 @@ def get_charge(oxidation):
     
     return charge
 
-
-def submit_jobs(job_count, minimization, basis, method, guess, gpus, memory):
-    """Generate and submit jobs to queueing system."""
-
-    pdb_dirs = sorted([d for d in os.listdir() if os.path.isdir(d) and not d == 'Protoss'])
-
-    for pdb in pdb_dirs:
-        structure_dirs = sorted(glob.glob(os.path.join(pdb, '[A-Z][0-9]*')))
-
-        for structure in structure_dirs:
-            qm_path = os.path.join(structure, method)
-            os.makedirs(qm_path, exist_ok=True)
-
-            # Check to see if a job has already been run here
-            if os.path.exists(os.path.join(qm_path, 'qmscript.out')):
-                continue
-            
-            # Remove previous slurm log files
-            for file in glob.glob(os.path.join(qm_path, 'Z*')):
-                os.remove(file)
-
-            # Move the xyz file into the QM job directory
-            xyz_files = glob.glob(os.path.join(structure, '*.xyz'))
-            if len(xyz_files) != 1:
-                print(f"Error: Expected 1 xyz file in {structure}, found {len(xyz_files)}")
-                continue
-            coord_file = os.path.join(qm_path, os.path.basename(xyz_files[0]))
-            shutil.copy(xyz_files[0], coord_file)
-
-            # Get total charge
-            current_directory = os.getcwd()
-            os.chdir(qm_path)
-
-            oxidation = get_oxidation(pdb.lower())
-            charge = get_charge(oxidation)
-
-            # Get atoms to restrain if requested
-            if minimization:
-                heavy_list = find_heavy()
-                constraint_freeze = f"$constraint_freeze\n{heavy_list}\n$end"
-            else:
-                constraint_freeze = ""
-
-            # Determine multiplicity
-            os.chdir(current_directory)
-            if method[0] == "u":
-                multiplicity = 5 if oxidation == 2 else 6
-            else:
-                multiplicity = 1
-
-            coord_name = os.path.basename(coord_file)
-            pdb_name = os.path.basename(pdb)
-            structure_name = os.path.basename(structure)
-            job_name = f"{pdb_name}{structure_name}"
-            
-            # Generate TeraChem job script contents
-            qmscript = write_qmscript(minimization,
-                                      coord_name,
-                                      basis, 
-                                      method, 
-                                      charge, 
-                                      multiplicity,
-                                      guess, 
-                                      constraint_freeze,)
-
-            jobscript = write_jobscript(job_name,
-                                        gpus,
-                                        memory,)
-
-            with open(os.path.join(qm_path, 'qmscript.in'), 'w') as f:
-                f.write(qmscript)
-            with open(os.path.join(qm_path, 'jobscript.sh'), 'w') as f:
-                f.write(jobscript)
-            os.system(f'cd {qm_path} && qsub jobscript.sh')
-
-            job_count -= 1
-            if job_count <= 0:
-                return
-
 def write_qmscript(minimzation,
                   coordinate_file,
                   basis, 
@@ -228,6 +165,7 @@ end
 
     return qmscript_content
 
+
 def write_jobscript(job_name,
                   gpus,
                   memory):
@@ -248,11 +186,98 @@ def write_jobscript(job_name,
 module load cuda/10.0
 module load terachem/071920-cuda10.0-intel16
 module load intel/16.0.109
+
 export OMP_NUM_THREADS={gpus}
 terachem qmscript.in > $SGE_O_WORKDIR/qmscript.out
 """
 
     return jobscript_content
+
+
+def get_master_list(url):
+    """Retrieve a copy of the master list csv from shared Google Spreadsheet."""
+
+    response = requests.get(url)
+    if response.status_code == 200:
+        with open('master_list.csv', 'wb') as file:
+            file.write(response.content)
+        print("File downloaded successfully.")
+    else:
+        print("Failed to retrieve the file.")
+        sys.exit(1)
+
+
+def submit_jobs(job_count, minimization, basis, method, guess, gpus, memory):
+    """Generate and submit jobs to queueing system."""
+
+    pdb_dirs = sorted([d for d in os.listdir() if os.path.isdir(d) and not d == 'Protoss'])
+
+    for pdb in pdb_dirs:
+        structure_dirs = sorted(glob.glob(os.path.join(pdb, '[A-Z][0-9]*')))
+
+        for structure in structure_dirs:
+            qm_path = os.path.join(structure, method)
+            os.makedirs(qm_path, exist_ok=True)
+
+            # Check to see if a job has already been run here
+            if os.path.exists(os.path.join(qm_path, 'qmscript.out')):
+                continue
+            
+            # Remove previous slurm log files
+            for file in glob.glob(os.path.join(qm_path, 'Z*')):
+                os.remove(file)
+
+            # Move the xyz file into the QM job directory
+            xyz_files = glob.glob(os.path.join(structure, '*.xyz'))
+            if len(xyz_files) != 1:
+                print(f"Error: Expected 1 xyz file in {structure}, found {len(xyz_files)}")
+                continue
+            coord_file = os.path.join(qm_path, os.path.basename(xyz_files[0]))
+            shutil.copy(xyz_files[0], coord_file)
+
+            # Get total charge
+            current_directory = os.getcwd()
+            os.chdir(qm_path)
+
+            oxidation, multiplicity = get_electronic(pdb.lower())
+            charge = get_charge(oxidation)
+
+            # Get atoms to restrain if requested
+            if minimization:
+                heavy_list = find_heavy()
+                constraint_freeze = f"$constraint_freeze\n{heavy_list}\n$end"
+            else:
+                constraint_freeze = ""
+
+            coord_name = os.path.basename(coord_file)
+            pdb_name = os.path.basename(pdb)
+            structure_name = os.path.basename(structure)
+            job_name = f"{pdb_name}{structure_name}"
+            
+            # Generate TeraChem job script contents
+            qmscript = write_qmscript(minimization,
+                                      coord_name,
+                                      basis, 
+                                      method, 
+                                      charge, 
+                                      multiplicity,
+                                      guess, 
+                                      constraint_freeze,)
+
+            jobscript = write_jobscript(job_name,
+                                        gpus,
+                                        memory,)
+
+            with open(os.path.join(qm_path, 'qmscript.in'), 'w') as f:
+                f.write(qmscript)
+            with open(os.path.join(qm_path, 'jobscript.sh'), 'w') as f:
+                f.write(jobscript)
+            os.system(f'cd {qm_path} && qsub jobscript.sh')
+
+            job_count -= 1
+            if job_count <= 0:
+                return
+
 
 if __name__ == '__main__':
 
@@ -276,4 +301,6 @@ if __name__ == '__main__':
         gpus = 1
         memory = "8G"
 
+    url = "https://docs.google.com/spreadsheets/d/1St_4YEKcWzrs7yS1GTehfAKabtGCJeuM0sC0u1JG8ZE/gviz/tq?tqx=out:csv&sheet=Sheet1"
+    get_master_list(url)
     submit_jobs(job_count, minimization, basis, method, guess, gpus, memory)
