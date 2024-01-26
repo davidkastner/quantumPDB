@@ -241,16 +241,31 @@ def submit(job_manager,
         click.echo("")
 
         # Get the users perferred functional
-        choice_map = {"0": "uwpbeh", "1": "ugfn2xtb", "2": "gfn2xtb"}
+        choice_map = {"0": "uwpbeh", "1": "ub3lyp", "2": "ugfn2xtb", "3": "gfn2xtb"}
         method_number = click.prompt(
-            "> Requested functional:\n   0: [uwpbeh]\n   1: ugfn2xtb\n   2: gfn2xtb\n ",
-            type=click.Choice(["0", "1", "2"]),
+            "> Requested functional:\n   0: [uwPBEh]\n   1: uB3LYP\n   2: uGFN2xTB\n   3: GFN2xTB\n ",
+            type=click.Choice(["0", "1", "2", "3"]),
             default="0",
             show_default=False)
         method = choice_map[method_number]
+
+        spheres = int(
+            click.prompt(
+                "> Coordination spheres to include:\n   0: First\n   1: [Second]\n   2: Third\n ",
+                type=click.Choice(["0", "1", "2"]),
+                default="1",
+                show_default=False,
+            )
+        )
+
         click.echo("")
 
         if method == "uwpbeh":
+            basis = "lacvps_ecp"
+            guess = "generate"
+            gpus = 1
+            memory = "8G"
+        elif method == "ub3lyp":
             basis = "lacvps_ecp"
             guess = "generate"
             gpus = 1
@@ -265,8 +280,10 @@ def submit(job_manager,
             guess = "hcore"
             gpus = 1
             memory = "8G"
-
-        job_manager.submit_jobs(job_count, minimization, basis, method, guess, gpus, memory)
+        
+        url = "https://docs.google.com/spreadsheets/d/1St_4YEKcWzrs7yS1GTehfAKabtGCJeuM0sC0u1JG8ZE/gviz/tq?tqx=out:csv&sheet=Sheet1"
+        master_list_path = job_manager.get_master_list(url)
+        job_manager.submit_jobs(job_count, spheres, master_list_path, minimization, basis, method, guess, gpus, memory)
 
     if failure_checkup:
         from qp.manager import failure_checkup
