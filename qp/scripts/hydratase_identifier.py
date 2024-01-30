@@ -97,13 +97,18 @@ def main():
     start_time = time.time()
     parser = PDBParser(QUIET=True)
     all_data = []
-    for filename in sorted(os.listdir('.')):
-        if filename.lower().endswith('.pdb'):
-            structure = parser.get_structure(filename, filename)
-            data = check_motif(structure, filename)
-            all_data.extend(data)
-    all_data = [(float(distance), float(dihedral), str(filename), str(residue_info)) for distance, dihedral, filename, residue_info in all_data]
 
+    for root, dirs, files in os.walk('.'):
+        for dir_name in dirs:
+            pdb_file = f"{dir_name}.pdb"
+            file_path = os.path.join(root, dir_name, pdb_file)
+            if os.path.isfile(file_path):
+                structure = parser.get_structure(dir_name, file_path)
+                data = check_motif(structure, pdb_file)
+                all_data.extend(data)
+
+    # Convert data for visualization
+    all_data = [(float(distance), float(dihedral), str(filename), str(residue_info)) for distance, dihedral, filename, residue_info in all_data]
 
     # Visualize the data using KDE plot
     plot_name = 'kde.png'
