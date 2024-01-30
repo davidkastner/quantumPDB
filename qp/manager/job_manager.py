@@ -202,7 +202,7 @@ def get_master_list(url):
     if response.status_code == 200:
         with open(master_list_file, 'wb') as file:
             file.write(response.content)
-        print("   > Protein master list downloaded successfully")
+        print("> Protein master list downloaded successfully")
         return os.path.abspath(master_list_file)
     
     else:
