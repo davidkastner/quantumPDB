@@ -6,10 +6,9 @@ import glob
 import shutil
 import requests
 import pandas as pd
-from io import StringIO
-from qp.checks import to_xyz
 from itertools import groupby
 from operator import itemgetter
+from qp.manager import failure_checkup
 
 def compress_sequence(seq):
     """Condenses frozen atoms to make it more readable."""
@@ -85,11 +84,11 @@ def get_electronic(pdb_id, master_list):
         sys.exit()
 
 
-def get_charge(oxidation):
+def get_charge(spheres):
     """Extract the charge values from charge.csv"""
     current_dir = os.getcwd()
     
-    # Calculate relative paths
+    # Construct relative paths
     charge_dir = os.path.abspath(os.path.join(current_dir, "../../"))
     structure_dir = os.path.abspath(os.path.join(current_dir, "../"))
     charge_csv_path = os.path.join(charge_dir, "charge.csv")
@@ -97,7 +96,7 @@ def get_charge(oxidation):
     
     charge = 0
     section = 1
-    identifier = os.path.basename(structure_dir)
+    chain_identifier = os.path.basename(structure_dir)
     chain = os.path.basename(structure_dir)[0]
 
     with open(charge_csv_path, 'r') as charge_csv_content:
@@ -110,11 +109,11 @@ def get_charge(oxidation):
                 continue
 
             # Parse charge.csv section 1
-            if section == 1 and line.startswith(identifier):
+            if section == 1 and line.startswith(chain_identifier):
                 parts = line.split(',')
-                current_identifier = parts[0]
-                if current_identifier == identifier:
-                    charge += sum([int(x) for x in parts[1:]])
+                current_chain_identifier = parts[0]
+                if current_chain_identifier == chain_identifier:
+                    charge += sum([int(x) for x in parts[1:spheres + 1]])
 
             # Parse charge.csv section 2
             elif section == 2 and '_' + chain in line:
@@ -122,10 +121,8 @@ def get_charge(oxidation):
                 if residue_exists(first_sphere_path, ligand.split('_')[0]):
                     charge += int(value)
     
-    # Add the in the metal oxidation state
-    charge += oxidation
-    
     return charge
+
 
 def write_qmscript(minimzation,
                   coordinate_file,
@@ -188,6 +185,7 @@ module load intel/16.0.109
 
 export OMP_NUM_THREADS={gpus}
 terachem qmscript.in > $SGE_O_WORKDIR/qmscript.out
+sleep 180
 """
 
     return jobscript_content
@@ -224,20 +222,27 @@ def submit_jobs(job_count, spheres, master_list_path, minimization, basis, metho
             qm_path = os.path.join(structure, method)
             os.makedirs(qm_path, exist_ok=True)
 
-            if os.path.exists(os.path.join(qm_path, 'qmscript.out')):
-                continue
-
+            # Check if a prevous job was run and finished correctly
+            qm_output_file = os.path.join(qm_path, 'qmscript.out')
+            if os.path.exists(qm_output_file):
+                job_status = failure_checkup.check_failure_mode(qm_output_file)
+                if job_status == "done" or job_status == "running":
+                    continue
+            
+            # Remove old log files
             for file in glob.glob(os.path.join(qm_path, 'Z*')):
                 os.remove(file)
 
+            # Copy over the xyz corresponding to the requested cluster model
             xyz_files = glob.glob(os.path.join(structure, '*.xyz'))
-            coord_file = os.path.join(qm_path, os.path.basename(xyz_files[spheres]))
-            shutil.copy(xyz_files[0], coord_file)
+            coord_file = os.path.join(qm_path, xyz_files[spheres])
+            shutil.copy(xyz_files[spheres], qm_path)
 
-            os.chdir(qm_path)  # Change to QM directory
+            os.chdir(qm_path)
 
             oxidation, multiplicity = get_electronic(pdb.lower(), master_list_path)
-            charge = get_charge(oxidation)
+            charge = get_charge(spheres)
+            total_charge = charge + oxidation
 
             if minimization:
                 heavy_list = find_heavy()
@@ -250,7 +255,7 @@ def submit_jobs(job_count, spheres, master_list_path, minimization, basis, metho
             structure_name = os.path.basename(structure)
             job_name = f"{pdb_name}{structure_name}"
 
-            qmscript = write_qmscript(minimization, coord_name, basis, method, charge, multiplicity, guess, constraint_freeze)
+            qmscript = write_qmscript(minimization, coord_name, basis, method, total_charge, multiplicity, guess, constraint_freeze)
             jobscript = write_jobscript(job_name, gpus, memory)
 
             with open('qmscript.in', 'w') as f:
