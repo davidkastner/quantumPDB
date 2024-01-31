@@ -287,7 +287,8 @@ def submit(job_manager,
 
     if failure_checkup:
         from qp.manager import failure_checkup
-        failure_checkup.main()
+        failure_counts = failure_checkup.check_all_jobs()
+        failure_checkup.plot_failures(failure_counts)
 
 
 if __name__ == "__main__":

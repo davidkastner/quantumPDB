@@ -559,6 +559,7 @@ def compute_charge(spheres, structure):
     # Identifying N-terminal and C-terminal residues for each chain
     n_terminals = set()
     c_terminals = set()
+
     # Loop over the residues to get first and last as indices may be different
     for chain in structure.get_chains():
         chain_residues = list(chain.get_residues())
@@ -632,7 +633,7 @@ def extract_clusters(
     metals,
     limit=2,
     ligands=[],
-    capping=0,
+    capping=1,
     charge=False,
     count=False,
     xyz=False,

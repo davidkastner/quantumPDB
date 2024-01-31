@@ -4,6 +4,7 @@ import os
 import glob
 import matplotlib.pyplot as plt
 
+
 def format_plot() -> None:
     """General plotting parameters for the Kulik Lab."""
 
@@ -22,10 +23,12 @@ def format_plot() -> None:
     plt.rcParams["ytick.right"] = True
     plt.rcParams["svg.fonttype"] = "none"
 
+
 def check_failure_mode(filepath):
     """Checks for specific failure mode keywords in generated output."""
     with open(filepath, 'r') as f:
         content = f.read()
+        
         if "Incorrect molecular charge or spin multiplicity" in content:
             return "charge"
         elif "In Alloc2D: malloc failed" in content:
@@ -36,8 +39,9 @@ def check_failure_mode(filepath):
             return "killed"
         elif "Job finished" in content:
             return "done"
-    return "unknown"
-    
+        
+    return "running"
+
 
 def plot_failures(failure_counts):
     """Create a bar plot for the failure modes."""
@@ -51,11 +55,12 @@ def plot_failures(failure_counts):
     plt.ylabel('job count', fontsize=12, fontweight='bold')
     plt.savefig('failure_modes.png', bbox_inches="tight", dpi=600)
 
-def main():
+
+def check_all_jobs():
     """Loop over all jobs and check if they failed."""
     
     print(f"   > Checking for failed QM jobs.")
-    output_name = "failure_checkup.txt"
+    output_name = "failure_modes.txt"
     failure_counts = {"done": 0, "charge": 0, "memory": 0, "atom type": 0, "unknown": 0}
 
     with open(output_name, "w") as output_file:
@@ -68,11 +73,14 @@ def main():
                             filepath = os.path.join(dirpath, filename)
                             failure_mode = check_failure_mode(filepath)
                             failure_counts[failure_mode] += 1
-                            if failure_mode != "done":  # Changed "Done" to "done" to match the case
+                            if failure_mode != "done":
                                 output_file.write(f"{filepath} - {failure_mode}\n")
 
-    plot_failures(failure_counts)
     print(f"   > Saving checkup results in {output_name}\n")
+    
+    return failure_counts
+
 
 if __name__ == '__main__':
-    main()
+    failure_counts = check_all_jobs()
+    plot_failures(failure_counts)
