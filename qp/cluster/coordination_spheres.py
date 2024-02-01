@@ -8,7 +8,7 @@
     ...     "path/to/PDB.pdb", 
     ...     "path/to/out/dir/", 
     ...     metals=["FE", "FE2"], # PDB IDs of active site metals
-    ...     limit=2,              # Number of spheres to extract
+    ...     sphere_count=2,              # Number of spheres to extract
     ...     ligands=["AKG"]       # PDB IDs of additional ligands
     ... )
 
@@ -240,7 +240,7 @@ def check_nitrogen(atom, metal):
 
 
 def get_next_neighbors(
-    start, neighbors, limit, ligands,
+    start, neighbors, sphere_count, ligands,
     first_sphere_radius=3,
     smooth_method="boxplot", 
     **smooth_params):
@@ -253,7 +253,7 @@ def get_next_neighbors(
         Starting metal atom
     neighbors: dict
         Adjacency list of neighboring atoms
-    limit: int
+    sphere_count: int
         Number of spheres to extract
     ligands:
         A list of ligands to include
@@ -270,7 +270,7 @@ def get_next_neighbors(
     seen = {start}
     spheres = [{start}]
     lig_adds = [set()]
-    for i in range(0, limit):
+    for i in range(0, sphere_count):
         # get candidate atoms in the new sphere
         nxt = set()
         lig_add = set()
@@ -559,7 +559,6 @@ def compute_charge(spheres, structure):
     # Identifying N-terminal and C-terminal residues for each chain
     n_terminals = set()
     c_terminals = set()
-
     # Loop over the residues to get first and last as indices may be different
     for chain in structure.get_chains():
         chain_residues = list(chain.get_residues())
@@ -631,9 +630,9 @@ def extract_clusters(
     path,
     out,
     metals,
-    limit=2,
+    sphere_count=2,
     ligands=[],
-    capping=1,
+    capping=0,
     charge=False,
     count=False,
     xyz=False,
@@ -653,7 +652,7 @@ def extract_clusters(
         Path to output directory
     metals: list
         List of active site metal IDs
-    limit: int
+    sphere_count: int
         Number of coordinations spheres to extract
     ligands: list
         Other ligand IDs to include, in addition to AAs and waters
@@ -679,7 +678,7 @@ def extract_clusters(
     for res in model.get_residues():
         if res.get_resname() in metals:
             metal_id, residues, spheres = get_next_neighbors(
-                res, neighbors, limit, ligands, first_sphere_radius, smooth_method, **smooth_params
+                res, neighbors, sphere_count, ligands, first_sphere_radius, smooth_method, **smooth_params
             )
 
             os.makedirs(f"{out}/{metal_id}", exist_ok=True)
@@ -693,7 +692,7 @@ def extract_clusters(
                 spheres[-1] |= cap_residues
 
             sphere_paths = []
-            for i in range(limit + 1):
+            for i in range(sphere_count + 1):
                 if spheres[i]:
                     sphere_path = f"{out}/{metal_id}/{i}.pdb"
                     sphere_paths.append(sphere_path)
@@ -702,17 +701,17 @@ def extract_clusters(
                 for cap in cap_residues:
                     cap.get_parent().detach_child(cap.get_id())
             if xyz:
-                to_xyz.to_xyz(f"{out}/{metal_id}/{metal_id}", sphere_paths)
+                to_xyz.to_xyz(f"{out}/{metal_id}/{metal_id}.xyz", *sphere_paths)
 
     if charge:
         with open(f"{out}/charge.csv", "w") as f:
-            f.write(f"Name,{','.join(str(x + 1) for x in range(limit))}\n")
+            f.write(f"Name,{','.join(str(x + 1) for x in range(sphere_count))}\n")
             for k, v in aa_charge.items():
                 f.write(f"{k},{','.join(str(x) for x in v)}\n")
 
     if count:
         with open(f"{out}/count.csv", "w") as f:
-            f.write(f"Name,{','.join(str(x + 1) for x in range(limit))}\n")
+            f.write(f"Name,{','.join(str(x + 1) for x in range(sphere_count))}\n")
             for k, v in res_count.items():
                 f.write(k)
                 for sphere in v:

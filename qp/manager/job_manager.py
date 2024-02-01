@@ -84,7 +84,7 @@ def get_electronic(pdb_id, master_list):
         sys.exit()
 
 
-def get_charge(spheres):
+def get_charge():
     """Extract the charge values from charge.csv"""
     current_dir = os.getcwd()
     
@@ -113,7 +113,7 @@ def get_charge(spheres):
                 parts = line.split(',')
                 current_chain_identifier = parts[0]
                 if current_chain_identifier == chain_identifier:
-                    charge += sum([int(x) for x in parts[1:spheres + 1]])
+                    charge += sum([int(x) for x in parts[1:]])
 
             # Parse charge.csv section 2
             elif section == 2 and '_' + chain in line:
@@ -208,7 +208,7 @@ def get_master_list(url):
         sys.exit(1)
 
 
-def submit_jobs(job_count, spheres, master_list_path, minimization, basis, method, guess, gpus, memory):
+def submit_jobs(job_count, master_list_path, minimization, basis, method, guess, gpus, memory):
     """Generate and submit jobs to queueing system."""
 
     base_dir = os.getcwd()  # Store the base directory
@@ -233,15 +233,18 @@ def submit_jobs(job_count, spheres, master_list_path, minimization, basis, metho
             for file in glob.glob(os.path.join(qm_path, 'Z*')):
                 os.remove(file)
 
-            # Copy over the xyz corresponding to the requested cluster model
+            # Move the xyz file into the QM job directory
             xyz_files = glob.glob(os.path.join(structure, '*.xyz'))
-            coord_file = os.path.join(qm_path, xyz_files[spheres])
-            shutil.copy(xyz_files[spheres], qm_path)
+            if len(xyz_files) != 1:
+                print(f"Error: Expected 1 xyz file in {structure}, found {len(xyz_files)}")
+                continue
+            coord_file = os.path.join(qm_path, os.path.basename(xyz_files[0]))
+            shutil.copy(xyz_files[0], coord_file)
 
             os.chdir(qm_path)
 
             oxidation, multiplicity = get_electronic(pdb.lower(), master_list_path)
-            charge = get_charge(spheres)
+            charge = get_charge()
             total_charge = charge + oxidation
 
             if minimization:
@@ -276,14 +279,13 @@ if __name__ == '__main__':
 
     job_count = int(input("Enter the number of jobs to be submitted simultaneously: "))
     method = input("What functional would you like to use (e.g. uwpbeh)? ").lower()
-    spheres = int(input("How many spheres would you like to run (e.g. 0-first, 1-second, 2-third)? "))
     minimization = False
 
     if method == "uwpbeh":
         basis = "lacvps_ecp"
         guess = "generate"
         gpus = 1
-        memory = "16G"
+        memory = "8G"
     elif method == "ugfn2xtb":
         basis = "gfn2xtb"
         guess = "hcore"
@@ -297,4 +299,4 @@ if __name__ == '__main__':
 
     url = "https://docs.google.com/spreadsheets/d/1St_4YEKcWzrs7yS1GTehfAKabtGCJeuM0sC0u1JG8ZE/gviz/tq?tqx=out:csv&sheet=Sheet1"
     master_list_path = get_master_list(url)
-    submit_jobs(job_count, spheres, master_list_path, minimization, basis, method, guess, gpus, memory)
+    submit_jobs(job_count, master_list_path, minimization, basis, method, guess, gpus, memory)
