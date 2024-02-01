@@ -33,7 +33,30 @@ import os
 import requests
 import json
 import time
+import numpy as np
 from Bio.PDB import PDBParser, PDBIO, Select
+
+
+# NON_STANDARD_AA_PROTOSS = {
+#     "CSO": "CSD"
+# }
+
+
+# def replace(entry):
+#     for AA1, AA2 in NON_STANDARD_AA_PROTOSS.items():
+#         entry = entry.replace(AA1, AA2)
+#     return entry
+    
+
+# def fix(path):
+#     """
+#     Replace the non-standard AA that can't be identified by Protoss API with valid ones
+#     """
+#     with open(path, "r") as f:
+#         lines = f.readlines()
+    
+#     with open(path, "w") as f:
+#         f.writelines(map(replace, lines))
 
 
 def upload(path):
@@ -113,11 +136,56 @@ def download(job, out, key="protein"):
         f.write(protoss.text)
 
 
+def flip_coordiating_HIS(points, res):
+    flip_flag = False
+    try:
+        CE1 = res["CE1"]
+        NE2 = res["NE2"]
+    except IndexError:
+        print("Non standard atom names of HIS")
+        return
+    for p in points:
+        dist_CE1_metal = p - CE1
+        dist_NE2_metal = p - NE2
+        if dist_CE1_metal < dist_NE2_metal and dist_CE1_metal < 3.5:
+            flip_flag = True
+            break
+    if flip_flag:
+        old_coords = dict()
+        try:
+            for atom_name in ["HD2", "HE1", "CD2", "ND1", "CE1", "NE2", "CG", "CB"]:
+                old_coords[atom_name] = res[atom_name].get_coord()
+        except IndexError:
+            print("Non standard atom names of HIS")
+            return
+        
+        coord_CB, coord_CG = old_coords["CB"], old_coords["CG"]
+        axis = coord_CG - coord_CB
+        for atom_name in ["HD2", "HE1", "CD2", "ND1", "CE1", "NE2"]:
+            coord = old_coords[atom_name]
+            loc = coord - coord_CB
+            proj = axis * np.dot(axis, loc) / np.dot(axis, axis)
+            flipped_loc = 2 * proj - loc
+            flipped_coord = flipped_loc + coord_CB
+            res[atom_name].set_coord(flipped_coord)
+
+        if "HE2" in res and "HD1" not in res:
+            coord_CE1 = res["CE1"].get_coord()
+            coord_ND1 = res["ND1"].get_coord()
+            vec_ND1_CE1 = coord_CE1 - coord_ND1
+            vec_ND1_CG = coord_CG - coord_ND1
+            bisector = vec_ND1_CE1 + vec_ND1_CG
+            vec_ND1_HD1 = - bisector / np.dot(bisector, bisector) # * 1.00
+            res["HE2"].set_coord(vec_ND1_HD1 + coord_ND1)
+            res["HE2"].name = "HD1"
+
+
 def adjust_activesites(path, metals):
     """
     Deprotonates metal-coordinating residues that are (most likely) incorrectly
     protonated by Protoss. Removes hydrogens from coordinating tyrosines and
-    cysteines, using a distance cutoff of 3 A.
+    cysteines, N-ligands and backbones using a distance cutoff of 3 A. Removes hydrogens
+    from NO, which is protonated as an hydroxylamine.
 
     Parameters
     ----------
@@ -134,14 +202,24 @@ def adjust_activesites(path, metals):
         if res.get_resname() in metals:
             points.append(res.get_unpacked_list()[0])
 
+    for res in structure[0].get_residues():
+        if res.get_resname() == "HIS":
+            flip_coordiating_HIS(points, res)
+
     class AtomSelect(Select):
         def accept_atom(self, atom):
             res = atom.get_parent()
+            if res.get_resname() == "NO":
+                if "H" in atom.get_name():
+                    return False
+
             coord = None
             if atom.get_name() == "HH" and res.get_resname() == "TYR":
                 coord = res["OH"]
             elif atom.get_name() == "HG" and res.get_resname() == "CYS":
                 coord = res["SG"]
+            elif atom.get_name() in ["H", "H2"] and "N" in res:
+                coord = res["N"]
 
             if coord:
                 for p in points:

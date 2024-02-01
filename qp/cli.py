@@ -164,6 +164,7 @@ def run(i,
                 if modeller:
                     path = mod_path
                 try:
+                    # add_hydrogens.fix(path)
                     pid = add_hydrogens.upload(path)
                 except ValueError:
                     click.secho("Error uploading PDB file\n", italic=True, fg="red")

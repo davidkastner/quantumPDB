@@ -590,6 +590,9 @@ def compute_charge(spheres, structure):
                 c += 1
             elif resname in neg and all(not res.has_id(h) for h in neg[resname]):
                 c -= 1
+            elif Polypeptide.is_aa(res) and all(not res.has_id(h) for h in ["H", "H2"]):
+                # TODO: termini
+                c -= 1
 
             # Check for charged N-terminus
             if res_id in n_terminals:
