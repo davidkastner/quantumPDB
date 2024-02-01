@@ -35,6 +35,7 @@ import json
 import time
 import numpy as np
 from Bio.PDB import PDBParser, PDBIO, Select
+from Bio.PDB.Atom import Atom
 
 
 # NON_STANDARD_AA_PROTOSS = {
@@ -175,9 +176,40 @@ def flip_coordiating_HIS(points, res):
             vec_ND1_CE1 = coord_CE1 - coord_ND1
             vec_ND1_CG = coord_CG - coord_ND1
             bisector = vec_ND1_CE1 + vec_ND1_CG
-            vec_ND1_HD1 = - bisector / np.dot(bisector, bisector) # * 1.00
+            vec_ND1_HD1 = - bisector / np.linalg.norm(bisector) # * 1.00
             res["HE2"].set_coord(vec_ND1_HD1 + coord_ND1)
             res["HE2"].name = "HD1"
+
+
+def add_hydrogen_CSO(res):
+    coords = dict()
+    try:
+        for atom_name in ["C", "N", "CA", "CB", "SG"]:
+            coords[atom_name] = res[atom_name].get_coord()
+    except IndexError:
+        print("Non standard atom names of CSO")
+        return
+    if "HA" not in res:
+        vec_CA_C = coords["C"] - coords["CA"]
+        vec_CA_N = coords["N"] - coords["CA"]
+        vec_CA_CB = coords["CB"] - coords["CA"]
+        vec_sum = vec_CA_C + vec_CA_N + vec_CA_CB
+        vec_CA_HA = - vec_sum / np.linalg.norm(vec_sum) # * 1.00
+        coord_HA = vec_CA_HA + coords["CA"]
+        res.add(Atom("HA", coord_HA, 0, 1, " ", "HA", None, "H"))
+    if "HB1" not in res and "HB2" not in res:
+        ANGLE_HCH = 109.51 / 180 * np.pi
+        vec_CB_SG = coords["SG"] - coords["CB"]
+        vec_CB_CA = coords["CA"] - coords["CB"]
+        vec_xy = vec_CB_SG + vec_CB_CA
+        vec_xy = - vec_xy / np.linalg.norm(vec_xy) * np.cos(ANGLE_HCH / 2) # * 1.00
+        vec_z = np.cross(vec_CB_SG, vec_CB_CA)
+        vec_z = vec_z / np.linalg.norm(vec_z) * np.sin(ANGLE_HCH / 2) # * 1.00
+        coord_HB1 = coords["CB"] + vec_xy + vec_z
+        coord_HB2 = coords["CB"] + vec_xy - vec_z
+        res.add(Atom("HB1", coord_HB1, 0, 1, " ", "HB1", None, "H"))
+        res.add(Atom("HB2", coord_HB2, 0, 1, " ", "HB2", None, "H"))
+    return res
 
 
 def adjust_activesites(path, metals):
@@ -205,6 +237,8 @@ def adjust_activesites(path, metals):
     for res in structure[0].get_residues():
         if res.get_resname() == "HIS":
             flip_coordiating_HIS(points, res)
+        if res.get_resname() == "CSO":
+            add_hydrogen_CSO(res)
 
     class AtomSelect(Select):
         def accept_atom(self, atom):
@@ -212,7 +246,7 @@ def adjust_activesites(path, metals):
             if res.get_resname() == "NO":
                 if "H" in atom.get_name():
                     return False
-
+                
             coord = None
             if atom.get_name() == "HH" and res.get_resname() == "TYR":
                 coord = res["OH"]
