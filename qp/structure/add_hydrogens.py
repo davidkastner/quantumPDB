@@ -276,7 +276,7 @@ def adjust_activesites(path, metals):
                 coord = res["OH"]
             elif atom.get_name() == "HG" and res.get_resname() == "CYS":
                 coord = res["SG"]
-            elif is_aa(res) and atom.get_name() in ["H", "H2"]:
+            elif is_aa(res) and atom.get_name() in ["H", "H2"] and "N" in res:
                 coord = res["N"]
 
             if coord:
