@@ -33,7 +33,32 @@ import os
 import requests
 import json
 import time
+import numpy as np
 from Bio.PDB import PDBParser, PDBIO, Select
+from Bio.PDB.Atom import Atom
+from Bio.PDB.Polypeptide import is_aa
+
+
+# NON_STANDARD_AA_PROTOSS = {
+#     "CSO": "CSD"
+# }
+
+
+# def replace(entry):
+#     for AA1, AA2 in NON_STANDARD_AA_PROTOSS.items():
+#         entry = entry.replace(AA1, AA2)
+#     return entry
+    
+
+# def fix(path):
+#     """
+#     Replace the non-standard AA that can't be identified by Protoss API with valid ones
+#     """
+#     with open(path, "r") as f:
+#         lines = f.readlines()
+    
+#     with open(path, "w") as f:
+#         f.writelines(map(replace, lines))
 
 
 def upload(path):
@@ -113,11 +138,101 @@ def download(job, out, key="protein"):
         f.write(protoss.text)
 
 
+def flip_coordiating_HIS(points, res):
+    flip_flag = False
+    try:
+        CE1 = res["CE1"]
+        NE2 = res["NE2"]
+    except IndexError:
+        print("Non standard atom names of HIS")
+        return
+    for p in points:
+        dist_CE1_metal = p - CE1
+        dist_NE2_metal = p - NE2
+        if dist_CE1_metal < dist_NE2_metal and dist_CE1_metal < 3.5:
+            flip_flag = True
+            break
+    if flip_flag:
+        old_coords = dict()
+        try:
+            for atom_name in ["HD2", "HE1", "CD2", "ND1", "CE1", "NE2", "CG", "CB"]:
+                old_coords[atom_name] = res[atom_name].get_coord()
+        except IndexError:
+            print("Non standard atom names of HIS")
+            return
+        
+        coord_CB, coord_CG = old_coords["CB"], old_coords["CG"]
+        axis = coord_CG - coord_CB
+        for atom_name in ["HD2", "HE1", "CD2", "ND1", "CE1", "NE2"]:
+            coord = old_coords[atom_name]
+            loc = coord - coord_CB
+            proj = axis * np.dot(axis, loc) / np.dot(axis, axis)
+            flipped_loc = 2 * proj - loc
+            flipped_coord = flipped_loc + coord_CB
+            res[atom_name].set_coord(flipped_coord)
+
+        if "HE2" in res and "HD1" not in res:
+            coord_CE1 = res["CE1"].get_coord()
+            coord_ND1 = res["ND1"].get_coord()
+            vec_ND1_CE1 = coord_CE1 - coord_ND1
+            vec_ND1_CG = coord_CG - coord_ND1
+            bisector = vec_ND1_CE1 + vec_ND1_CG
+            vec_ND1_HD1 = - bisector / np.linalg.norm(bisector) # * 1.00
+            res["HE2"].set_coord(vec_ND1_HD1 + coord_ND1)
+            res["HE2"].name = "HD1"
+
+
+def add_hydrogen_CSO(res, structure):
+    coords = dict()
+    try:
+        for atom_name in ["C", "N", "CA", "CB", "SG", "OD"]:
+            coords[atom_name] = res[atom_name].get_coord()
+    except IndexError:
+        print("Non standard atom names of CSO")
+        return
+    if "H_1" not in res and "HA" not in res:
+        vec_CA_C = coords["C"] - coords["CA"]
+        vec_CA_N = coords["N"] - coords["CA"]
+        vec_CA_CB = coords["CB"] - coords["CA"]
+        vec_sum = vec_CA_C + vec_CA_N + vec_CA_CB
+        vec_CA_HA = - vec_sum / np.linalg.norm(vec_sum) # * 1.00
+        coord_HA = vec_CA_HA + coords["CA"]
+        res.add(Atom("HA", coord_HA, 0, 1, " ", "HA", None, "H"))
+    if "H_2" not in res and "H_3" not in res and "HB1" not in res and "HB2" not in res:
+        ANGLE_HCH = 109.51 / 180 * np.pi
+        vec_CB_SG = coords["SG"] - coords["CB"]
+        vec_CB_CA = coords["CA"] - coords["CB"]
+        vec_xy = vec_CB_SG + vec_CB_CA
+        vec_xy = - vec_xy / np.linalg.norm(vec_xy) * np.cos(ANGLE_HCH / 2) # * 1.00
+        vec_z = np.cross(vec_CB_SG, vec_CB_CA)
+        vec_z = vec_z / np.linalg.norm(vec_z) * np.sin(ANGLE_HCH / 2) # * 1.00
+        coord_HB1 = coords["CB"] + vec_xy + vec_z
+        coord_HB2 = coords["CB"] + vec_xy - vec_z
+        res.add(Atom("HB1", coord_HB1, 0, 1, " ", "HB1", None, "H"))
+        res.add(Atom("HB2", coord_HB2, 0, 1, " ", "HB2", None, "H"))
+    if "H_4" not in res and "HD" not in res:
+        for res2 in structure[0].get_residues():
+            if res2.get_resname() == "TAN":
+                try:
+                    C = res2["C"]
+                except:
+                    print("Non standard atom names of TAN")
+                if C - res["OD"] < 1.6 and "H1" in res2:
+                    # TAN reacting with CSO, ref. 3X20, 3X24, 3X25
+                    print("TAN reacting with CSO!")
+                    return
+        vec_CB_SG = coords["SG"] - coords["CB"]
+        vec_OD_HD = vec_CB_SG / np.linalg.norm(vec_CB_SG) # * 1.00
+        coord_HD = coords["OD"] + vec_OD_HD
+        res.add(Atom("HD", coord_HD, 0, 1, " ", "HD", None, "H"))
+
+
 def adjust_activesites(path, metals):
     """
     Deprotonates metal-coordinating residues that are (most likely) incorrectly
     protonated by Protoss. Removes hydrogens from coordinating tyrosines and
-    cysteines, using a distance cutoff of 3 A.
+    cysteines, N-ligands and backbones using a distance cutoff of 3 A. Removes hydrogens
+    from NO, which is protonated as an hydroxylamine.
 
     Parameters
     ----------
@@ -134,18 +249,34 @@ def adjust_activesites(path, metals):
         if res.get_resname() in metals:
             points.append(res.get_unpacked_list()[0])
 
+    for res in structure[0].get_residues():
+        if res.get_resname() == "HIS":
+            flip_coordiating_HIS(points, res)
+        if res.get_resname() == "CSO":
+            add_hydrogen_CSO(res, structure)
+
     class AtomSelect(Select):
         def accept_atom(self, atom):
             res = atom.get_parent()
+            if res.get_resname() == "NO":
+                if "H" in atom.get_name():
+                    return False
+                
             coord = None
             if atom.get_name() == "HH" and res.get_resname() == "TYR":
                 coord = res["OH"]
             elif atom.get_name() == "HG" and res.get_resname() == "CYS":
                 coord = res["SG"]
+            elif is_aa(res) and atom.get_name() in ["H", "H2"]:
+                coord = res["N"]
 
             if coord:
                 for p in points:
                     if p - coord < 3:
+                        return False
+            if atom.element == "H" and res.get_resname() != "HOH" and not is_aa(res):
+                for p in points:
+                    if p - atom < 1.5:
                         return False
             return True
 
@@ -154,7 +285,7 @@ def adjust_activesites(path, metals):
     io.save(path, AtomSelect())
 
 
-def compute_charge(path):
+def compute_charge(path_ligand, path_pdb):
     """
     Computes the total charge of each ligand
 
@@ -168,8 +299,10 @@ def compute_charge(path):
     charge: dict
         Keyed by ligand ID
     """
-    with open(path, "r") as f:
+    with open(path_ligand, "r") as f:
         sdf = f.read()
+    with open(path_pdb, "r") as f:
+        pdb_lines = f.readlines()
     ligands = [
         [t for t in s.splitlines() if t != ""]
         for s in sdf.split("$$$$")
@@ -178,12 +311,25 @@ def compute_charge(path):
 
     charge = {}
     for l in ligands:
-        n = l[0].split("_")
-        name = " ".join([f"{a}_{b}{c}" for a, b, c in zip(n[::3], n[1::3], n[2::3])])
+        title = l[0]
+        res_name, chain_id, res_id = title.split("_")
+
+        name = f"{res_name}_{chain_id}{res_id}"
         c = 0
+        n_atom = 0
         for line in l:
+            if "V2000" in line:
+                n_atom = int(line.split()[0])
+            if line.startswith("M  RGP"):
+                n_atom -= sum([int(x) for x in line.split()[4::2]])
             if line.startswith("M  CHG"):
                 c += sum([int(x) for x in line.split()[4::2]])
                 break
         charge[name] = c
+        if res_name != "NO":
+            cnt = 0
+            for line in pdb_lines:
+                if line[17:20].strip() == res_name and line[21] == chain_id and line[22:26].strip() == res_id:
+                    cnt += 1
+            charge[name] -= (n_atom - cnt)
     return charge

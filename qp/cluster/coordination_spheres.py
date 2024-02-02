@@ -578,6 +578,7 @@ def compute_charge(spheres, structure):
         "CYS": ["HG"],
         "TYR": ["HH"],
         "OCS": [],
+        "CSD": ["HD1", "HD2"]
     }
 
     charge = []
@@ -589,6 +590,9 @@ def compute_charge(spheres, structure):
             if resname in pos and all(res.has_id(h) for h in pos[resname]):
                 c += 1
             elif resname in neg and all(not res.has_id(h) for h in neg[resname]):
+                c -= 1
+            if Polypeptide.is_aa(res) and resname != "PRO" and all(not res.has_id(h) for h in ["H", "H2"]):
+                # TODO: termini
                 c -= 1
 
             # Check for charged N-terminus

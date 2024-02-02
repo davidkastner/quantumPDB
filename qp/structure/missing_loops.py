@@ -399,8 +399,8 @@ def build_model(residues, pdb, ali, out, optimize=1):
         transfer_numbering(e, ali, pdb, out)
     else:
         a.make()
-        # for ext in ["ini", "rsr", "sch", "D00000001", "V99990001"]:
-        #     os.remove(f"{pdb}_fill.{ext}")
+        for ext in ["ini", "rsr", "sch", "D00000001", "V99990001"]:
+            os.remove(f"{pdb}_fill.{ext}")
         transfer_numbering(e, ali, pdb, out)
 
     os.chdir(cwd)
