@@ -320,10 +320,14 @@ def compute_charge(path_ligand, path_pdb):
 
     charge = {}
     for l in ligands:
-        title = l[0]
-        res_name, chain_id, res_id = title.split("_")
+        title = l[0].split("_")
+        name_id = [
+            (res_name, chain_id, res_id) 
+            for res_name, chain_id, res_id 
+            in zip(title[::3], title[1::3], title[2::3])
+        ]
+        name = " ".join([f"{res_name}_{chain_id}{res_id}" for res_name, chain_id, res_id in name_id])
 
-        name = f"{res_name}_{chain_id}{res_id}"
         c = 0
         n_atom = 0
         for line in l:
@@ -337,12 +341,15 @@ def compute_charge(path_ligand, path_pdb):
                 c += sum([int(x) for x in line.split()[4::2]])
                 break
         charge[name] = c
-        if res_name != "NO":
+        cnt = 0
+        for res_name, chain_id, res_id in name_id:
+            if res_name == "NO":
+                cnt = n_atom
+                break
             # to detect removed atoms
             # NO is corrected from NH2OH, thus the deleted 3 hydrogen shouldn't affect the charge
-            cnt = 0
             for line in pdb_lines:
                 if line[17:20].strip() == res_name and line[21] == chain_id and line[22:26].strip() == res_id:
                     cnt += 1
-            charge[name] -= (n_atom - cnt)
+        charge[name] -= (n_atom - cnt)
     return charge
