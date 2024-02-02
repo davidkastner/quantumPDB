@@ -39,28 +39,6 @@ from Bio.PDB.Atom import Atom
 from Bio.PDB.Polypeptide import is_aa
 
 
-# NON_STANDARD_AA_PROTOSS = {
-#     "CSO": "CSD"
-# }
-
-
-# def replace(entry):
-#     for AA1, AA2 in NON_STANDARD_AA_PROTOSS.items():
-#         entry = entry.replace(AA1, AA2)
-#     return entry
-    
-
-# def fix(path):
-#     """
-#     Replace the non-standard AA that can't be identified by Protoss API with valid ones
-#     """
-#     with open(path, "r") as f:
-#         lines = f.readlines()
-    
-#     with open(path, "w") as f:
-#         f.writelines(map(replace, lines))
-
-
 def upload(path):
     """
     Uploads a PDB file to the ProteinsPlus web server
@@ -139,6 +117,22 @@ def download(job, out, key="protein"):
 
 
 def flip_coordiating_HIS(points, res):
+    """
+    Flip the imidazole ring of HIS if it can be coordinated with the metal
+
+    The conformation and tautomerism states of HIS is adjusted by Protoss. 
+    However, sometimes the coordinated nitrogen will be flipped away from 
+    where it's supposed to be. This procedure detect if the nitrogen (NE2) is
+    more favorable to be nearer to the metal than its neighbor carbon (CE1) and
+    re-flip the ring and re-arrange the hydrogen.
+
+    Parameters
+    ----------
+    points: list of Bio.PDB.Atom.Atom
+        Metal atoms
+    res: Bio.PDB.Residue.Residue
+        A HIS residue
+    """
     flip_flag = False
     try:
         CE1 = res["CE1"]
@@ -183,6 +177,21 @@ def flip_coordiating_HIS(points, res):
 
 
 def add_hydrogen_CSO(res, structure):
+    """
+    Add hydrogens to CSO
+
+    CSO is a non-standard amino acid which cannot be identified by Protoss REST API.
+    This procedure add hydrogens by geometric rules to its carbons 
+    and the hydroxyl oxygen (not added in the special case where a TAN ligand
+    is reacting with CSO's hydroxyl group).
+
+    Parameters
+    ----------
+    res: Bio.PDB.Residue.Residue
+        A CSO residue
+    structure: Bio.PDB.Structure.Structure
+        The whole structure of the protein
+    """
     coords = dict()
     try:
         for atom_name in ["C", "N", "CA", "CB", "SG", "OD"]:
@@ -321,12 +330,16 @@ def compute_charge(path_ligand, path_pdb):
             if "V2000" in line:
                 n_atom = int(line.split()[0])
             if line.startswith("M  RGP"):
+                # R# atom is found in the addition between CSO and TAN
+                # It's not a real atom and recorded in the RGP entry
                 n_atom -= sum([int(x) for x in line.split()[4::2]])
             if line.startswith("M  CHG"):
                 c += sum([int(x) for x in line.split()[4::2]])
                 break
         charge[name] = c
         if res_name != "NO":
+            # to detect removed atoms
+            # NO is corrected from NH2OH, thus the deleted 3 hydrogen shouldn't affect the charge
             cnt = 0
             for line in pdb_lines:
                 if line[17:20].strip() == res_name and line[21] == chain_id and line[22:26].strip() == res_id:
