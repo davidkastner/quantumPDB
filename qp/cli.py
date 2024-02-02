@@ -160,22 +160,36 @@ def run(i,
             if skip in ["protoss", "all"] and os.path.isfile(f"{prot_path}/{pdb}_protoss.pdb"):
                 click.echo("> Protoss file found")
             else:
-                click.echo("> Running Protoss")
-                if modeller:
-                    path = mod_path
-                try:
-                    pid = add_hydrogens.upload(path)
-                except ValueError:
-                    click.secho("Error uploading PDB file\n", italic=True, fg="red")
-                    # Occurs when uploading a PDB file > 4MB
-                    # TODO retry with parsed PDB code? Will raise Bio.PDB error if
-                    #      number of atoms in output exceeds 99999
-                    err["Protoss"].append(pdb)
-                    continue
-                job = add_hydrogens.submit(pid)
-                add_hydrogens.download(job, f"{prot_path}/{pdb}_protoss.pdb", "protein")
-                add_hydrogens.download(job, f"{prot_path}/{pdb}_ligands.sdf", "ligands")
-                add_hydrogens.download(job, f"{prot_path}/{pdb}_log.txt", "log")
+                import qp
+                pdbl = pdb.lower()
+                prepared_flag = False
+                for path in qp.__path__:
+                    prepared_prot_path = os.path.join(path, f"prepared/{pdbl}/Protoss")
+                    if os.path.exists(prepared_prot_path):
+                        prepared_flag = True
+                if prepared_flag:
+                    os.makedirs(prot_path, exist_ok=True)
+                    from shutil import copy
+                    copy(os.path.join(prepared_prot_path, f"{pdbl}_protoss.pdb"), f"{prot_path}/{pdb}_protoss.pdb")
+                    copy(os.path.join(prepared_prot_path, f"{pdbl}_ligands.sdf"), f"{prot_path}/{pdb}_ligands.sdf")
+                    click.echo("> Using pre-prepared protoss file")
+                else:
+                    click.echo("> Running Protoss")
+                    if modeller:
+                        path = mod_path
+                    try:
+                        pid = add_hydrogens.upload(path)
+                    except ValueError:
+                        click.secho("Error uploading PDB file\n", italic=True, fg="red")
+                        # Occurs when uploading a PDB file > 4MB
+                        # TODO retry with parsed PDB code? Will raise Bio.PDB error if
+                        #      number of atoms in output exceeds 99999
+                        err["Protoss"].append(pdb)
+                        continue
+                    job = add_hydrogens.submit(pid)
+                    add_hydrogens.download(job, f"{prot_path}/{pdb}_protoss.pdb", "protein")
+                    add_hydrogens.download(job, f"{prot_path}/{pdb}_ligands.sdf", "ligands")
+                    add_hydrogens.download(job, f"{prot_path}/{pdb}_log.txt", "log")
 
         if coordination:
             click.echo("> Extracting clusters")
