@@ -116,7 +116,7 @@ def download(job, out, key="protein"):
         f.write(protoss.text)
 
 
-def flip_coordiating_HIS(points, res):
+def flip_coordinated_HIS(points, res):
     """
     Flip the imidazole ring of HIS if it can be coordinated with the metal
 
@@ -260,7 +260,7 @@ def adjust_activesites(path, metals):
 
     for res in structure[0].get_residues():
         if res.get_resname() == "HIS":
-            flip_coordiating_HIS(points, res)
+            flip_coordinated_HIS(points, res)
         if res.get_resname() == "CSO":
             add_hydrogen_CSO(res, structure)
 
