@@ -9,6 +9,7 @@ import pandas as pd
 from itertools import groupby
 from operator import itemgetter
 from qp.manager import failure_checkup
+from qp.manager import job_scripts
 
 def compress_sequence(seq):
     """Condenses frozen atoms to make it more readable."""
@@ -124,73 +125,6 @@ def get_charge():
     return charge
 
 
-def write_qmscript(minimzation,
-                  coordinate_file,
-                  basis, 
-                  method, 
-                  charge, 
-                  multiplicity,
-                  guess, 
-                  constraint_freeze):
-    """Generate TeraChem job submission scripts."""
-
-    minimization_keywords = """new_minimizer yes\nrun minimize\n""" if minimzation == True else ""
-    qmscript_content = f"""levelshift yes
-levelshiftvala 0.25
-levelshiftvalb 0.25
-{minimization_keywords}coordinates {coordinate_file}
-basis {basis}
-method {method}
-charge {charge}
-spinmult {multiplicity}
-guess {guess}
-maxit 500 
-dftd d3
-scrdir ./scr
-pcm cosmo
-epsilon 10
-pcm_matrix no
-scf diis+a
-pcm_radii read
-pcm_radii_file /home/kastner/reference/pcm_radii
-ml_prop yes
-end
-
-{constraint_freeze}
-"""
-
-    return qmscript_content
-
-
-def write_jobscript(job_name,
-                  gpus,
-                  memory):
-    """Generate bash submission scripts."""
-
-    jobscript_content = f"""#!/bin/bash
-#$ -N Z{job_name}
-#$ -cwd
-#$ -l h_rt=300:00:00
-#$ -l h_rss={memory}
-#$ -q (gpusnew|gpus|gpusbig)
-#$ -l gpus=1
-#$ -pe smp {gpus}
-# -fin qmscript.in
-# -fin *.xyz
-# -fout scr/
-
-module load cuda/10.0
-module load terachem/071920-cuda10.0-intel16
-module load intel/16.0.109
-
-export OMP_NUM_THREADS={gpus}
-terachem qmscript.in > $SGE_O_WORKDIR/qmscript.out
-sleep 180
-"""
-
-    return jobscript_content
-
-
 def get_master_list(url):
     """Retrieve a copy of the master list csv from shared Google Spreadsheet."""
 
@@ -217,6 +151,10 @@ def submit_jobs(job_count, master_list_path, minimization, basis, method, guess,
     for pdb in pdb_dirs:
         pdb_dir_path = os.path.join(base_dir, pdb)
         structure_dirs = sorted(glob.glob(os.path.join(pdb_dir_path, '[A-Z][0-9]*')))
+
+        # In case you want to start running QM while generating structures
+        if len(structure_dirs) == 0:
+            continue
 
         for structure in structure_dirs:
             qm_path = os.path.join(structure, method)
@@ -258,8 +196,8 @@ def submit_jobs(job_count, master_list_path, minimization, basis, method, guess,
             structure_name = os.path.basename(structure)
             job_name = f"{pdb_name}{structure_name}"
 
-            qmscript = write_qmscript(minimization, coord_name, basis, method, total_charge, multiplicity, guess, constraint_freeze)
-            jobscript = write_jobscript(job_name, gpus, memory)
+            qmscript = job_scripts.write_qmscript(minimization, coord_name, basis, method, total_charge, multiplicity, guess, constraint_freeze)
+            jobscript = job_scripts.write_jobscript(job_name, gpus, memory)
 
             with open('qmscript.in', 'w') as f:
                 f.write(qmscript)

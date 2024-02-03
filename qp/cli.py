@@ -186,6 +186,10 @@ def run(i,
 
             # try:
             if protoss:
+                old_path = f"{prot_path}/{pdb}_protoss_old.pdb"
+                if not os.path.exists(old_path):
+                    from shutil import copy
+                    copy(path, old_path)
                 add_hydrogens.adjust_activesites(path, metals)
 
             clusters = coordination_spheres.extract_clusters(
@@ -205,7 +209,7 @@ def run(i,
             #     continue
 
             if charge:
-                ligand_charge = add_hydrogens.compute_charge(f"{prot_path}/{pdb}_ligands.sdf")
+                ligand_charge = add_hydrogens.compute_charge(f"{prot_path}/{pdb}_ligands.sdf", path)
                 with open(f"{o}/{pdb}/charge.csv", "a") as f:
                     f.write("\n")
                     for k, v in sorted(ligand_charge.items()):
