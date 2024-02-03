@@ -278,7 +278,8 @@ def submit(job_manager,
 
     if failure_checkup:
         from qp.manager import failure_checkup
-        failure_counts = failure_checkup.check_all_jobs()
+        qm_job_dir = input("What is the name of your QM job directory? ")
+        failure_counts = failure_checkup.check_all_jobs(qm_job_dir)
         failure_checkup.plot_failures(failure_counts)
 
 
