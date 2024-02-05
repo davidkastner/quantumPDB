@@ -33,8 +33,6 @@ def check_failure_mode(filepath):
             return "charge"
         elif "In Alloc2D: malloc failed" in content:
             return "memory"
-        elif "Unable to find atom" in content:
-            return "atom type"
         elif "Job terminated" in content:
             return "killed"
         elif "Job finished" in content:
@@ -51,30 +49,37 @@ def plot_failures(failure_counts):
     counts = failure_counts.values()
 
     plt.bar(labels, counts, color="silver")
-    plt.xlabel('failure modes', fontsize=12, fontweight='bold')
+    plt.xlabel('job status', fontsize=12, fontweight='bold')
     plt.ylabel('job count', fontsize=12, fontweight='bold')
-    plt.savefig('failure_modes.png', bbox_inches="tight", dpi=600)
+    plt.savefig('job_status.png', bbox_inches="tight", dpi=600)
 
 
-def check_all_jobs():
-    """Loop over all jobs and check if they failed."""
+def check_all_jobs(qm_job_dir):
+    """Loop over all jobs and check if they failed or are still queued."""
     
-    print(f"   > Checking for failed QM jobs.")
+    print(f"   > Checking for failed QM jobs in the {qm_job_dir} directory.")
     output_name = "failure_modes.txt"
-    failure_counts = {"done": 0, "charge": 0, "memory": 0, "atom type": 0, "unknown": 0}
+    failure_counts = {"done": 0, "charge": 0, "memory": 0, "unknown": 0, "running": 0, "queue": 0}
 
     with open(output_name, "w") as output_file:
-        pdb_directories = sorted(glob.glob("."))
-        for pdb in pdb_directories:
-            for dir in sorted(glob.glob('[0-9]*')):
-                for dirpath, dirnames, filenames in os.walk(dir):
-                    for filename in filenames:
-                        if filename == "qmscript.out":
-                            filepath = os.path.join(dirpath, filename)
-                            failure_mode = check_failure_mode(filepath)
+        for pdb_dir in sorted(glob.glob('[0-9]*')):  # Loop over PDB directories
+            for chain_dir in os.listdir(pdb_dir):  # Loop over chain subdirectories
+                chain_dir_path = os.path.join(pdb_dir, chain_dir)
+
+                if os.path.isdir(chain_dir_path) and chain_dir_path != "Protoss":
+                    # Check each chain sub-subdirectory (e.g., A208, C208)
+                    if qm_job_dir in os.listdir(chain_dir_path):
+                        qm_dir_path = os.path.join(chain_dir_path, qm_job_dir)
+                        qmscript_path = os.path.join(qm_dir_path, "qmscript.out")
+
+                        if os.path.exists(qmscript_path):
+                            failure_mode = check_failure_mode(qmscript_path)
                             failure_counts[failure_mode] += 1
-                            if failure_mode != "done":
-                                output_file.write(f"{filepath} - {failure_mode}\n")
+                            if failure_mode not in ["done", "running"]:
+                                output_file.write(f"{chain_dir_path} - {failure_mode}\n")
+                    else:
+                        # No QM directory has been generated yet
+                        failure_counts["queue"] += 1
 
     print(f"   > Saving checkup results in {output_name}\n")
     
@@ -82,5 +87,6 @@ def check_all_jobs():
 
 
 if __name__ == '__main__':
-    failure_counts = check_all_jobs()
+    qm_job_dir = input("What is the name of your QM job directory? ")
+    failure_counts = check_all_jobs(qm_job_dir)
     plot_failures(failure_counts)

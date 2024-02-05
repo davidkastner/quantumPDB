@@ -3,8 +3,11 @@
 import os
 import sys
 import glob
+import time
 import shutil
+import getpass
 import requests
+import subprocess
 import pandas as pd
 from itertools import groupby
 from operator import itemgetter
@@ -213,9 +216,39 @@ def submit_jobs(job_count, master_list_path, minimization, basis, method, guess,
                 return
 
 
+def count_running_jobs():
+    """Counts jobs submitted by the user that are currently running or in the queue."""
+
+    try:
+        user_name = getpass.getuser()
+        cmd = f"qstat -u {user_name} | grep {user_name} | wc -l"
+        result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
+        job_count = int(result.stdout.strip())
+    except subprocess.CalledProcessError:
+        job_count = 0
+    return job_count
+
+
+def manage_jobs(target_job_count, master_list_path, minimization, basis, method, guess, gpus, memory, check_interval=60):
+    """Continuously check and maintain the specified number of jobs running."""
+    
+    while True:
+        current_job_count = count_running_jobs()
+        jobs_to_submit = target_job_count - current_job_count
+
+        if jobs_to_submit > 0:
+            print(f"Submitting {jobs_to_submit} jobs to reach the target of {target_job_count} running jobs.")
+            submit_jobs(jobs_to_submit, master_list_path, minimization, basis, method, guess, gpus, memory)
+        else:
+            print(f"Currently have {current_job_count} jobs running or queued, no need to submit more.")
+
+        print(f"Waiting {check_interval} seconds before checking again.")
+        time.sleep(check_interval)
+
+
 if __name__ == '__main__':
 
-    job_count = int(input("Enter the number of jobs to be submitted simultaneously: "))
+    job_count = int(input("Enter the request batch size: "))
     method = input("What functional would you like to use (e.g. uwpbeh)? ").lower()
     minimization = False
 

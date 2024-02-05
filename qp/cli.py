@@ -292,7 +292,8 @@ def submit(job_manager,
         
         url = "https://docs.google.com/spreadsheets/d/1St_4YEKcWzrs7yS1GTehfAKabtGCJeuM0sC0u1JG8ZE/gviz/tq?tqx=out:csv&sheet=Sheet1"
         master_list_path = job_manager.get_master_list(url)
-        job_manager.submit_jobs(job_count, master_list_path, minimization, basis, method, guess, gpus, memory)
+        job_manager.manage_jobs(job_count, master_list_path, minimization, basis, method, guess, gpus, memory)
+
 
     if failure_checkup:
         from qp.manager import failure_checkup
