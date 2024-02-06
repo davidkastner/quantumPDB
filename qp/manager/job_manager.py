@@ -146,74 +146,72 @@ def get_master_list(url):
 
 
 def submit_jobs(job_count, master_list_path, minimization, basis, method, guess, gpus, memory):
-    """Generate and submit jobs to queueing system."""
-
-    base_dir = os.getcwd()  # Store the base directory
+    """Generate and submit jobs to queueing system, returning True if any jobs were submitted."""
+    base_dir = os.getcwd()
+    submitted_jobs = 0
+    
     pdb_dirs = sorted([d for d in os.listdir() if os.path.isdir(d) and not d == 'Protoss'])
-
     for pdb in pdb_dirs:
         pdb_dir_path = os.path.join(base_dir, pdb)
         structure_dirs = sorted(glob.glob(os.path.join(pdb_dir_path, '[A-Z][0-9]*')))
-
-        # In case you want to start running QM while generating structures
+        
         if len(structure_dirs) == 0:
             continue
 
         for structure in structure_dirs:
             qm_path = os.path.join(structure, method)
             os.makedirs(qm_path, exist_ok=True)
-
-            # Check if a prevous job was run and finished correctly
+            
             qm_output_file = os.path.join(qm_path, 'qmscript.out')
             if os.path.exists(qm_output_file):
                 job_status = failure_checkup.check_failure_mode(qm_output_file)
+
+                # Skip this structure as it's already processed or processing
                 if job_status == "done" or job_status == "running":
                     continue
             
-            # Remove old log files
-            for file in glob.glob(os.path.join(qm_path, 'Z*')):
-                os.remove(file)
-
-            # Move the xyz file into the QM job directory
             xyz_files = glob.glob(os.path.join(structure, '*.xyz'))
             if len(xyz_files) != 1:
                 print(f"Error: Expected 1 xyz file in {structure}, found {len(xyz_files)}")
                 continue
+            
             coord_file = os.path.join(qm_path, os.path.basename(xyz_files[0]))
             shutil.copy(xyz_files[0], coord_file)
-
             os.chdir(qm_path)
-
+            
             oxidation, multiplicity = get_electronic(pdb.lower(), master_list_path)
             charge = get_charge()
             total_charge = charge + oxidation
-
-            if minimization:
-                heavy_list = find_heavy()
-                constraint_freeze = f"$constraint_freeze\n{heavy_list}\n$end"
-            else:
-                constraint_freeze = ""
-
+            
+            heavy_list = find_heavy() if minimization else ""
+            constraint_freeze = f"$constraint_freeze\n{heavy_list}\n$end" if minimization else ""
+            
             coord_name = os.path.basename(coord_file)
             pdb_name = os.path.basename(pdb)
             structure_name = os.path.basename(structure)
             job_name = f"{pdb_name}{structure_name}"
-
+            
             qmscript = job_scripts.write_qmscript(minimization, coord_name, basis, method, total_charge, multiplicity, guess, constraint_freeze)
             jobscript = job_scripts.write_jobscript(job_name, gpus, memory)
-
+            
             with open('qmscript.in', 'w') as f:
                 f.write(qmscript)
             with open('jobscript.sh', 'w') as f:
                 f.write(jobscript)
-
+            
+            time.sleep(.5) # Let's the user use ctrl + C if something goes wrong
             os.system('qsub jobscript.sh')
-
             os.chdir(base_dir)  # Return to base directory
 
-            job_count -= 1
-            if job_count <= 0:
-                return
+            submitted_jobs += 1  # Increment for each successful submission
+
+            
+            # Existing condition to break early if job_count is reached
+            if submitted_jobs == job_count:
+                print(f"   > Submitted {job_count} jobs")
+                return submitted_jobs
+            
+    return 0
 
 
 def count_running_jobs():
@@ -229,21 +227,25 @@ def count_running_jobs():
     return job_count
 
 
-def manage_jobs(target_job_count, master_list_path, minimization, basis, method, guess, gpus, memory, check_interval=60):
-    """Continuously check and maintain the specified number of jobs running."""
-    
+def manage_jobs(target_job_count, master_list_path, minimization, basis, method, guess, gpus, memory, check_interval=300):
     while True:
         current_job_count = count_running_jobs()
-        jobs_to_submit = target_job_count - current_job_count
+        print(f"   > Currently, there are {current_job_count} jobs running or queued.")
 
-        if jobs_to_submit > 0:
-            print(f"Submitting {jobs_to_submit} jobs to reach the target of {target_job_count} running jobs.")
-            submit_jobs(jobs_to_submit, master_list_path, minimization, basis, method, guess, gpus, memory)
-        else:
-            print(f"Currently have {current_job_count} jobs running or queued, no need to submit more.")
+        if current_job_count < target_job_count:
+            jobs_needed = target_job_count - current_job_count
+            print(f"   > Attempting to submit {jobs_needed} jobs to reach the target of {target_job_count}.")
+            submitted_jobs = submit_jobs(jobs_needed, master_list_path, minimization, basis, method, guess, gpus, memory)
+            
+            # Check if any new jobs were submitted
+            if submitted_jobs == 0:
+                print("\033[1;31mComplete.\033[0m\n") # Bold red
+                sys.exit(0)
 
-        print(f"Waiting {check_interval} seconds before checking again.")
-        time.sleep(check_interval)
+            # Wait a moment to let the system update
+            sleep_time_seconds = 600
+            print(f"   > Sleeping for {int(sleep_time_seconds / 60)} minutes before checking queue")
+            time.sleep(sleep_time_seconds)
 
 
 if __name__ == '__main__':
@@ -270,4 +272,4 @@ if __name__ == '__main__':
 
     url = "https://docs.google.com/spreadsheets/d/1St_4YEKcWzrs7yS1GTehfAKabtGCJeuM0sC0u1JG8ZE/gviz/tq?tqx=out:csv&sheet=Sheet1"
     master_list_path = get_master_list(url)
-    submit_jobs(job_count, master_list_path, minimization, basis, method, guess, gpus, memory)
+    manage_jobs(job_count, master_list_path, minimization, basis, method, guess, gpus, memory)
