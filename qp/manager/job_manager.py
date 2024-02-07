@@ -6,6 +6,7 @@ import glob
 import time
 import shutil
 import getpass
+import datetime
 import requests
 import subprocess
 import pandas as pd
@@ -145,6 +146,17 @@ def get_master_list(url):
         sys.exit(1)
 
 
+def create_submission_marker(submission_marker_path, job_name, submission_command, submission_output):
+    """Creates a comprehensive summary of submission information that doubles as a tracker."""
+
+    with open(submission_marker_path, 'w') as marker:
+        marker.write(f"Jobname: {job_name}\n")
+        marker.write(f"Author: {getpass.getuser()}\n")
+        marker.write(f"Time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        marker.write(f"Command: {submission_command}\n")
+        marker.write(f"Output: {submission_output}\n")
+
+
 def submit_jobs(job_count, master_list_path, minimization, basis, method, guess, gpus, memory):
     """Generate and submit jobs to queueing system, returning True if any jobs were submitted."""
     base_dir = os.getcwd()
@@ -161,14 +173,18 @@ def submit_jobs(job_count, master_list_path, minimization, basis, method, guess,
         for structure in structure_dirs:
             qm_path = os.path.join(structure, method)
             os.makedirs(qm_path, exist_ok=True)
-            
-            qm_output_file = os.path.join(qm_path, 'qmscript.out')
-            if os.path.exists(qm_output_file):
-                job_status = failure_checkup.check_failure_mode(qm_output_file)
 
-                # Skip this structure as it's already processed or processing
-                if job_status == "done" or job_status == "running":
-                    continue
+            submission_marker_path = os.path.join(qm_path, '.submit_record')
+            qm_output_file = os.path.join(qm_path, 'qmscript.out')
+            log_files = os.path.join(qm_path, 'Z*')
+            
+            # Remove previous slurm log files
+            for file in glob.glob(log_files):
+                os.remove(file)
+
+            # Placeholder for submitted jobs to prevent resubmission
+            if os.path.exists(submission_marker_path) or os.path.exists(qm_output_file):
+                continue
             
             xyz_files = glob.glob(os.path.join(structure, '*.xyz'))
             if len(xyz_files) != 1:
@@ -183,6 +199,7 @@ def submit_jobs(job_count, master_list_path, minimization, basis, method, guess,
             charge = get_charge()
             total_charge = charge + oxidation
             
+            # Get heavy atoms to fix if geometry optimization was requested
             heavy_list = find_heavy() if minimization else ""
             constraint_freeze = f"$constraint_freeze\n{heavy_list}\n$end" if minimization else ""
             
@@ -199,11 +216,18 @@ def submit_jobs(job_count, master_list_path, minimization, basis, method, guess,
             with open('jobscript.sh', 'w') as f:
                 f.write(jobscript)
             
-            time.sleep(.5) # Let's the user use ctrl + C if something goes wrong
-            os.system('qsub jobscript.sh')
-            os.chdir(base_dir)  # Return to base directory
+            time.sleep(.25) # Gives user time to abort with ctrl + C
+            
+            # Execute the job submission command and capture its output
+            submission_command = 'qsub jobscript.sh'
+            result = subprocess.run(submission_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            submission_output = result.stdout.strip() if result.returncode == 0 else result.stderr.strip()
+            print(f"      > {submission_output}")
+            create_submission_marker(submission_marker_path, job_name, submission_command, submission_output)
 
-            submitted_jobs += 1  # Increment for each successful submission
+            os.chdir(base_dir)
+
+            submitted_jobs += 1
 
             
             # Existing condition to break early if job_count is reached
@@ -230,6 +254,7 @@ def count_running_jobs():
 def manage_jobs(target_job_count, master_list_path, minimization, basis, method, guess, gpus, memory, check_interval=300):
     while True:
         current_job_count = count_running_jobs()
+        sleep_time_seconds = 300
         print(f"   > Currently, there are {current_job_count} jobs running or queued.")
 
         if current_job_count < target_job_count:
@@ -243,7 +268,11 @@ def manage_jobs(target_job_count, master_list_path, minimization, basis, method,
                 sys.exit(0)
 
             # Wait a moment to let the system update
-            sleep_time_seconds = 600
+            print(f"   > Sleeping for {int(sleep_time_seconds / 60)} minutes before checking queue")
+            time.sleep(sleep_time_seconds)
+        
+        else:
+            # Max requested jobs are already running
             print(f"   > Sleeping for {int(sleep_time_seconds / 60)} minutes before checking queue")
             time.sleep(sleep_time_seconds)
 
