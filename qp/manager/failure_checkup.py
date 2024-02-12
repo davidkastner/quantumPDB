@@ -34,7 +34,7 @@ def check_failure_mode(filepath):
         elif "In Alloc2D: malloc failed" in content:
             return "memory"
         elif "Job terminated" in content:
-            return "killed"
+            return "unknown"
         elif "Job finished" in content:
             return "done"
         
@@ -64,6 +64,8 @@ def check_all_jobs(qm_job_dir):
     with open(output_name, "w") as output_file:
         for pdb_dir in sorted(glob.glob('[0-9]*')):  # Loop over PDB directories
             for chain_dir in os.listdir(pdb_dir):  # Loop over chain subdirectories
+                if chain_dir == "Protoss":
+                    continue
                 chain_dir_path = os.path.join(pdb_dir, chain_dir)
 
                 if os.path.isdir(chain_dir_path) and chain_dir_path != "Protoss":
