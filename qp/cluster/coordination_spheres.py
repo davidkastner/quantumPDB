@@ -27,7 +27,7 @@ from Bio.PDB.Atom import Atom
 from Bio.PDB.Residue import Residue
 from Bio.PDB.NeighborSearch import NeighborSearch
 from scipy.spatial import Voronoi
-from qp.checks import to_xyz
+from qp.structure import struct_to_file
 from sklearn.cluster import DBSCAN
 
 
@@ -600,7 +600,7 @@ def compute_charge(spheres, structure):
                 c += 1
 
             # Check for charged C-terminus
-            if res_id in c_terminals and res.has_id("OXT"):
+            if res.has_id("OXT"):
                 c -= 1
 
         charge.append(c)
@@ -705,7 +705,8 @@ def extract_clusters(
                 for cap in cap_residues:
                     cap.get_parent().detach_child(cap.get_id())
             if xyz:
-                to_xyz.to_xyz(f"{out}/{metal_id}/{metal_id}.xyz", *sphere_paths)
+                struct_to_file.to_xyz(f"{out}/{metal_id}/{metal_id}.xyz", *sphere_paths)
+                struct_to_file.combine_pdbs(f"{out}/{metal_id}/{metal_id}.pdb", metals, *sphere_paths)
 
     if charge:
         with open(f"{out}/charge.csv", "w") as f:
