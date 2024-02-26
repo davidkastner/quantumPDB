@@ -44,11 +44,8 @@ from modeller.automodel import AutoModel
 from modeller import alignment, model
 
 
-
 log.none()
-e = Environ()  #: MODELLER environment
-e.io.hetatm = True
-e.io.water = True
+
 
 #: Amino acid 3 to 1 lookup table
 def define_residues():
@@ -392,6 +389,9 @@ def build_model(residues, pdb, path, ali, out, optimize=1):
             *[self.residue_range(x, y) for x, y in missing]
         )
 
+    e = Environ()
+    e.io.hetatm = True
+    e.io.water = True
     a = CustomModel(e, alnfile=ali, knowns=pdb, sequence=f"{pdb}_fill")
     a.starting_model = 1
     a.ending_model = 1
