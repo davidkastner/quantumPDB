@@ -31,6 +31,9 @@ from qp.structure import struct_to_file
 from sklearn.cluster import DBSCAN
 
 
+RANDOM_SEED = 66265
+
+
 def get_grid_coord_idx(coord, coord_min, mean_distance):
     """
     Compute a point's position in a 1D grid
@@ -116,6 +119,7 @@ def fill_dummy(points, mean_distance=3, noise_amp=0.2):
             get_grid_coord_idx(z, z_min, mean_distance)
         ] = False
     flags = flags.flatten()
+    np.random.seed(RANDOM_SEED)
     noise = mean_distance * noise_amp * (np.random.rand(len(x_grids), len(y_grids), len(z_grids), 3) - 0.5)
     dummy = np.stack(np.meshgrid(x_grids, y_grids, z_grids, indexing="ij"), axis=-1)
     dummy = (dummy + noise).reshape(-1, 3)
