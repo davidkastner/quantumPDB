@@ -153,7 +153,7 @@ def run(i,
 
                 ali_path = f"{o}/{pdb}/{pdb}.ali"
                 missing_loops.write_alignment(residues, pdb, path, ali_path)
-                missing_loops.build_model(residues, pdb, ali_path, mod_path, optimize)
+                missing_loops.build_model(residues, pdb, path, ali_path, mod_path, optimize)
 
         prot_path = f"{o}/{pdb}/Protoss"
         if protoss:
@@ -206,7 +206,7 @@ def run(i,
                     copy(path, old_path)
                 add_hydrogens.adjust_activesites(path, metals)
 
-            clusters = coordination_spheres.extract_clusters(
+            coordination_spheres.extract_clusters(
                 path, f"{o}/{pdb}", metals,
                 limit, ligands, capping, charge, count, xyz, first_sphere_radius,
                 smooth_method=smooth_method,
