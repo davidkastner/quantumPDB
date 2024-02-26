@@ -1,0 +1,9 @@
+PDB residue entry with clash will be removed: 337 HOH
+PDB residue entry with clash will be removed: 338 HOH
+PDB residue entry with clash will be removed: 324 HOH
+PDB residue entry with clash will be removed: 325 HOH
+PDB entry filter removed HETATM67295  O   HOH A 337     -34.347 -22.223 143.079  1.00  0.00           O  
+PDB entry filter removed HETATM67295  O   HOH A 338     -34.480 -19.824 140.512  1.00  0.00           O  
+PDB entry filter removed HETATM67295  O   HOH B 324     -41.766   1.027 116.001  1.00  0.00           O  
+PDB entry filter removed HETATM67295  O   HOH B 325     -41.910  -1.790 119.198  1.00  0.00           O  
+PDB entry filter removed 4 atom entries

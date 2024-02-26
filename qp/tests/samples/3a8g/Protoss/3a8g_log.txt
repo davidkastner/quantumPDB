@@ -1,0 +1,8 @@
+PDB residue entry with clash will be removed: 212 ALA
+PDB entry filter removed ATOM  67295  N   ALA B 212     110.691  54.521   7.281  1.00 40.01           N  
+PDB entry filter removed ATOM  67295  CA  ALA B 212     111.140  55.689   6.569  1.00 40.61           C  
+PDB entry filter removed ATOM  67295  CB  ALA B 212     111.155  56.994   7.366  1.00 49.92           C  
+PDB entry filter removed ATOM  67295  C   ALA B 212     112.558  55.451   6.025  1.00 43.98           C  
+PDB entry filter removed ATOM  67295  O   ALA B 212     113.348  56.394   5.881  1.00 48.15           O  
+PDB entry filter removed ATOM  67295  OXT ALA B 212     113.105  56.380   5.372  1.00  0.00           O  
+PDB entry filter removed 6 atom entries
