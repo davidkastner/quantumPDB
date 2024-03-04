@@ -6,22 +6,12 @@ import filecmp
 from qp.cluster import coordination_spheres
 
 
-@pytest.fixture
-def sample_pdb(request):
-    np.random.seed(66265)
-    pdb, metal_ids = request.param
-    return pdb, metal_ids, os.path.join(os.path.dirname(__file__), "samples", pdb)
-
-
 def check_clusters(path, out, metal_ids):
     for metal in metal_ids:
-        expected_xyz = os.path.join(path, metal, f"{metal}.xyz")
-        output_xyz = os.path.join(out, metal, f"{metal}.xyz")
-        assert filecmp.cmp(expected_xyz, output_xyz), "Cluster XYZ does not match expected"
-
-        expected_pdb = os.path.join(path, metal, f"{metal}.pdb")
-        output_pdb = os.path.join(out, metal, f"{metal}.pdb")
-        assert filecmp.cmp(expected_pdb, output_pdb), "Cluster PDB does not match expected"
+        for i in range(4):
+            expected_pdb = os.path.join(path, metal, f"{i}.pdb")
+            output_pdb = os.path.join(out, metal, f"{i}.pdb")
+            assert filecmp.cmp(expected_pdb, output_pdb), f"Sphere {i} PDB does not match expected"
 
     # Expected charge.csv includes additional ligands, which must be excluded
     expected_charge = os.path.join(path, "charge.csv")
@@ -36,13 +26,13 @@ def check_clusters(path, out, metal_ids):
     assert filecmp.cmp(expected_count, output_count), "Residue count does not match expected"
 
 
-@pytest.mark.parametrize("sample_pdb", [
+@pytest.mark.parametrize("sample_cluster", [
     ("1sp9", ("A446", "B446")),
     ("2q4a", ("A901", "B902")),
     ("3a8g", ("A301",))
 ], indirect=True)
-def test_extract_clusters(tmpdir, sample_pdb):
-    pdb, metal_ids, path = sample_pdb
+def test_extract_clusters(tmpdir, sample_cluster):
+    pdb, metal_ids, path = sample_cluster
     pdb_path = os.path.join(path, "Protoss", f"{pdb}_protoss.pdb")
     coordination_spheres.extract_clusters(
         pdb_path, tmpdir, ["FE", "FE2"], 3, 
@@ -53,9 +43,9 @@ def test_extract_clusters(tmpdir, sample_pdb):
     check_clusters(path, tmpdir, metal_ids)
 
 
-@pytest.mark.parametrize("sample_pdb", [("4qm8", ("A201", "B201"))], indirect=True)
-def test_cap_heavy(tmpdir, sample_pdb):
-    pdb, metal_ids, path = sample_pdb
+@pytest.mark.parametrize("sample_cluster", [("4ilv", ("A301", "B301"))], indirect=True)
+def test_cap_heavy(tmpdir, sample_cluster):
+    pdb, metal_ids, path = sample_cluster
     pdb_path = os.path.join(path, "Protoss", f"{pdb}_protoss.pdb")
     coordination_spheres.extract_clusters(
         pdb_path, tmpdir, ["FE", "FE2"], 3, 
@@ -66,9 +56,9 @@ def test_cap_heavy(tmpdir, sample_pdb):
     check_clusters(path, tmpdir, metal_ids)
 
 
-@pytest.mark.parametrize("sample_pdb", [("1lm6", ("A204",))], indirect=True)
-def test_box_plot(tmpdir, sample_pdb):
-    pdb, metal_ids, path = sample_pdb
+@pytest.mark.parametrize("sample_cluster", [("1lm6", ("A204",))], indirect=True)
+def test_box_plot(tmpdir, sample_cluster):
+    pdb, metal_ids, path = sample_cluster
     pdb_path = os.path.join(path, "Protoss", f"{pdb}_protoss.pdb")
     coordination_spheres.extract_clusters(
         pdb_path, tmpdir, ["FE", "FE2"], 3, 
@@ -79,9 +69,9 @@ def test_box_plot(tmpdir, sample_pdb):
     check_clusters(path, tmpdir, metal_ids)
 
 
-@pytest.mark.parametrize("sample_pdb", [("2r6s", ("A501",))], indirect=True)
-def test_dbscan(tmpdir, sample_pdb):
-    pdb, metal_ids, path = sample_pdb
+@pytest.mark.parametrize("sample_cluster", [("2r6s", ("A501",))], indirect=True)
+def test_dbscan(tmpdir, sample_cluster):
+    pdb, metal_ids, path = sample_cluster
     pdb_path = os.path.join(path, "Protoss", f"{pdb}_protoss.pdb")
     coordination_spheres.extract_clusters(
         pdb_path, tmpdir, ["FE", "FE2"], 3, 

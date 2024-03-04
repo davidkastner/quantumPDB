@@ -163,8 +163,8 @@ def run(i,
                 import qp
                 pdbl = pdb.lower()
                 prepared_flag = False
-                for path in qp.__path__:
-                    prepared_prot_path = os.path.join(path, f"prepared/{pdbl}/Protoss")
+                for qp_path in qp.__path__:
+                    prepared_prot_path = os.path.join(qp_path, f"prepared/{pdbl}/Protoss")
                     if os.path.exists(prepared_prot_path):
                         prepared_flag = True
                 if prepared_flag:

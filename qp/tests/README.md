@@ -9,7 +9,7 @@ Outputs generated with default parameters unless otherwise stated
 - `1sp9`
 - `2q4a`
 - `3a8g`
-- `4qm8` (ACE/NME capping)
+- `4ilv` (ACE/NME capping)
 - `1lm6` (boxplot smoothing)
 - `2r6s` (DBSCAN smoothing)
 
