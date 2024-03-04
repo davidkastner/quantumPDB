@@ -19,7 +19,19 @@ if not MISSING_LICENSE:
 
 # ========== add_hydrogens ==========
 
-@pytest.mark.parametrize("sample_pdb", ["3a8g"], indirect=True)
+@pytest.mark.parametrize("sample_pdb", ["1lm6"], indirect=True)
+def test_protoss(tmpdir, sample_pdb):
+    pdb, path = sample_pdb
+    pdb_path = os.path.join(path, f"{pdb}.pdb")
+    out = os.path.join(tmpdir, f"{pdb}_protoss.pdb")
+
+    pid = add_hydrogens.upload(pdb_path)
+    job = add_hydrogens.submit(pid)
+    add_hydrogens.download(job, out)
+    assert os.path.getsize(out) > 0, "Found empty PDB file"
+
+
+@pytest.mark.parametrize("sample_pdb", ["1sp9", "2q4a", "3a8g", "3x20", "6f2a"], indirect=True)
 def test_adjust_activesites(tmpdir, sample_pdb):
     pdb, path = sample_pdb
     expected_prot = os.path.join(path, "Protoss", f"{pdb}_protoss.pdb")
@@ -50,7 +62,7 @@ def test_compute_charge(tmpdir, sample_pdb):
 # ========== missing_loops ==========
 
 @pytest.mark.skipif(MISSING_LICENSE, reason="MODELLER license not found")
-@pytest.mark.parametrize("sample_pdb", ["1lm6", "1sp9", "2q4a", "2r6s", "3a8g", "4ilv"], indirect=True)
+@pytest.mark.parametrize("sample_pdb", ["1lm6", "1sp9", "2q4a", "2r6s", "3x20", "4ilv"], indirect=True)
 def test_write_alignment(tmpdir, sample_pdb):
     pdb, path = sample_pdb
     pdb_path = os.path.join(path, f"{pdb}.pdb")

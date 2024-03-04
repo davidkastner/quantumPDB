@@ -1,0 +1,10 @@
+PDB residue entry with clash will be removed: 205 THR
+PDB entry filter removed ATOM  67295  N   THR A 205      71.081  21.577   5.071  1.00 60.44           N  
+PDB entry filter removed ATOM  67295  CA  THR A 205      69.831  21.808   4.354  1.00 68.95           C  
+PDB entry filter removed ATOM  67295  CB  THR A 205      69.832  20.887   3.130  1.00 67.66           C  
+PDB entry filter removed ATOM  67295  OG1 THR A 205      71.036  21.127   2.375  1.00 74.59           O  
+PDB entry filter removed ATOM  67295  CG2 THR A 205      68.631  21.114   2.255  1.00 66.25           C  
+PDB entry filter removed ATOM  67295  C   THR A 205      68.656  21.508   5.278  1.00 82.77           C  
+PDB entry filter removed ATOM  67295  O   THR A 205      67.734  22.334   5.432  1.00 79.89           O  
+PDB entry filter removed ATOM  67295  OXT THR A 205      67.491  21.655   4.821  1.00  0.00           O  
+PDB entry filter removed 8 atom entries
