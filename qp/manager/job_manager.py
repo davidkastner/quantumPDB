@@ -89,13 +89,14 @@ def get_electronic(pdb_id, master_list):
         sys.exit()
 
 
-def get_charge():
+def get_charge(structure_dir=None):
     """Extract the charge values from charge.csv"""
-    current_dir = os.getcwd()
-    
-    # Construct relative paths
-    charge_dir = os.path.abspath(os.path.join(current_dir, "../../"))
-    structure_dir = os.path.abspath(os.path.join(current_dir, "../"))
+    if structure_dir is None:
+        current_dir = os.getcwd()
+        charge_dir = os.path.abspath(os.path.join(current_dir, "../../"))
+        structure_dir = os.path.abspath(os.path.join(current_dir, "../"))
+    else:
+        charge_dir = os.path.abspath(os.path.join(structure_dir, "../"))
     charge_csv_path = os.path.join(charge_dir, "charge.csv")
     first_sphere_path = os.path.join(structure_dir, "1.pdb")
     

@@ -23,7 +23,6 @@ performed by specifying ``capping`` in ``coordination_spheres.extract_clusters``
 import os
 import numpy as np
 from Bio.PDB import PDBParser, Polypeptide, PDBIO, Select
-from Bio.PDB.PDBExceptions import PDBConstructionException
 from Bio.PDB.Atom import Atom
 from Bio.PDB.Residue import Residue
 from Bio.PDB.NeighborSearch import NeighborSearch
@@ -610,8 +609,6 @@ def compute_charge(spheres, structure, ligand_charge):
                 # Check for charged C-terminus
                 if res.has_id("OXT"):
                     c -= 1
-            else:
-                print(f"{ligand_key} found in ligand charge!")
 
         charge.append(c)
     return charge
@@ -690,13 +687,15 @@ def extract_clusters(
 
     aa_charge = {}
     res_count = {}
+    cluster_paths = []
     for res in model.get_residues():
         if res.get_resname() in metals:
             metal_id, residues, spheres = get_next_neighbors(
                 res, neighbors, sphere_count, ligands, first_sphere_radius, smooth_method, **smooth_params
             )
-
-            os.makedirs(f"{out}/{metal_id}", exist_ok=True)
+            cluster_path = f"{out}/{metal_id}"
+            cluster_paths.append(cluster_path)
+            os.makedirs(cluster_path, exist_ok=True)
 
             if charge:
                 aa_charge[metal_id] = compute_charge(spheres, structure, ligand_charge)
@@ -709,15 +708,15 @@ def extract_clusters(
             sphere_paths = []
             for i in range(sphere_count + 1):
                 if spheres[i]:
-                    sphere_path = f"{out}/{metal_id}/{i}.pdb"
+                    sphere_path = f"{cluster_path}/{i}.pdb"
                     sphere_paths.append(sphere_path)
                     write_pdb(io, spheres[i], sphere_path)
             if capping:
                 for cap in cap_residues:
                     cap.get_parent().detach_child(cap.get_id())
             if xyz:
-                struct_to_file.to_xyz(f"{out}/{metal_id}/{metal_id}.xyz", *sphere_paths)
-                struct_to_file.combine_pdbs(f"{out}/{metal_id}/{metal_id}.pdb", metals, *sphere_paths)
+                struct_to_file.to_xyz(f"{cluster_path}/{metal_id}.xyz", *sphere_paths)
+                struct_to_file.combine_pdbs(f"{cluster_path}/{metal_id}.pdb", metals, *sphere_paths)
 
     if charge:
         with open(f"{out}/charge.csv", "w") as f:
@@ -734,3 +733,5 @@ def extract_clusters(
                     s = ", ".join(f"{r} {c}" for r, c in sorted(sphere.items()))
                     f.write(f',"{s}"')
                 f.write("\n")
+
+    return cluster_paths

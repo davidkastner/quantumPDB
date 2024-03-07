@@ -87,7 +87,7 @@ def run(i,
         from qp.cluster import coordination_spheres
         click.echo("Coordination sphere parameters:")
         metals = click.prompt("> Active site metals", default="FE FE2").split(" ")
-        limit = click.prompt("> Number of spheres", default=3)
+        limit = click.prompt("> Number of spheres", default=2)
         first_sphere_radius = click.prompt("> Radius of first spheres", type=float, default=4.0)
         ligands = click.prompt("> Additional ligands [unnatural AAs] in outer coordination spheres", default=[], show_default=False)
         capping = int(
@@ -211,7 +211,7 @@ def run(i,
             else:
                 ligand_charge = dict()
 
-            clusters = coordination_spheres.extract_clusters(
+            cluster_paths = coordination_spheres.extract_clusters(
                 path, f"{o}/{pdb}", metals,
                 limit, ligands, capping, charge, count, xyz, first_sphere_radius, 
                 ligand_charge=ligand_charge,
@@ -233,6 +233,11 @@ def run(i,
                     f.write("\n")
                     for k, v in sorted(ligand_charge.items()):
                         f.write(f"{k},{v}\n")
+                
+                from qp.checks.charge_count import check_charge
+                for cluster_path in cluster_paths:
+                    check_charge(cluster_path)
+                        
 
         click.echo("")
 
