@@ -23,6 +23,7 @@ performed by specifying ``capping`` in ``coordination_spheres.extract_clusters``
 import os
 import numpy as np
 from Bio.PDB import PDBParser, Polypeptide, PDBIO, Select
+from Bio.PDB.PDBExceptions import PDBConstructionException
 from Bio.PDB.Atom import Atom
 from Bio.PDB.Residue import Residue
 from Bio.PDB.NeighborSearch import NeighborSearch
@@ -390,13 +391,16 @@ def build_hydrogen(chain, parent, template, atom):
     else:
         pos = scale_hydrogen(parent["C"], template["N"], 1.09 / 1.32)
 
-    res_id = ("H_" + parent.get_resname(), template.get_id()[1], " ")
+    res_id = parent.id
     if not chain.has_id(res_id):
         res = Residue(res_id, parent.get_resname(), " ")
         res.add(Atom("H1", pos, 0, 1, " ", "H1", None, "H"))
         chain.add(res)
     else:
-        chain[res_id].add(Atom("H2", pos, 0, 1, " ", "H2", None, "H"))
+        if "H1" in chain[res_id]:
+            chain[res_id].add(Atom("H2", pos, 0, 1, " ", "H2", None, "H"))
+        else:
+            chain[res_id].add(Atom("H1", pos, 0, 1, " ", "H1", None, "H"))
     return chain[res_id]
 
 
@@ -573,8 +577,8 @@ def compute_charge(spheres, structure):
         "MLZ": []
     }
     neg = {
-        "ASP": ["HD2"],
-        "GLU": ["HE2", "HOE1"],
+        "ASP": ["HD2", "HOD1", "HOD2"],
+        "GLU": ["HE2", "HOE1", "HOE2"],
         "CYS": ["HG"],
         "TYR": ["HH"],
         "OCS": [],
@@ -582,25 +586,30 @@ def compute_charge(spheres, structure):
     }
 
     charge = []
-    for s in spheres[1:]:
+    for si, s in enumerate(spheres[1:]):
         c = 0
         for res in s:
             res_id = res.get_full_id()
             resname = res.get_resname()
             if resname in pos and all(res.has_id(h) for h in pos[resname]):
                 c += 1
+                print(res_id, resname, si + 1, 1)
             elif resname in neg and all(not res.has_id(h) for h in neg[resname]):
                 c -= 1
+                print(res_id, resname, si + 1, -1)
             if Polypeptide.is_aa(res) and resname != "PRO" and all(not res.has_id(h) for h in ["H", "H2"]):
                 # TODO: termini
+                print(res_id, resname, si + 1)
                 c -= 1
 
             # Check for charged N-terminus
             if res_id in n_terminals:
+                print(res_id, resname, si + 1, "N")
                 c += 1
 
             # Check for charged C-terminus
             if res.has_id("OXT"):
+                print(res_id, resname, si + 1, "C")
                 c -= 1
 
         charge.append(c)
@@ -701,9 +710,9 @@ def extract_clusters(
                     sphere_path = f"{out}/{metal_id}/{i}.pdb"
                     sphere_paths.append(sphere_path)
                     write_pdb(io, spheres[i], sphere_path)
-            if capping:
-                for cap in cap_residues:
-                    cap.get_parent().detach_child(cap.get_id())
+            # if capping:
+            #     for cap in cap_residues:
+            #         cap.get_parent().detach_child(cap.get_id())
             if xyz:
                 struct_to_file.to_xyz(f"{out}/{metal_id}/{metal_id}.xyz", *sphere_paths)
                 struct_to_file.combine_pdbs(f"{out}/{metal_id}/{metal_id}.pdb", metals, *sphere_paths)
