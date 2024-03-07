@@ -586,30 +586,25 @@ def compute_charge(spheres, structure):
     }
 
     charge = []
-    for si, s in enumerate(spheres[1:]):
+    for s in spheres[1:]:
         c = 0
         for res in s:
             res_id = res.get_full_id()
             resname = res.get_resname()
             if resname in pos and all(res.has_id(h) for h in pos[resname]):
                 c += 1
-                print(res_id, resname, si + 1, 1)
             elif resname in neg and all(not res.has_id(h) for h in neg[resname]):
                 c -= 1
-                print(res_id, resname, si + 1, -1)
             if Polypeptide.is_aa(res) and resname != "PRO" and all(not res.has_id(h) for h in ["H", "H2"]):
                 # TODO: termini
-                print(res_id, resname, si + 1)
                 c -= 1
 
             # Check for charged N-terminus
             if res_id in n_terminals:
-                print(res_id, resname, si + 1, "N")
                 c += 1
 
             # Check for charged C-terminus
             if res.has_id("OXT"):
-                print(res_id, resname, si + 1, "C")
                 c -= 1
 
         charge.append(c)
@@ -710,9 +705,9 @@ def extract_clusters(
                     sphere_path = f"{out}/{metal_id}/{i}.pdb"
                     sphere_paths.append(sphere_path)
                     write_pdb(io, spheres[i], sphere_path)
-            # if capping:
-            #     for cap in cap_residues:
-            #         cap.get_parent().detach_child(cap.get_id())
+            if capping:
+                for cap in cap_residues:
+                    cap.get_parent().detach_child(cap.get_id())
             if xyz:
                 struct_to_file.to_xyz(f"{out}/{metal_id}/{metal_id}.xyz", *sphere_paths)
                 struct_to_file.combine_pdbs(f"{out}/{metal_id}/{metal_id}.pdb", metals, *sphere_paths)
