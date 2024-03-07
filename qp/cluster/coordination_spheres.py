@@ -583,7 +583,9 @@ def compute_charge(spheres, structure, ligand_charge):
         "CYS": ["HG"],
         "TYR": ["HH"],
         "OCS": [],
-        "CSD": ["HD1", "HD2"]
+        "CSD": ["HD1", "HD2"],
+        "KCX": ["HQ1", "HQ2", "HOQ1", "HOQ2"],
+        "HIS": ["HD1"]
     }
 
     charge = []
