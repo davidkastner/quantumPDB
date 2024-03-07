@@ -544,7 +544,7 @@ def write_pdb(io, sphere, out):
     io.save(out, ResSelect())
 
 
-def compute_charge(spheres, structure):
+def compute_charge(spheres, structure, ligand_charge):
     """
     Computes the total charge of coordinating AAs
 
@@ -554,6 +554,8 @@ def compute_charge(spheres, structure):
         Sets of residues separated by spheres
     structure: Bio.PDB.Structure
         The protein structure
+    ligand_charge: dict
+        Key, value pairs of ligand names and charges
 
     Returns
     -------
@@ -591,21 +593,25 @@ def compute_charge(spheres, structure):
         for res in s:
             res_id = res.get_full_id()
             resname = res.get_resname()
-            if resname in pos and all(res.has_id(h) for h in pos[resname]):
-                c += 1
-            elif resname in neg and all(not res.has_id(h) for h in neg[resname]):
-                c -= 1
-            if Polypeptide.is_aa(res) and resname != "PRO" and all(not res.has_id(h) for h in ["H", "H2"]):
-                # TODO: termini
-                c -= 1
+            ligand_key = f"{resname}_{res_id[2]}{res_id[3][1]}"
+            if ligand_key not in ligand_charge:
+                if resname in pos and all(res.has_id(h) for h in pos[resname]):
+                    c += 1
+                elif resname in neg and all(not res.has_id(h) for h in neg[resname]):
+                    c -= 1
+                if Polypeptide.is_aa(res) and resname != "PRO" and all(not res.has_id(h) for h in ["H", "H2"]):
+                    # TODO: termini
+                    c -= 1
 
-            # Check for charged N-terminus
-            if res_id in n_terminals:
-                c += 1
+                # Check for charged N-terminus
+                if res_id in n_terminals:
+                    c += 1
 
-            # Check for charged C-terminus
-            if res.has_id("OXT"):
-                c -= 1
+                # Check for charged C-terminus
+                if res.has_id("OXT"):
+                    c -= 1
+            else:
+                print(f"{ligand_key} found in ligand charge!")
 
         charge.append(c)
     return charge
@@ -645,6 +651,7 @@ def extract_clusters(
     count=False,
     xyz=False,
     first_sphere_radius=3.0,
+    ligand_charge=dict(),
     smooth_method="box_plot",
     **smooth_params
 ):
@@ -692,7 +699,7 @@ def extract_clusters(
             os.makedirs(f"{out}/{metal_id}", exist_ok=True)
 
             if charge:
-                aa_charge[metal_id] = compute_charge(spheres, structure)
+                aa_charge[metal_id] = compute_charge(spheres, structure, ligand_charge)
             if count:
                 res_count[metal_id] = count_residues(spheres)
             if capping:
