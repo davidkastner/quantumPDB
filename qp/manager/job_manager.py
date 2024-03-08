@@ -98,10 +98,10 @@ def get_charge(structure_dir=None):
     else:
         charge_dir = os.path.abspath(os.path.join(structure_dir, "../"))
     charge_csv_path = os.path.join(charge_dir, "charge.csv")
-    first_sphere_path = os.path.join(structure_dir, "1.pdb")
     
     charge = 0
     section = 1
+    num_sphere = 0
     chain_identifier = os.path.basename(structure_dir)
     chain = os.path.basename(structure_dir)[0]
 
@@ -117,6 +117,7 @@ def get_charge(structure_dir=None):
             # Parse charge.csv section 1
             if section == 1 and line.startswith(chain_identifier):
                 parts = line.split(',')
+                num_sphere = len(parts) - 1
                 current_chain_identifier = parts[0]
                 if current_chain_identifier == chain_identifier:
                     charge += sum([int(x) for x in parts[1:]])
@@ -124,8 +125,10 @@ def get_charge(structure_dir=None):
             # Parse charge.csv section 2
             elif section == 2 and '_' + chain in line:
                 ligand, value = line.split(',')
-                if residue_exists(first_sphere_path, ligand.split('_')[0]):
-                    charge += int(value)
+                for i in range(num_sphere):
+                    sphere_path = os.path.join(structure_dir, f"{i + 1}.pdb")
+                    if residue_exists(sphere_path, ligand.split('_')[0]):
+                        charge += int(value)
     
     return charge
 
