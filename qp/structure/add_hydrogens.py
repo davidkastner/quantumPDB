@@ -353,3 +353,29 @@ def compute_charge(path_ligand, path_pdb):
                     cnt += 1
         charge[name] -= (n_atom - cnt)
     return charge
+
+
+def compute_spin(path_ligand):
+    with open(path_ligand, "r") as f:
+        sdf = f.read()
+
+    ligands = [
+        [t for t in s.splitlines() if t != ""]
+        for s in sdf.split("$$$$")
+        if s != "\n" and s != ""
+    ]
+    spin = {}
+    for l in ligands:
+        title = l[0].split("_")
+        name_id = [
+            (res_name, chain_id, res_id) 
+            for res_name, chain_id, res_id 
+            in zip(title[::3], title[1::3], title[2::3])
+        ]
+        name = " ".join([f"{res_name}_{chain_id}{res_id}" for res_name, chain_id, res_id in name_id])
+        for res_name, chain_id, res_id in name_id:
+            if res_name == "NO":
+                spin[name] = 1
+            elif res_name == "OXY":
+                spin[name] = 2
+    return spin

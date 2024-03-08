@@ -31,8 +31,8 @@ def count_electron(xyzfile):
 
 
 def check_charge(cluster_path):
-    charge = get_charge(cluster_path)
-    spinmult = 1
+    charge, extraspin = get_charge(cluster_path)
+    spinmult = 1 + extraspin
     xyzfile = glob(os.path.join(cluster_path, "*.xyz"))[0]
     num_electron = count_electron(xyzfile)
     if (num_electron - charge) % 2 == spinmult % 2:

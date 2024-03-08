@@ -208,6 +208,7 @@ def run(i,
 
             if charge:
                 ligand_charge = add_hydrogens.compute_charge(f"{prot_path}/{pdb}_ligands.sdf", path)
+                ligand_spin = add_hydrogens.compute_spin(f"{prot_path}/{pdb}_ligands.sdf")
             else:
                 ligand_charge = dict()
 
@@ -232,6 +233,10 @@ def run(i,
                 with open(f"{o}/{pdb}/charge.csv", "a") as f:
                     f.write("\n")
                     for k, v in sorted(ligand_charge.items()):
+                        f.write(f"{k},{v}\n")
+                with open(f"{o}/{pdb}/spin.csv", "a") as f:
+                    f.write("\n")
+                    for k, v in sorted(ligand_spin.items()):
                         f.write(f"{k},{v}\n")
                 
                 from qp.checks.charge_count import check_charge

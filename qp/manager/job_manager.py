@@ -99,6 +99,7 @@ def get_charge(structure_dir=None):
     else:
         charge_dir = os.path.abspath(os.path.join(structure_dir, "../"))
     charge_csv_path = os.path.join(charge_dir, "charge.csv")
+    spin_csv_path = os.path.join(charge_dir, "spin.csv")
     
     charge = 0
     section = 1
@@ -133,8 +134,24 @@ def get_charge(structure_dir=None):
                     sphere_path = os.path.join(structure_dir, f"{i + 1}.pdb")
                     if residue_exists(sphere_path, res_name, chain, res_id):
                         charge += int(value)
+
+    spin = 0
+    if os.path.exists(spin_csv_path):
+        with open(spin_csv_path, 'r') as spin_csv_content:
+            for line in spin_csv_content:
+                line = line.strip()
+                if not line:
+                    continue
+                ligand, value = line.split(',')
+                res_name, res_id_full = ligand.split('_')
+                chain = res_id_full[0]
+                res_id = int(res_id_full[1:])
+                for i in range(num_sphere):
+                    sphere_path = os.path.join(structure_dir, f"{i + 1}.pdb")
+                    if residue_exists(sphere_path, res_name, chain, res_id):
+                        spin += int(value)
     
-    return charge
+    return charge, spin
 
 
 def get_master_list(url):
@@ -204,7 +221,8 @@ def submit_jobs(job_count, master_list_path, minimization, basis, method, guess,
             os.chdir(qm_path)
             
             oxidation, multiplicity = get_electronic(pdb.lower(), master_list_path)
-            charge = get_charge()
+            charge, extra_spin = get_charge()
+            multiplicity += extra_spin
             total_charge = charge + oxidation
             
             # Get heavy atoms to fix if geometry optimization was requested
