@@ -585,11 +585,11 @@ def compute_charge(spheres, structure, ligand_charge):
         "OCS": [],
         "CSD": ["HD1", "HD2"],
         "KCX": ["HQ1", "HQ2", "HOQ1", "HOQ2"],
-        "HIS": ["HD1"]
+        "HIS": ["HD1", "HE2"]
     }
 
     charge = []
-    for s in spheres[1:]:
+    for i, s in enumerate(spheres[1:]):
         c = 0
         for res in s:
             res_id = res.get_full_id()
@@ -598,19 +598,24 @@ def compute_charge(spheres, structure, ligand_charge):
             if ligand_key not in ligand_charge:
                 if resname in pos and all(res.has_id(h) for h in pos[resname]):
                     c += 1
+                    # print(res_id, resname, i+1, 1)
                 elif resname in neg and all(not res.has_id(h) for h in neg[resname]):
                     c -= 1
+                    # print(res_id, resname, i+1, -1)
                 if Polypeptide.is_aa(res) and resname != "PRO" and all(not res.has_id(h) for h in ["H", "H2"]):
                     # TODO: termini
                     c -= 1
+                    # print(res_id, resname, i+1, "B")
 
                 # Check for charged N-terminus
                 if res_id in n_terminals:
                     c += 1
+                    # print(res_id, resname, i+1, "N")
 
                 # Check for charged C-terminus
                 if res.has_id("OXT"):
                     c -= 1
+                    # print(res_id, resname, i+1, "C")
 
         charge.append(c)
     return charge
@@ -713,9 +718,9 @@ def extract_clusters(
                     sphere_path = f"{cluster_path}/{i}.pdb"
                     sphere_paths.append(sphere_path)
                     write_pdb(io, spheres[i], sphere_path)
-            if capping:
-                for cap in cap_residues:
-                    cap.get_parent().detach_child(cap.get_id())
+            # if capping:
+            #     for cap in cap_residues:
+            #         cap.get_parent().detach_child(cap.get_id())
             if xyz:
                 struct_to_file.to_xyz(f"{cluster_path}/{metal_id}.xyz", *sphere_paths)
                 struct_to_file.combine_pdbs(f"{cluster_path}/{metal_id}.pdb", metals, *sphere_paths)
