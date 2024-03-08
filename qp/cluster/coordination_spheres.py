@@ -396,10 +396,13 @@ def build_hydrogen(chain, parent, template, atom):
         res.add(Atom("H1", pos, 0, 1, " ", "H1", None, "H"))
         chain.add(res)
     else:
-        if "H1" in chain[res_id]:
+        if "H1" not in chain[res_id]:
+            chain[res_id].add(Atom("H1", pos, 0, 1, " ", "H1", None, "H"))
+        elif "H2" not in chain[res_id]:
             chain[res_id].add(Atom("H2", pos, 0, 1, " ", "H2", None, "H"))
         else:
-            chain[res_id].add(Atom("H1", pos, 0, 1, " ", "H1", None, "H"))
+            chain[res_id].add(Atom("H3", pos, 0, 1, " ", "H3", None, "H"))
+            
     return chain[res_id]
 
 
