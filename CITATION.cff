@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "QuantumPDB: Database and Automated Electronic Structure Predictions for Proteins"
+version: 1.0.0
+date-released: 2024-03-15
+authors:
+  - family-names: "Kastner"
+    given-names: "David W."
+    orcid: "https://orcid.org/0000-0002-7766-4249"
+    affiliation: "Massachusetts Institute of Technology"
+  - family-names: "Ho"
+    given-names: "Wilson"
+    affiliation: "Massachusetts Institute of Technology"
+  - family-names: "Luo"
+    given-names: "Weiliang"
+    affiliation: "Massachusetts Institute of Technology"
+  - family-names: "Reinhardt"
+    given-names: "Clorice"
+    affiliation: "Massachusetts Institute of Technology"
+abstract: "A database and workflow for DFT electronic structure predictions for proteins."
+keywords:
+  - "computational chemistry"
+  - "protein structure"
+repository-code: "https://github.com/davidkastner/quantumPDB"
+license: "MIT"
