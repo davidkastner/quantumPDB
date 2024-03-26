@@ -390,13 +390,19 @@ def build_hydrogen(chain, parent, template, atom):
     else:
         pos = scale_hydrogen(parent["C"], template["N"], 1.09 / 1.32)
 
-    res_id = ("H_" + parent.get_resname(), template.get_id()[1], " ")
+    res_id = parent.id
     if not chain.has_id(res_id):
         res = Residue(res_id, parent.get_resname(), " ")
         res.add(Atom("H1", pos, 0, 1, " ", "H1", None, "H"))
         chain.add(res)
     else:
-        chain[res_id].add(Atom("H2", pos, 0, 1, " ", "H2", None, "H"))
+        if "H1" not in chain[res_id]:
+            chain[res_id].add(Atom("H1", pos, 0, 1, " ", "H1", None, "H"))
+        elif "H2" not in chain[res_id]:
+            chain[res_id].add(Atom("H2", pos, 0, 1, " ", "H2", None, "H"))
+        else:
+            chain[res_id].add(Atom("H3", pos, 0, 1, " ", "H3", None, "H"))
+            
     return chain[res_id]
 
 
@@ -540,7 +546,7 @@ def write_pdb(io, sphere, out):
     io.save(out, ResSelect())
 
 
-def compute_charge(spheres, structure):
+def compute_charge(spheres, structure, ligand_charge):
     """
     Computes the total charge of coordinating AAs
 
@@ -550,6 +556,8 @@ def compute_charge(spheres, structure):
         Sets of residues separated by spheres
     structure: Bio.PDB.Structure
         The protein structure
+    ligand_charge: dict
+        Key, value pairs of ligand names and charges
 
     Returns
     -------
@@ -573,35 +581,44 @@ def compute_charge(spheres, structure):
         "MLZ": []
     }
     neg = {
-        "ASP": ["HD2"],
-        "GLU": ["HE2", "HOE1"],
+        "ASP": ["HD2", "HOD1", "HOD2"],
+        "GLU": ["HE2", "HOE1", "HOE2"],
         "CYS": ["HG"],
         "TYR": ["HH"],
         "OCS": [],
-        "CSD": ["HD1", "HD2"]
+        "CSD": ["HD1", "HD2"],
+        "KCX": ["HQ1", "HQ2", "HOQ1", "HOQ2"],
+        "HIS": ["HD1", "HE2"]
     }
 
     charge = []
-    for s in spheres[1:]:
+    for i, s in enumerate(spheres[1:]):
         c = 0
         for res in s:
             res_id = res.get_full_id()
             resname = res.get_resname()
-            if resname in pos and all(res.has_id(h) for h in pos[resname]):
-                c += 1
-            elif resname in neg and all(not res.has_id(h) for h in neg[resname]):
-                c -= 1
-            if Polypeptide.is_aa(res) and resname != "PRO" and all(not res.has_id(h) for h in ["H", "H2"]):
-                # TODO: termini
-                c -= 1
+            ligand_key = f"{resname}_{res_id[2]}{res_id[3][1]}"
+            if ligand_key not in ligand_charge:
+                if resname in pos and all(res.has_id(h) for h in pos[resname]):
+                    c += 1
+                    # print(res_id, resname, i+1, 1)
+                elif resname in neg and all(not res.has_id(h) for h in neg[resname]):
+                    c -= 1
+                    # print(res_id, resname, i+1, -1)
+                if Polypeptide.is_aa(res) and resname != "PRO" and all(not res.has_id(h) for h in ["H", "H2"]):
+                    # TODO: termini
+                    c -= 1
+                    # print(res_id, resname, i+1, "B")
 
-            # Check for charged N-terminus
-            if res_id in n_terminals:
-                c += 1
+                # Check for charged N-terminus
+                if res_id in n_terminals:
+                    c += 1
+                    # print(res_id, resname, i+1, "N")
 
-            # Check for charged C-terminus
-            if res.has_id("OXT"):
-                c -= 1
+                # Check for charged C-terminus
+                if res.has_id("OXT"):
+                    c -= 1
+                    # print(res_id, resname, i+1, "C")
 
         charge.append(c)
     return charge
@@ -641,6 +658,7 @@ def extract_clusters(
     count=False,
     xyz=False,
     first_sphere_radius=3.0,
+    ligand_charge=dict(),
     smooth_method="box_plot",
     **smooth_params
 ):
@@ -679,16 +697,18 @@ def extract_clusters(
 
     aa_charge = {}
     res_count = {}
+    cluster_paths = []
     for res in model.get_residues():
         if res.get_resname() in metals:
             metal_id, residues, spheres = get_next_neighbors(
                 res, neighbors, sphere_count, ligands, first_sphere_radius, smooth_method, **smooth_params
             )
-
-            os.makedirs(f"{out}/{metal_id}", exist_ok=True)
+            cluster_path = f"{out}/{metal_id}"
+            cluster_paths.append(cluster_path)
+            os.makedirs(cluster_path, exist_ok=True)
 
             if charge:
-                aa_charge[metal_id] = compute_charge(spheres, structure)
+                aa_charge[metal_id] = compute_charge(spheres, structure, ligand_charge)
             if count:
                 res_count[metal_id] = count_residues(spheres)
             if capping:
@@ -698,15 +718,15 @@ def extract_clusters(
             sphere_paths = []
             for i in range(sphere_count + 1):
                 if spheres[i]:
-                    sphere_path = f"{out}/{metal_id}/{i}.pdb"
+                    sphere_path = f"{cluster_path}/{i}.pdb"
                     sphere_paths.append(sphere_path)
                     write_pdb(io, spheres[i], sphere_path)
-            if capping:
-                for cap in cap_residues:
-                    cap.get_parent().detach_child(cap.get_id())
+            # if capping:
+            #     for cap in cap_residues:
+            #         cap.get_parent().detach_child(cap.get_id())
             if xyz:
-                struct_to_file.to_xyz(f"{out}/{metal_id}/{metal_id}.xyz", *sphere_paths)
-                struct_to_file.combine_pdbs(f"{out}/{metal_id}/{metal_id}.pdb", metals, *sphere_paths)
+                struct_to_file.to_xyz(f"{cluster_path}/{metal_id}.xyz", *sphere_paths)
+                struct_to_file.combine_pdbs(f"{cluster_path}/{metal_id}.pdb", metals, *sphere_paths)
 
     if charge:
         with open(f"{out}/charge.csv", "w") as f:
@@ -723,3 +743,5 @@ def extract_clusters(
                     s = ", ".join(f"{r} {c}" for r, c in sorted(sphere.items()))
                     f.write(f',"{s}"')
                 f.write("\n")
+
+    return cluster_paths

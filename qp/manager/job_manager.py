@@ -43,11 +43,12 @@ def find_heavy():
 
     return compress_sequence(non_hydrogens)
 
-def residue_exists(first_sphere_path, ligand_name):
+def residue_exists(sphere_path, res_name, chain, res_id):
     """Returns True if ligand_name exists in the pdb file."""
-    with open(first_sphere_path, 'r') as f:
+    with open(sphere_path, 'r') as f:
         for line in f:
-            if line.startswith("HETATM") and ligand_name in line:
+            if line.startswith("HETATM") and res_name == line[17:20].strip() \
+                and chain == line[21] and res_id == int(line[22:26]):
                 return True
     return False
 
@@ -89,18 +90,20 @@ def get_electronic(pdb_id, master_list):
         sys.exit()
 
 
-def get_charge():
+def get_charge(structure_dir=None):
     """Extract the charge values from charge.csv"""
-    current_dir = os.getcwd()
-    
-    # Construct relative paths
-    charge_dir = os.path.abspath(os.path.join(current_dir, "../../"))
-    structure_dir = os.path.abspath(os.path.join(current_dir, "../"))
+    if structure_dir is None:
+        current_dir = os.getcwd()
+        charge_dir = os.path.abspath(os.path.join(current_dir, "../../"))
+        structure_dir = os.path.abspath(os.path.join(current_dir, "../"))
+    else:
+        charge_dir = os.path.abspath(os.path.join(structure_dir, "../"))
     charge_csv_path = os.path.join(charge_dir, "charge.csv")
-    first_sphere_path = os.path.join(structure_dir, "1.pdb")
+    spin_csv_path = os.path.join(charge_dir, "spin.csv")
     
     charge = 0
     section = 1
+    num_sphere = 0
     chain_identifier = os.path.basename(structure_dir)
     chain = os.path.basename(structure_dir)[0]
 
@@ -116,17 +119,39 @@ def get_charge():
             # Parse charge.csv section 1
             if section == 1 and line.startswith(chain_identifier):
                 parts = line.split(',')
+                num_sphere = len(parts) - 1
                 current_chain_identifier = parts[0]
                 if current_chain_identifier == chain_identifier:
                     charge += sum([int(x) for x in parts[1:]])
 
             # Parse charge.csv section 2
-            elif section == 2 and '_' + chain in line:
+            elif section == 2:
                 ligand, value = line.split(',')
-                if residue_exists(first_sphere_path, ligand.split('_')[0]):
-                    charge += int(value)
+                res_name, res_id_full = ligand.split('_')
+                chain = res_id_full[0]
+                res_id = int(res_id_full[1:])
+                for i in range(num_sphere):
+                    sphere_path = os.path.join(structure_dir, f"{i + 1}.pdb")
+                    if residue_exists(sphere_path, res_name, chain, res_id):
+                        charge += int(value)
+
+    spin = 0
+    if os.path.exists(spin_csv_path):
+        with open(spin_csv_path, 'r') as spin_csv_content:
+            for line in spin_csv_content:
+                line = line.strip()
+                if not line:
+                    continue
+                ligand, value = line.split(',')
+                res_name, res_id_full = ligand.split('_')
+                chain = res_id_full[0]
+                res_id = int(res_id_full[1:])
+                for i in range(num_sphere):
+                    sphere_path = os.path.join(structure_dir, f"{i + 1}.pdb")
+                    if residue_exists(sphere_path, res_name, chain, res_id):
+                        spin += int(value)
     
-    return charge
+    return charge, spin
 
 
 def get_master_list(url):
@@ -196,7 +221,8 @@ def submit_jobs(job_count, master_list_path, minimization, basis, method, guess,
             os.chdir(qm_path)
             
             oxidation, multiplicity = get_electronic(pdb.lower(), master_list_path)
-            charge = get_charge()
+            charge, extra_spin = get_charge()
+            multiplicity += extra_spin
             total_charge = charge + oxidation
             
             # Get heavy atoms to fix if geometry optimization was requested

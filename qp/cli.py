@@ -87,7 +87,7 @@ def run(i,
         from qp.cluster import coordination_spheres
         click.echo("Coordination sphere parameters:")
         metals = click.prompt("> Active site metals", default="FE FE2").split(" ")
-        limit = click.prompt("> Number of spheres", default=3)
+        limit = click.prompt("> Number of spheres", default=2)
         first_sphere_radius = click.prompt("> Radius of first spheres", type=float, default=4.0)
         ligands = click.prompt("> Additional ligands [unnatural AAs] in outer coordination spheres", default=[], show_default=False)
         capping = int(
@@ -206,9 +206,16 @@ def run(i,
                     copy(path, old_path)
                 add_hydrogens.adjust_activesites(path, metals)
 
-            clusters = coordination_spheres.extract_clusters(
+            if charge:
+                ligand_charge = add_hydrogens.compute_charge(f"{prot_path}/{pdb}_ligands.sdf", path)
+                ligand_spin = add_hydrogens.compute_spin(f"{prot_path}/{pdb}_ligands.sdf")
+            else:
+                ligand_charge = dict()
+
+            cluster_paths = coordination_spheres.extract_clusters(
                 path, f"{o}/{pdb}", metals,
-                limit, ligands, capping, charge, count, xyz, first_sphere_radius,
+                limit, ligands, capping, charge, count, xyz, first_sphere_radius, 
+                ligand_charge=ligand_charge,
                 smooth_method=smooth_method,
                 **smooth_params
             )
@@ -223,11 +230,19 @@ def run(i,
             #     continue
 
             if charge:
-                ligand_charge = add_hydrogens.compute_charge(f"{prot_path}/{pdb}_ligands.sdf", path)
                 with open(f"{o}/{pdb}/charge.csv", "a") as f:
                     f.write("\n")
                     for k, v in sorted(ligand_charge.items()):
                         f.write(f"{k},{v}\n")
+                with open(f"{o}/{pdb}/spin.csv", "a") as f:
+                    f.write("\n")
+                    for k, v in sorted(ligand_spin.items()):
+                        f.write(f"{k},{v}\n")
+                
+                from qp.checks.charge_count import check_charge
+                for cluster_path in cluster_paths:
+                    check_charge(cluster_path)
+                        
 
         click.echo("")
 
