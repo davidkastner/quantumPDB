@@ -1,46 +1,41 @@
 """Command-line interface (CLI) entry point.
 
-**Usage** ``qp [OPTIONS]``
-
-Options:
-
-==================== =====
--i                   Input PDB code, PDB file, or batch file [required]
--o                   Output directory  [required]
--m, --modeller       Use MODELLER to add missing loops 
--p, --protoss        Use Protoss to add hydrogens
--c, --coordination   Select the first, second, etc. coordination spheres
--s, --skip           Skips rerunning MODELLER or Protoss if an
-                     existing output file is found
-==================== =====
-
+**Usage** ``qp run --config path/to/config.yaml``
 """
 
 import click
+import yaml
 
 def welcome():
     """Print first to welcome the user while it waits to load the modules"""
     
-    print("\n        ╔═══════════════════════════════╗")
-    print("        ║ .---------------------------. ║")
-    print("        ║ |         __________        | ║")
-    print("        ║ |       / ____/\____ \      | ║")
-    print("        ║ |      < <_|  ||  |_> >     | ║")
-    print("        ║ |       \__   ||   __/      | ║")
-    print("        ║ |          |__||__|         | ║")
-    print("        ║ |                           | ║")
-    print("        ║ |   WELCOME TO QUANTUMPDB   | ║")
-    print("        ║ '---------------------------' ║")
-    print("        ╚═══════════════════════════════╝\n")
-
-    print("GitHub: https://github.com/davidkastner/quantumpdb")
-    print("Documenation: https://quantumpdb.readthedocs.io")
-    print("• Flags: -m (modeller) -p (protoss) -c (spheres) -s (use previous modeller/protoss)")
-    print("• Generate structures: qp run -i pdbs.txt -o datasets/ -m -p -c")
-    print("• Submit QM: qp submit -j\n")
+    print("\n             ╔═════════════════════════╗             ")
+    print("             ║       __________        ║             ")
+    print("             ║     / ____/\____ \      ║             ")
+    print("             ║    < <_|  ||  |_> >     ║             ")
+    print("             ║     \__   ||   __/      ║             ")
+    print("             ║        |__||__|         ║             ")
+    print("             ║                         ║             ")
+    print("             ║       QUANTUMPDB        ║             ")
+    print("             ║  [quantumpdb.rtfd.io]   ║             ")
+    print("             ╚══════════╗   ╔══════════╝             ")
+    print("                 ╔══════╝   ╚══════╗                 ")
+    print("                 ║  THE KULIK LAB  ║                 ")
+    print("                 ╚══════╗   ╔══════╝                 ")
+    print("  ╔═════════════════════╝   ╚═════════════════════╗  ")
+    print("  ║   Code: github.com/davidkastner/quantumpdb    ║  ")
+    print("  ║   Docs: quantumpdb.readthedocs.io             ║  ")
+    print("  ║      - Clusters: qp run -c config.yaml        ║  ")
+    print("  ║      - QM calcs: qp submit -j                 ║  ")
+    print("  ╚═══════════════════════════════════════════════╝  \n")
 
 # Welcome even if no flags
 welcome()
+
+# Read in the configuration yaml file
+def read_config(config_file):
+    with open(config_file, 'r') as file:
+        return yaml.safe_load(file)
 
 @click.group()
 def cli():
@@ -48,21 +43,26 @@ def cli():
     pass
 
 @cli.command()
-@click.option("-i", required=True, multiple=True, help="Input PDB code, PDB file, or batch file")
-@click.option("-o", required=True, type=click.Path(file_okay=False), help="Output directory")
-@click.option("--modeller", "-m", is_flag=True, help="Use MODELLER to add missing loops")
-@click.option("--protoss", "-p", is_flag=True, help="Use Protoss to add hydrogens")
-@click.option("--coordination", "-c", is_flag=True, help="Select the first, second, etc. coordination spheres")
-@click.option("--skip", "-s", type=click.Choice(["modeller", "protoss", "all"]), is_flag=False, flag_value="all",
-                              help="Skips rerunning MODELLER or Protoss if an existing output file is found")
-def run(i,
-        o,
-        modeller,
-        protoss,
-        coordination,
-        skip,):
+@click.option("--config", "-c", required=True, type=click.Path(exists=True), help="Path to the configuration YAML file")
+def run(config):
     """Generates quantumPDB structures and files."""
-    
+
+    config_data = read_config(config)
+
+    # Parse configuration parameters
+    i = config_data.get('input', [])
+    if isinstance(i, str):
+        if ',' in i:
+            i = [pdb.strip() for pdb in i.split(',')]  # Split by commas and strip whitespace
+        else:
+            i = [i]
+
+    o = config_data.get('output_dir', '')
+    modeller = config_data.get('modeller', False)
+    protoss = config_data.get('protoss', False)
+    coordination = config_data.get('coordination', False)
+    skip = config_data.get('skip', False)
+
     import os
     from Bio.PDB.PDBExceptions import PDBIOException
     from qp.checks import fetch_pdb
@@ -73,46 +73,29 @@ def run(i,
     if modeller:
         from qp.structure import missing_loops
         click.echo("MODELLER parameters:")
-        optimize = int(
-            click.prompt(
-                "> Optimize select residues\n   0: None\n   1: [Missing]\n   2: All\n ",
-                type=click.Choice(["0", "1", "2"]),
-                default="1",
-                show_default=False,
-            )
-        )
-        click.echo("")
+        optimize = config_data.get('optimize_select_residues', 1)
 
     if coordination:
         from qp.cluster import coordination_spheres
         click.echo("Coordination sphere parameters:")
-        metals = click.prompt("> Active site metals", default="FE FE2").split(" ")
-        limit = click.prompt("> Number of spheres", default=2)
-        first_sphere_radius = click.prompt("> Radius of first spheres", type=float, default=4.0)
-        ligands = click.prompt("> Additional ligands [unnatural AAs] in outer coordination spheres", default=[], show_default=False)
-        capping = int(
-            click.prompt(
-                "> Capping (requires Protoss)\n   0: None\n   1: [H]\n   2: ACE/NME\n ",
-                type=click.Choice(["0", "1", "2"]),
-                default="1",
-                show_default=False,
-            )
-        )
+        metals = config_data.get('active_site_metals', ['FE', 'FE2'])
+        limit = config_data.get('number_of_spheres', 2)
+        first_sphere_radius = config_data.get('radius_of_first_sphere', 4.0)
+        ligands = config_data.get('additional_ligands', [])
+        print(ligands)
+        capping = config_data.get('capping_method', 1)
 
         # Prompt user for their preferred cluster smoothing method
-        choice = click.prompt(
-            "> Smoothing method\n   0: Box plot\n   1: DBSCAN\n   2: [Dummy Atom]\n   3: None\n",
-            type=click.Choice(["0", "1", "2", "3"]),
-            default="2",
-            show_default=False,)
-        smooth_options = {"0": {}, "1": {"eps": 6, "min_samples": 3}, "2": {"mean_distance": 3}, "3": {}}
-        smooth_method_options = {"0": "box_plot", "1": "dbscan", "2": "dummy_atom", "3": False}
-        smooth_params = smooth_options[choice]
-        smooth_method = smooth_method_options[choice]
+        smooth_choice = config_data.get('smoothing_method', 2)
+        smooth_options = {0: {}, 1: {"eps": 6, "min_samples": 3}, 2: {"mean_distance": 3}, 3: {}}
+        smooth_method_options = {0: "box_plot", 1: "dbscan", 2: "dummy_atom", 3: False}
+        smooth_params = smooth_options[smooth_choice]
+        smooth_method = smooth_method_options[smooth_choice]
 
-        charge = click.confirm("> Compute charges (requires Protoss)", default=True)
-        count = click.confirm("> Count residues", default=True)
-        xyz = click.confirm("> Write XYZ files", default=True)
+
+        charge = config_data.get('compute_charges', True)
+        count = config_data.get('count_residues', True)
+        xyz = config_data.get('write_xyz', True)
 
         if capping or charge:
             protoss = True
@@ -219,15 +202,6 @@ def run(i,
                 smooth_method=smooth_method,
                 **smooth_params
             )
-            # except (ValueError, PDBIOException):  # TODO add custom exceptions
-            #     click.secho("Residue or atom limit exceeded\n", italic=True, fg="red")
-            #     err["Other"].append(pdb)
-            #     continue
-            # except KeyError as e:
-            #     raise e
-            #     click.secho(f"Missing template atoms for capping {e}\n", italic=True, fg="red")
-            #     err["Coordination sphere"].append(pdb)
-            #     continue
 
             if charge:
                 with open(f"{o}/{pdb}/charge.csv", "a") as f:
