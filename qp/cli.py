@@ -3,8 +3,9 @@
 **Usage** ``qp run --config path/to/config.yaml``
 """
 
-import click
+import os
 import yaml
+import click
 
 def welcome():
     """Print first to welcome the user while it waits to load the modules"""
@@ -26,7 +27,7 @@ def welcome():
     print("  ║   Code: github.com/davidkastner/quantumpdb   ║  ")
     print("  ║   Docs: quantumpdb.readthedocs.io            ║  ")
     print("  ║      - Clusters: qp run -c config.yaml       ║  ")
-    print("  ║      - QM calcs: qp submit -j                ║  ")
+    print("  ║      - QM calcs: qp submit -c config.yaml    ║  ")
     print("  ╚══════════════════════════════════════════════╝  \n")
 
 # Welcome even if no flags
@@ -53,7 +54,7 @@ def run(config):
     modeller = config_data.get('modeller', False)
     protoss = config_data.get('protoss', False)
     coordination = config_data.get('coordination', False)
-    skip = config_data.get('skip', False)
+    skip = config_data.get('skip', 'all')
 
     import os
     from Bio.PDB.PDBExceptions import PDBIOException
@@ -97,13 +98,13 @@ def run(config):
         "Other": []
     }
 
-    i = config_data.get('input', [])
+    input = config_data.get('input', [])
     # If the input was a path or a single PDB, convert it to a list
-    if isinstance(i, str):
-        i = [i]
-    o = config_data.get('output_dir', '')
-    o = os.path.abspath(o)
-    pdb_all = fetch_pdb.parse_input(i, o)
+    if isinstance(input, str):
+        input = [input]
+    output = config_data.get('output_dir', '')
+    output = os.path.abspath(output)
+    pdb_all = fetch_pdb.parse_input(input, output)
 
     for pdb, path in pdb_all:
         click.secho(pdb, bold=True)
@@ -118,7 +119,7 @@ def run(config):
                 err["PDB"].append(pdb)
                 continue
 
-        mod_path = f"{o}/{pdb}/{pdb}_modeller.pdb"
+        mod_path = f"{output}/{pdb}/{pdb}_modeller.pdb"
         if modeller:
             if skip in ["modeller", "all"] and os.path.isfile(mod_path):
                 click.echo("> MODELLER file found")
@@ -129,11 +130,11 @@ def run(config):
                 # Remove trailing missing residues from the ends of all chains
                 residues = missing_loops.clean_termini(residues)
 
-                ali_path = f"{o}/{pdb}/{pdb}.ali"
+                ali_path = f"{output}/{pdb}/{pdb}.ali"
                 missing_loops.write_alignment(residues, pdb, path, ali_path)
                 missing_loops.build_model(residues, pdb, ali_path, mod_path, optimize)
 
-        prot_path = f"{o}/{pdb}/Protoss"
+        prot_path = f"{output}/{pdb}/Protoss"
         if protoss:
             if skip in ["protoss", "all"] and os.path.isfile(f"{prot_path}/{pdb}_protoss.pdb"):
                 click.echo("> Protoss file found")
@@ -191,7 +192,7 @@ def run(config):
                 ligand_charge = dict()
 
             cluster_paths = coordination_spheres.extract_clusters(
-                path, f"{o}/{pdb}", center_residues,
+                path, f"{output}/{pdb}", center_residues,
                 limit, ligands, capping, charge, count, xyz, first_sphere_radius, 
                 ligand_charge=ligand_charge,
                 smooth_method=smooth_method,
@@ -199,12 +200,12 @@ def run(config):
             )
 
             if charge:
-                with open(f"{o}/{pdb}/charge.csv", "a") as f:
+                with open(f"{output}/{pdb}/charge.csv", "a") as f:
                     f.write("\n")
                     for k, v in sorted(ligand_charge.items()):
                         f.write(f"{k},{v}\n")
                 if ligand_spin:
-                    with open(f"{o}/{pdb}/spin.csv", "w") as f:
+                    with open(f"{output}/{pdb}/spin.csv", "w") as f:
                         f.write("\n")
                         for k, v in sorted(ligand_spin.items()):
                             f.write(f"{k},{v}\n")
@@ -213,7 +214,6 @@ def run(config):
                 for cluster_path in cluster_paths:
                     check_charge(cluster_path)
                         
-
         click.echo("")
 
     for k, v in err.items():
@@ -222,62 +222,31 @@ def run(config):
 
 
 @cli.command()
-@click.option("--job_manager", "-j", is_flag=True, help="Submit qp generated QM jobs")
+@click.option("--config", "-c", required=True, type=click.Path(exists=True), help="Path to the configuration YAML file")
 @click.option("--failure_checkup", "-f", is_flag=True, help="Find failed structures")
-def submit(job_manager,
-           failure_checkup,):
+def submit(config, failure_checkup):
     """Handles the submission of jobs for the quantumPDB."""
 
-    if job_manager:
-        from qp.manager import job_manager
-        
+    from qp.manager import job_manager
+    
+    if config:
+        config_data = read_config(config)
+        optimization = config_data.get('optimization', False)
+        method = config_data.get('method', 'wpbeh')
+        basis = config_data.get('basis', 'lacvps_ecp')
+        guess = config_data.get('guess', 'generate')
+        gpus = config_data.get('gpus', 1)
+        memory = config_data.get('memory', '8G')
+
+        # Check if a config file and end if it was a PDB
+        output = config_data.get('output_dir', '') # Ensure execution from the correct directory
+        input = config_data.get('input', [])
+        if not os.path.exists(input):
+            raise FileNotFoundError(f"Could not find input file named {input}.")
+        input = os.path.abspath(input)
+
         job_count = click.prompt("> Jobs count to be submitted in this batch", default=80)
-
-        # Single point or geometry optimization
-        choice_map = {"0": False, "1": True}
-        calculation_type = click.prompt(
-            "> Calculation type:\n   0: [single point]\n   1: geometry optimization\n",
-            type=click.Choice(["0", "1"]),
-            default="0",
-            show_default=False)
-        minimization = choice_map[calculation_type]
-        click.echo("")
-
-        # Get the users perferred functional
-        choice_map = {"0": "uwpbeh", "1": "ub3lyp", "2": "ugfn2xtb", "3": "gfn2xtb"}
-        method_number = click.prompt(
-            "> Requested functional:\n   0: [uwPBEh]\n   1: uB3LYP\n   2: uGFN2xTB\n   3: GFN2xTB\n ",
-            type=click.Choice(["0", "1", "2", "3"]),
-            default="0",
-            show_default=False)
-        method = choice_map[method_number]
-
-        click.echo("")
-
-        if method == "uwpbeh":
-            basis = "lacvps_ecp"
-            guess = "generate"
-            gpus = 1
-            memory = "8G"
-        elif method == "ub3lyp":
-            basis = "lacvps_ecp"
-            guess = "generate"
-            gpus = 1
-            memory = "8G"
-        elif method == "ugfn2xtb":
-            basis = "gfn2xtb"
-            guess = "hcore"
-            gpus = 1
-            memory = "8G"
-        elif method == "gfn2xtb":
-            basis = "gfn2xtb"
-            guess = "hcore"
-            gpus = 1
-            memory = "8G"
-        
-        url = "https://docs.google.com/spreadsheets/d/1St_4YEKcWzrs7yS1GTehfAKabtGCJeuM0sC0u1JG8ZE/gviz/tq?tqx=out:csv&sheet=Sheet1"
-        master_list_path = job_manager.get_master_list(url)
-        job_manager.manage_jobs(job_count, master_list_path, minimization, basis, method, guess, gpus, memory)
+        job_manager.manage_jobs(job_count, input, output, optimization, basis, method, guess, gpus, memory)
 
 
     if failure_checkup:
