@@ -4,7 +4,7 @@ output_dir: ./dataset/v1                    # Path to save the generated cluster
 modeller: true                              # Model missing loops
 protoss: true                               # Assign protonation states
 coordination: true                          # Generate clusters
-skip: true                                  # Check for an existing job
+skip: all                                   # Check for an existing job
 optimize_select_residues: 1                 # Modeller to model no (0), missing (1), or all (2) residues
 
 # Parameters for coordination spheres                       

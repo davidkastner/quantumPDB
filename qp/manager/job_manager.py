@@ -130,8 +130,8 @@ def get_charge(structure_dir=None):
                 res_name, res_id_full = ligand.split('_')
                 chain = res_id_full[0]
                 res_id = int(res_id_full[1:])
-                for i in range(num_sphere):
-                    sphere_path = os.path.join(structure_dir, f"{i + 1}.pdb")
+                for i in range(num_sphere + 1):
+                    sphere_path = os.path.join(structure_dir, f"{i}.pdb")
                     if residue_exists(sphere_path, res_name, chain, res_id):
                         charge += int(value)
 
@@ -146,8 +146,8 @@ def get_charge(structure_dir=None):
                 res_name, res_id_full = ligand.split('_')
                 chain = res_id_full[0]
                 res_id = int(res_id_full[1:])
-                for i in range(num_sphere):
-                    sphere_path = os.path.join(structure_dir, f"{i + 1}.pdb")
+                for i in range(num_sphere + 1):
+                    sphere_path = os.path.join(structure_dir, f"{i}.pdb")
                     if residue_exists(sphere_path, res_name, chain, res_id):
                         spin += int(value)
     

@@ -203,10 +203,11 @@ def run(config):
                     f.write("\n")
                     for k, v in sorted(ligand_charge.items()):
                         f.write(f"{k},{v}\n")
-                with open(f"{o}/{pdb}/spin.csv", "a") as f:
-                    f.write("\n")
-                    for k, v in sorted(ligand_spin.items()):
-                        f.write(f"{k},{v}\n")
+                if ligand_spin:
+                    with open(f"{o}/{pdb}/spin.csv", "w") as f:
+                        f.write("\n")
+                        for k, v in sorted(ligand_spin.items()):
+                            f.write(f"{k},{v}\n")
                 
                 from qp.checks.charge_count import check_charge
                 for cluster_path in cluster_paths:

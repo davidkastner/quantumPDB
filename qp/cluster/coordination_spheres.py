@@ -208,17 +208,17 @@ def box_outlier_thres(data, coeff=1.5):
     return Q1 - coeff * IQR, Q3 + coeff * IQR
 
 
-def check_nitrogen(atom, metal):
+def check_NC(atom, metal):
     """
-    Check if a nitrogen atom in the first sphere is coordinated.
+    Check if a nitrogen / carbon atom in the first sphere is coordinated.
 
-    If the nitrogen atom is in the backbone, or it's the nearest atom to the metal
+    If the nitrogen / carbon atom is in the backbone, or it's the nearest atom to the metal
     among all atoms in its residue, it's considered coordinated.
 
     Parameters
     ----------
     atom: Bio.PDB.Atom
-        The nitrogen atom to be checked
+        The nitrogen / carbon atom to be checked
     metal:
         The metal atom (coordination center)
 
@@ -275,19 +275,22 @@ def get_next_neighbors(
         nxt = set()
         lig_add = set()
         if i == 0 and first_sphere_radius > 0:
-            metal = start.get_unpacked_list()[0]
-            search = NeighborSearch([atom for atom in start.get_parent().get_parent().get_atoms() if atom.element != "H" and atom != metal])
-            first_sphere = search.search(center=metal.get_coord(), radius=first_sphere_radius, level="A")
+            is_metal_like = (len(start.get_unpacked_list()) == 1)
+            search = NeighborSearch([atom for atom in start.get_parent().get_parent().get_atoms() if atom.element != "H" and atom not in start])
+            first_sphere = []
+            for center in start.get_unpacked_list():
+                first_sphere += search.search(center=center.get_coord(), radius=first_sphere_radius, level="A")
             for atom in first_sphere:
-                element = atom.element
-                if element in "OS" or (element == "N" and check_nitrogen(atom, metal)):
-                    # only consider coordinated atoms
-                    res = atom.get_parent()
-                    seen.add(res)
-                    if Polypeptide.is_aa(res):
-                        nxt.add(res)
-                    else:
-                        lig_add.add(res)
+                if atom.get_parent() not in seen:
+                    element = atom.element
+                    if not is_metal_like or element in "OS" or (element in "NC" and check_NC(atom, center)):
+                        # only consider coordinated atoms
+                        res = atom.get_parent()
+                        seen.add(res)
+                        if Polypeptide.is_aa(res):
+                            nxt.add(res)
+                        else:
+                            lig_add.add(res)
         else:
             candidates = []
             frontiers = spheres[-1] if spheres[-1] else spheres[0]
