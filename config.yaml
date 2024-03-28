@@ -1,6 +1,6 @@
 # Parse configuration parameters
-input: ./protein_master_list.txt            # Path to your list of proteins or a list of PDB ID's PDB1, PDB2, PDB3
-output_dir: ./dataset/test-v1               # Path to save the generated clusters
+input: ./input.csv                          # Path to protein csv, single PDB, or list of PDBs [PDB1, PDB2, PDB3]
+output_dir: ./dataset/v1                    # Path to save the generated clusters
 modeller: true                              # Model missing loops
 protoss: true                               # Assign protonation states
 coordination: true                          # Generate clusters
@@ -8,7 +8,7 @@ skip: true                                  # Check for an existing job
 optimize_select_residues: 1                 # Modeller to model no (0), missing (1), or all (2) residues
 
 # Parameters for coordination spheres                       
-active_site_metals: [FE, FE2]               # Metal residue names to look for
+center_residues: [FE, FE2]                  # Residue name to use as the cluster center
 number_of_spheres: 2                        # Coordination spheres to generate
 radius_of_first_sphere: 4.0                 # Distance based cut off to determine first sphere
 additional_ligands: []                      # Residues beyond first sphere to include

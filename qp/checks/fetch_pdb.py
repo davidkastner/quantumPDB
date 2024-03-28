@@ -1,8 +1,8 @@
 """Fetch PDB and perform quality checks"""
 
-import requests
 import os
-
+import csv
+import requests
 
 def fetch_pdb(pdb, out):
     """
@@ -25,6 +25,9 @@ def fetch_pdb(pdb, out):
         f.write(r.text)
 
 
+import os
+import csv
+
 def parse_input(input_path, output_path):
     """
     Parses the input PDBs and returns a list of tuples
@@ -32,7 +35,7 @@ def parse_input(input_path, output_path):
     Parameters
     ----------
     input_path: list
-        List of PDB codes or paths to PDB files
+        List of PDB codes, paths to PDB files, or path to CSV file
     output_path: str
         Path to output directory
 
@@ -52,6 +55,12 @@ def parse_input(input_path, output_path):
             pdb = pdb.replace(".", "_")
             if ext == ".pdb":
                 pdb_all.append((pdb, pdb_id))
+            elif ext == ".csv":
+                with open(pdb_id, "r") as csvfile:
+                    reader = csv.DictReader(csvfile)
+                    for row in reader:
+                        pdb = row['pdb_id']
+                        pdb_all.append((pdb, f"{output_path}/{pdb}/{pdb}.pdb"))
             else:
                 with open(pdb_id, "r") as f:
                     pdb_all.extend(
@@ -59,5 +68,7 @@ def parse_input(input_path, output_path):
                     )
         else:
             pdb_all.append((pdb_id, f"{output_path}/{pdb_id}/{pdb_id}.pdb"))
-    
+
     return pdb_all
+
+

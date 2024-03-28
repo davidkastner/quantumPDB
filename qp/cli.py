@@ -8,26 +8,26 @@ import yaml
 
 def welcome():
     """Print first to welcome the user while it waits to load the modules"""
-    
-    print("\n             ╔═════════════════════════╗             ")
-    print("             ║       __________        ║             ")
-    print("             ║     / ____/\____ \      ║             ")
-    print("             ║    < <_|  ||  |_> >     ║             ")
-    print("             ║     \__   ||   __/      ║             ")
-    print("             ║        |__||__|         ║             ")
-    print("             ║                         ║             ")
-    print("             ║       QUANTUMPDB        ║             ")
-    print("             ║  [quantumpdb.rtfd.io]   ║             ")
-    print("             ╚══════════╗   ╔══════════╝             ")
-    print("                 ╔══════╝   ╚══════╗                 ")
-    print("                 ║  THE KULIK LAB  ║                 ")
-    print("                 ╚══════╗   ╔══════╝                 ")
-    print("  ╔═════════════════════╝   ╚═════════════════════╗  ")
-    print("  ║   Code: github.com/davidkastner/quantumpdb    ║  ")
-    print("  ║   Docs: quantumpdb.readthedocs.io             ║  ")
-    print("  ║      - Clusters: qp run -c config.yaml        ║  ")
-    print("  ║      - QM calcs: qp submit -j                 ║  ")
-    print("  ╚═══════════════════════════════════════════════╝  \n")
+    print("\n")
+    print("             ╔════════════════════════╗             ")
+    print("             ║       __________       ║             ")
+    print("             ║     / ____/\____ \     ║             ")
+    print("             ║    < <_|  ||  |_> >    ║             ")
+    print("             ║     \__   ||   __/     ║             ")
+    print("             ║        |__||__|        ║             ")
+    print("             ║                        ║             ")
+    print("             ║       QUANTUMPDB       ║             ")
+    print("             ║  [quantumpdb.rtfd.io]  ║             ")
+    print("             ╚═══════════╗╔═══════════╝             ")
+    print("                 ╔═══════╝╚═══════╗                 ")
+    print("                 ║ THE KULIK LAB  ║                 ")
+    print("                 ╚═══════╗╔═══════╝                 ")
+    print("  ╔══════════════════════╝╚══════════════════════╗  ")
+    print("  ║   Code: github.com/davidkastner/quantumpdb   ║  ")
+    print("  ║   Docs: quantumpdb.readthedocs.io            ║  ")
+    print("  ║      - Clusters: qp run -c config.yaml       ║  ")
+    print("  ║      - QM calcs: qp submit -j                ║  ")
+    print("  ╚══════════════════════════════════════════════╝  \n")
 
 # Welcome even if no flags
 welcome()
@@ -50,14 +50,6 @@ def run(config):
     config_data = read_config(config)
 
     # Parse configuration parameters
-    i = config_data.get('input', [])
-    if isinstance(i, str):
-        if ',' in i:
-            i = [pdb.strip() for pdb in i.split(',')]  # Split by commas and strip whitespace
-        else:
-            i = [i]
-
-    o = config_data.get('output_dir', '')
     modeller = config_data.get('modeller', False)
     protoss = config_data.get('protoss', False)
     coordination = config_data.get('coordination', False)
@@ -67,9 +59,6 @@ def run(config):
     from Bio.PDB.PDBExceptions import PDBIOException
     from qp.checks import fetch_pdb
 
-    o = os.path.abspath(o)
-    pdb_all = fetch_pdb.parse_input(i, o)
-
     if modeller:
         from qp.structure import missing_loops
         click.echo("MODELLER parameters:")
@@ -77,12 +66,9 @@ def run(config):
 
     if coordination:
         from qp.cluster import coordination_spheres
-        click.echo("Coordination sphere parameters:")
-        metals = config_data.get('active_site_metals', ['FE', 'FE2'])
         limit = config_data.get('number_of_spheres', 2)
         first_sphere_radius = config_data.get('radius_of_first_sphere', 4.0)
         ligands = config_data.get('additional_ligands', [])
-        print(ligands)
         capping = config_data.get('capping_method', 1)
 
         # Prompt user for their preferred cluster smoothing method
@@ -92,7 +78,7 @@ def run(config):
         smooth_params = smooth_options[smooth_choice]
         smooth_method = smooth_method_options[smooth_choice]
 
-
+        center_residues = config_data.get('center_residues', [])
         charge = config_data.get('compute_charges', True)
         count = config_data.get('count_residues', True)
         xyz = config_data.get('write_xyz', True)
@@ -110,6 +96,15 @@ def run(config):
         "Coordination sphere": [],
         "Other": []
     }
+
+    i = config_data.get('input', [])
+    # If the input was a path or a single PDB, convert it to a list
+    if isinstance(i, str):
+        i = [i]
+    o = config_data.get('output_dir', '')
+    o = os.path.abspath(o)
+    pdb_all = fetch_pdb.parse_input(i, o)
+
     for pdb, path in pdb_all:
         click.secho(pdb, bold=True)
 
@@ -187,7 +182,7 @@ def run(config):
                 if not os.path.exists(old_path):
                     from shutil import copy
                     copy(path, old_path)
-                add_hydrogens.adjust_activesites(path, metals)
+                add_hydrogens.adjust_activesites(path, center_residues)
 
             if charge:
                 ligand_charge = add_hydrogens.compute_charge(f"{prot_path}/{pdb}_ligands.sdf", path)
@@ -196,7 +191,7 @@ def run(config):
                 ligand_charge = dict()
 
             cluster_paths = coordination_spheres.extract_clusters(
-                path, f"{o}/{pdb}", metals,
+                path, f"{o}/{pdb}", center_residues,
                 limit, ligands, capping, charge, count, xyz, first_sphere_radius, 
                 ligand_charge=ligand_charge,
                 smooth_method=smooth_method,

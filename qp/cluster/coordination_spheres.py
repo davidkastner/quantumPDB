@@ -7,7 +7,7 @@
     >>> coordination_spheres.extract_clusters(
     ...     "path/to/PDB.pdb", 
     ...     "path/to/out/dir/", 
-    ...     metals=["FE", "FE2"], # PDB IDs of active site metals
+    ...     center_residues=["FE", "FE2"], # List of resnames of the residues to use as the cluster center
     ...     sphere_count=2,              # Number of spheres to extract
     ...     ligands=["AKG"]       # PDB IDs of additional ligands
     ... )
@@ -143,7 +143,7 @@ def calc_dist(point_a, point_b):
     return np.linalg.norm(point_a - point_b)
 
 
-def voronoi(model, metals, ligands, smooth_method, **smooth_params):
+def voronoi(model, center_residues, ligands, smooth_method, **smooth_params):
     """
     Computes the Voronoi tessellation of a protein structure.
 
@@ -161,7 +161,7 @@ def voronoi(model, metals, ligands, smooth_method, **smooth_params):
     points = []
     for res in model.get_residues():
         if Polypeptide.is_aa(res) or \
-            res.get_resname() in metals or \
+            res.get_resname() in center_residues or \
             (res.get_resname() in ligands):
             for atom in res.get_unpacked_list(): # includes atoms from multiple conformations
                 atoms.append(atom)
@@ -650,7 +650,7 @@ def count_residues(spheres):
 def extract_clusters(
     path,
     out,
-    metals,
+    center_residues,
     sphere_count=2,
     ligands=[],
     capping=0,
@@ -672,8 +672,8 @@ def extract_clusters(
         Path to PDB file
     out: str
         Path to output directory
-    metals: list
-        List of active site metal IDs
+    center_residues: list
+        List of resnames of the residues to use as the cluster center
     sphere_count: int
         Number of coordinations spheres to extract
     ligands: list
@@ -693,13 +693,13 @@ def extract_clusters(
     io.set_structure(structure)
 
     model = structure[0]
-    neighbors = voronoi(model, metals, ligands, smooth_method, **smooth_params)
+    neighbors = voronoi(model, center_residues, ligands, smooth_method, **smooth_params)
 
     aa_charge = {}
     res_count = {}
     cluster_paths = []
     for res in model.get_residues():
-        if res.get_resname() in metals:
+        if res.get_resname() in center_residues:
             metal_id, residues, spheres = get_next_neighbors(
                 res, neighbors, sphere_count, ligands, first_sphere_radius, smooth_method, **smooth_params
             )
@@ -726,7 +726,7 @@ def extract_clusters(
             #         cap.get_parent().detach_child(cap.get_id())
             if xyz:
                 struct_to_file.to_xyz(f"{cluster_path}/{metal_id}.xyz", *sphere_paths)
-                struct_to_file.combine_pdbs(f"{cluster_path}/{metal_id}.pdb", metals, *sphere_paths)
+                struct_to_file.combine_pdbs(f"{cluster_path}/{metal_id}.pdb", center_residues, *sphere_paths)
 
     if charge:
         with open(f"{out}/charge.csv", "w") as f:
