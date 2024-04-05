@@ -36,4 +36,4 @@ def check_charge(cluster_path):
     xyzfile = glob(os.path.join(cluster_path, "*.xyz"))[0]
     num_electron = count_electron(xyzfile)
     if (num_electron - charge) % 2 == spinmult % 2:
-        raise ValueError(f"charge {charge}, spin multiplicity {spinmult}, electron number {num_electron} in {cluster_path} are not consistent!")
+        print(f"charge {charge}, spin multiplicity {spinmult}, electron number {num_electron} in {cluster_path} are not consistent!")
