@@ -122,8 +122,8 @@ def flip_coordinated_HIS(points, res):
 
     The conformation and tautomerism states of HIS is adjusted by Protoss. 
     However, sometimes the coordinated nitrogen will be flipped away from 
-    where it's supposed to be. This procedure detect if the nitrogen (NE2) is
-    more favorable to be nearer to the metal than its neighbor carbon (CE1) and
+    where it's supposed to be. This procedure detect if the nitrogen (NE2/ND1) is
+    more favorable to be nearer to the metal than its neighbor carbon (CE1/CD2) and
     re-flip the ring and re-arrange the hydrogen.
 
     Parameters
@@ -133,39 +133,46 @@ def flip_coordinated_HIS(points, res):
     res: Bio.PDB.Residue.Residue
         A HIS residue
     """
-    flip_flag = False
+    flip_flag = ""
     try:
         CE1 = res["CE1"]
         NE2 = res["NE2"]
+        CD2 = res["CD2"]
+        ND1 = res["ND1"]
+        CB = res["CB"]
+        CG = res["CG"]
     except IndexError:
         print("Non standard atom names of HIS")
         return
     for p in points:
         dist_CE1_metal = p - CE1
         dist_NE2_metal = p - NE2
-        if dist_CE1_metal < dist_NE2_metal and dist_CE1_metal < 3.5:
-            flip_flag = True
+        dist_CD2_metal = p - CD2
+        dist_ND1_metal = p - ND1
+        if dist_CE1_metal < dist_NE2_metal and dist_CE1_metal < 3.5 and dist_CE1_metal < dist_ND1_metal:
+            flip_flag = "E"
+            break
+        elif dist_CD2_metal < dist_ND1_metal and dist_CD2_metal < 3.5 and dist_CD2_metal < dist_NE2_metal:
+            flip_flag = "D"
             break
     if flip_flag:
         old_coords = dict()
-        try:
-            for atom_name in ["HD2", "HE1", "CD2", "ND1", "CE1", "NE2", "CG", "CB"]:
+        for atom_name in ["HD2", "HE1", "HD1", "HE2", "CD2", "ND1", "CE1", "NE2", "CG", "CB"]:
+            if atom_name in res:
                 old_coords[atom_name] = res[atom_name].get_coord()
-        except IndexError:
-            print("Non standard atom names of HIS")
-            return
         
         coord_CB, coord_CG = old_coords["CB"], old_coords["CG"]
         axis = coord_CG - coord_CB
-        for atom_name in ["HD2", "HE1", "CD2", "ND1", "CE1", "NE2"]:
-            coord = old_coords[atom_name]
-            loc = coord - coord_CB
-            proj = axis * np.dot(axis, loc) / np.dot(axis, axis)
-            flipped_loc = 2 * proj - loc
-            flipped_coord = flipped_loc + coord_CB
-            res[atom_name].set_coord(flipped_coord)
+        for atom_name in ["HD2", "HE1", "HD1", "HE2", "CD2", "ND1", "CE1", "NE2"]:
+            if atom_name in res:
+                coord = old_coords[atom_name]
+                loc = coord - coord_CB
+                proj = axis * np.dot(axis, loc) / np.dot(axis, axis)
+                flipped_loc = 2 * proj - loc
+                flipped_coord = flipped_loc + coord_CB
+                res[atom_name].set_coord(flipped_coord)
 
-        if "HE2" in res and "HD1" not in res:
+        if flip_flag == "E" and "HE2" in res and "HD1" not in res:
             coord_CE1 = res["CE1"].get_coord()
             coord_ND1 = res["ND1"].get_coord()
             vec_ND1_CE1 = coord_CE1 - coord_ND1
@@ -174,6 +181,17 @@ def flip_coordinated_HIS(points, res):
             vec_ND1_HD1 = - bisector / np.linalg.norm(bisector) # * 1.00
             res["HE2"].set_coord(vec_ND1_HD1 + coord_ND1)
             res["HE2"].name = "HD1"
+
+        if flip_flag == "D" and "HD1" in res and "HE2" not in res:
+            coord_CE1 = res["CE1"].get_coord()
+            coord_NE2 = res["NE2"].get_coord()
+            coord_CD2 = res["CD2"].get_coord()
+            vec_NE2_CE1 = coord_CE1 - coord_NE2
+            vec_NE2_CD2 = coord_CD2 - coord_NE2
+            bisector = vec_NE2_CE1 + vec_NE2_CD2
+            vec_NE2_HE2 = - bisector / np.linalg.norm(bisector) # * 1.00
+            res["HD1"].set_coord(vec_NE2_HE2 + coord_NE2)
+            res["HD1"].name = "HE2"
 
 
 def add_hydrogen_CSO(res, structure):
