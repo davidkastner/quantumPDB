@@ -4,7 +4,6 @@ from qp.manager.job_manager import get_charge
 
 
 ATOM_ELECTRON_MAP = {
-    "Fe": 26,
     "H": 1,
     "C": 6,
     "N": 7,
@@ -26,7 +25,7 @@ def count_electron(xyzfile):
     for line in lines:
         if line:
             atom_type = line.split()[0].strip()
-            count += ATOM_ELECTRON_MAP[atom_type]
+            count += ATOM_ELECTRON_MAP.get(atom_type, 0)
     return count
 
 
