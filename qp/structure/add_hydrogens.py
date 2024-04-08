@@ -33,6 +33,7 @@ import os
 import requests
 import json
 import time
+from warnings import warn
 import numpy as np
 from Bio.PDB import PDBParser, PDBIO, Select, Polypeptide
 from Bio.PDB.Atom import Atom
@@ -367,10 +368,10 @@ def clean_partial_occupancy(path, path_new, center_residues):
                 p2 = res_priority(clash_res, kept_partial_res, center_residues)
                 if p1 > p2:
                     kept_partial_res[clash_res]["kept"] = False
-                    print(f"{partial_res_info(clash_res, kept_partial_res)} is deleted in comparison with {partial_res_info(res, kept_partial_res)}")
+                    warn(f"{partial_res_info(clash_res, kept_partial_res)} is deleted in comparison with {partial_res_info(res, kept_partial_res)}")
                 elif p1 < p2:
                     kept_partial_res[res]["kept"] = False
-                    print(f"{partial_res_info(res, kept_partial_res)} is deleted in comparison with {partial_res_info(clash_res, kept_partial_res)}")
+                    warn(f"{partial_res_info(res, kept_partial_res)} is deleted in comparison with {partial_res_info(clash_res, kept_partial_res)}")
                     break
 
     class ResSelect(Select):
