@@ -663,6 +663,7 @@ def extract_clusters(
     first_sphere_radius=3.0,
     ligand_charge=dict(),
     smooth_method="box_plot",
+    hetero_pdb=False,
     **smooth_params
 ):
     """
@@ -729,8 +730,7 @@ def extract_clusters(
             #         cap.get_parent().detach_child(cap.get_id())
             if xyz:
                 struct_to_file.to_xyz(f"{cluster_path}/{metal_id}.xyz", *sphere_paths)
-                struct_to_file.combine_pdbs(f"{cluster_path}/{metal_id}.pdb", center_residues, *sphere_paths)
-
+                struct_to_file.combine_pdbs(f"{cluster_path}/{metal_id}.pdb", center_residues, *sphere_paths, hetero_pdb=hetero_pdb)
     if charge:
         with open(f"{out}/charge.csv", "w") as f:
             f.write(f"Name,{','.join(str(x + 1) for x in range(sphere_count))}\n")

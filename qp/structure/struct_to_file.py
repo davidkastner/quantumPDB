@@ -28,7 +28,7 @@ def to_xyz(out, *paths):
         for element, (x, y, z) in atoms:
             f.write(f"{format_element(element):>3}  {x:8.3f} {y:8.3f} {z:8.3f}\n")
 
-def combine_pdbs(out_path, metals, *input_paths):
+def combine_pdbs(out_path, metals, *input_paths, hetero_pdb=False):
     """
     Combines multiple PDB files into a single PDB file, excluding atoms of type "H1",
     while maintaining the order of residues and atoms as they appear in the input files,
@@ -45,7 +45,7 @@ def combine_pdbs(out_path, metals, *input_paths):
         for path in input_paths:
             with open(path) as infile:
                 for line in infile:
-                    if line.startswith("HETATM") and all(metal not in line for metal in metals):
+                    if not hetero_pdb and line.startswith("HETATM") and all(metal not in line for metal in metals):
                         continue
                     if line.startswith("END"):
                         continue

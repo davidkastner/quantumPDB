@@ -83,6 +83,7 @@ def run(config):
         charge = config_data.get('compute_charges', True)
         count = config_data.get('count_residues', True)
         xyz = config_data.get('write_xyz', True)
+        hetero_pdb = config_data.get('write_hetero_pdb', False)
 
         if capping or charge:
             protoss = True
@@ -195,7 +196,7 @@ def run(config):
                 path, f"{output}/{pdb}", center_residues,
                 limit, ligands, capping, charge, count, xyz, first_sphere_radius, 
                 ligand_charge=ligand_charge,
-                smooth_method=smooth_method,
+                smooth_method=smooth_method, hetero_pdb=hetero_pdb,
                 **smooth_params
             )
 
