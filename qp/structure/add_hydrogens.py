@@ -34,9 +34,10 @@ import requests
 import json
 import time
 import numpy as np
-from Bio.PDB import PDBParser, PDBIO, Select
+from Bio.PDB import PDBParser, PDBIO, Select, Polypeptide
 from Bio.PDB.Atom import Atom
 from Bio.PDB.Polypeptide import is_aa
+from Bio.PDB.NeighborSearch import NeighborSearch
 
 
 def upload(path):
@@ -310,6 +311,74 @@ def adjust_activesites(path, metals):
     io = PDBIO()
     io.set_structure(structure)
     io.save(path, AtomSelect())
+
+
+def res_priority(res, res_info, center_residues):
+    if Polypeptide.is_aa(res, standard=True) or res.get_resname() in center_residues:
+        return 4e7
+    else:
+        return res_info[res]["num_atom"] + \
+            int(res_info[res]["avg_occupancy"] * 100) * 1e5 + \
+            int(Polypeptide.is_aa(res)) * 2e7
+
+
+def partial_res_info(res, res_info):
+    _, _, chain, code = res.get_full_id()
+    _, resid, _ = code
+    resname = res.get_resname()
+    return f'resname {resname}_{chain}{resid} with averaged occupancy {res_info[res]["avg_occupancy"]:.2f} and {res_info[res]["num_atom"]} atoms'
+
+
+def clean_partial_occupancy(path, path_new, center_residues):
+    parser = PDBParser(QUIET=True)
+    io = PDBIO()
+    structure = parser.get_structure("PDB", path)
+    io.set_structure(structure)
+    kept_partial_res = dict()
+    partial_atom_list = []
+    for res in structure[0].get_residues():
+        for atom in res:
+            atom_occupancy = atom.get_occupancy()
+            if atom_occupancy < 1.0:
+                partial_atom_list.append(atom)
+                if res not in kept_partial_res:
+                    kept_partial_res[res] = {
+                        "avg_occupancy": atom_occupancy,
+                        "num_atom": len(res),
+                        "kept": True
+                    }
+                else:
+                    kept_partial_res[res]["avg_occupancy"] += atom_occupancy
+    if not partial_atom_list:
+        return False
+    for res in kept_partial_res:
+        kept_partial_res[res]["avg_occupancy"] /= kept_partial_res[res]["num_atom"]
+    for res in kept_partial_res:
+        if not kept_partial_res[res]["kept"]:
+            continue
+        search = NeighborSearch(partial_atom_list)
+        for atom in res:
+            if not kept_partial_res[res]["kept"]:
+                break
+            for clash_res in search.search(center=atom.get_coord(), radius=3, level="R"):
+                if clash_res == res or not kept_partial_res[clash_res]["kept"]:
+                    continue
+                p1 = res_priority(res, kept_partial_res, center_residues)
+                p2 = res_priority(clash_res, kept_partial_res, center_residues)
+                if p1 > p2:
+                    kept_partial_res[clash_res]["kept"] = False
+                    print(f"{partial_res_info(clash_res, kept_partial_res)} is deleted in comparison with {partial_res_info(res, kept_partial_res)}")
+                elif p1 < p2:
+                    kept_partial_res[res]["kept"] = False
+                    print(f"{partial_res_info(res, kept_partial_res)} is deleted in comparison with {partial_res_info(clash_res, kept_partial_res)}")
+                    break
+
+    class ResSelect(Select):
+        def accept_residue(self, residue):
+            return (residue not in kept_partial_res) or kept_partial_res[residue]["kept"]
+
+    io.save(path_new, ResSelect())
+    return True
 
 
 def compute_charge(path_ligand, path_pdb):

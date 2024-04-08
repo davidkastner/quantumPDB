@@ -154,9 +154,13 @@ def run(config):
                     copy(os.path.join(prepared_prot_path, f"{pdbl}_ligands.sdf"), f"{prot_path}/{pdb}_ligands.sdf")
                     click.echo("> Using pre-prepared protoss file")
                 else:
+                    from qp.structure.add_hydrogens import clean_partial_occupancy
                     click.echo("> Running Protoss")
                     if modeller:
                         path = mod_path
+                    cleaned_path = path[:-4] + "_new.pdb"
+                    if clean_partial_occupancy(path, cleaned_path, center_residues):
+                        path = cleaned_path
                     try:
                         pid = add_hydrogens.upload(path)
                     except ValueError:
