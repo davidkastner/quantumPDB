@@ -188,6 +188,8 @@ def merge_centers(cur, search, seen, radius=4.0):
     seen.add(cur)
     nxt = set()
     for atom in cur.get_unpacked_list():
+        if atom.element == "H":
+            continue
         for res in search.search(atom.get_coord(), radius, "R"):
             nxt.add(res)
     for res in nxt:
@@ -202,7 +204,7 @@ def get_center_residues(model, center_residues, merge_cutoff=4.0):
     for res in model.get_residues():
         if res.get_resname() in center_residues:
             found.add(res)
-            center_atoms.extend(res.get_unpacked_list())
+            center_atoms.extend([atom for atom in res.get_unpacked_list() if atom.element != "H"])
     if not len(center_atoms):
         raise ValueError("No matching cluster centers found")
     
