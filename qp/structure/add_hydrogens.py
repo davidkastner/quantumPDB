@@ -321,7 +321,10 @@ def adjust_activesites(path, metals):
     points = []
     for res in structure[0].get_residues():
         if res.get_resname() in metals:
-            points.append(res.get_unpacked_list()[0])
+            atoms = res.get_unpacked_list()
+            if len(atoms) > 1:
+                continue # skip if not metal-like
+            points.append(atoms[0])
 
     for res in structure[0].get_residues():
         if res.get_resname() == "HIS":
