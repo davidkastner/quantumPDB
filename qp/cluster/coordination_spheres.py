@@ -214,10 +214,6 @@ def get_center_residues(model, center_residues, merge_cutoff=4.0):
     for res in found:
         if res not in seen:
             centers.append(merge_centers(res, search, seen, merge_cutoff))
-    for c in centers:
-        for r in c:
-            print(r.get_full_id())
-        print()
     return centers
 
 

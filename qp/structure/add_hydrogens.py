@@ -124,7 +124,6 @@ def repair_ligands(path, orig):
     for res in prot_structure[0].get_residues():
         if res.get_resname() == "MOL":
             resid = res.get_id()
-            print(res.get_full_id())
             chain = res.get_parent()
             chain.detach_child(resid)
 
@@ -137,10 +136,8 @@ def repair_ligands(path, orig):
                     if r.get_id() not in chain:
                         chain.add(r)
                         missing.append(r)
-                        print(r.get_full_id())
                     else:
                         break
-            print()
 
             for r in missing:
                 for a in r.get_unpacked_list():
