@@ -385,6 +385,33 @@ def get_next_neighbors(
     return "_".join(sorted(metal_id)), seen, spheres
 
 
+def prune_atoms(center, residues, spheres, max_atom_count):
+    atom_cnt = 0
+    for res in residues:
+        atom_cnt += len(res)
+    if atom_cnt <= max_atom_count:
+        return
+
+    center_atoms = []
+    for c in center:
+        center_atoms.extend(c.get_unpacked_list())
+    def dist(res):
+        return min(atom - x for x in center_atoms
+                   for atom in res.get_unpacked_list())
+                   
+    prune = set()
+    for res in sorted(residues, key=dist, reverse=True):
+        print(res.get_full_id(), dist(res))
+        prune.add(res)
+        atom_cnt -= len(res)
+        if atom_cnt <= max_atom_count:
+            break
+
+    residues -= prune
+    for s in spheres:
+        s -= prune
+
+
 def scale_hydrogen(a, b, scale):
     """
     Replaces an atom with hydrogen, rescaling the original bond length
@@ -686,14 +713,15 @@ def extract_clusters(
     path,
     out,
     center_residues,
-    sphere_count=2,
     merge_cutoff=4.0,
+    sphere_count=2,
+    first_sphere_radius=3.0,
+    max_atom_count=None,
     ligands=[],
     capping=0,
     charge=False,
     count=False,
     xyz=False,
-    first_sphere_radius=3.0,
     ligand_charge=dict(),
     smooth_method="box_plot",
     hetero_pdb=False,
@@ -745,6 +773,8 @@ def extract_clusters(
         cluster_paths.append(cluster_path)
         os.makedirs(cluster_path, exist_ok=True)
 
+        if max_atom_count is not None:
+            prune_atoms(c, residues, spheres, max_atom_count)
         if charge:
             aa_charge[metal_id] = compute_charge(spheres, structure, ligand_charge)
         if count:
