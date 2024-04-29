@@ -62,7 +62,6 @@ def run(config):
 
     if modeller:
         from qp.structure import missing_loops
-        click.echo("MODELLER parameters:")
         optimize = config_data.get('optimize_select_residues', 1)
 
     if coordination:
@@ -81,6 +80,7 @@ def run(config):
 
         center_residues = config_data.get('center_residues', [])
         merge_cutoff = config_data.get('merge_distance_cutoff', 4.0)
+        max_atom_count = config_data.get('max_atom_count', None)
         charge = config_data.get('compute_charges', True)
         count = config_data.get('count_residues', True)
         xyz = config_data.get('write_xyz', True)
@@ -88,7 +88,6 @@ def run(config):
 
         if capping or charge:
             protoss = True
-        click.echo("")
 
     if protoss:
         from qp.structure import add_hydrogens
@@ -195,8 +194,8 @@ def run(config):
                 ligand_charge = dict()
 
             cluster_paths = coordination_spheres.extract_clusters(
-                path, f"{output}/{pdb}", center_residues, limit, 
-                merge_cutoff, ligands, capping, charge, count, xyz, first_sphere_radius, 
+                path, f"{output}/{pdb}", center_residues, merge_cutoff, limit, 
+                first_sphere_radius, max_atom_count, ligands, capping, charge, count, xyz, 
                 ligand_charge=ligand_charge,
                 smooth_method=smooth_method, hetero_pdb=hetero_pdb,
                 **smooth_params
