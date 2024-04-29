@@ -183,6 +183,40 @@ def voronoi(model, center_residues, ligands, smooth_method, **smooth_params):
     return neighbors
 
 
+def merge_centers(cur, search, seen, radius=4.0):
+    center = {cur}
+    seen.add(cur)
+    nxt = set()
+    for atom in cur.get_unpacked_list():
+        if atom.element == "H":
+            continue
+        for res in search.search(atom.get_coord(), radius, "R"):
+            nxt.add(res)
+    for res in nxt:
+        if res not in seen:
+            center |= merge_centers(res, search, seen, radius)
+    return center
+
+
+def get_center_residues(model, center_residues, merge_cutoff=4.0):
+    found = set()
+    center_atoms = []
+    for res in model.get_residues():
+        if res.get_resname() in center_residues:
+            found.add(res)
+            center_atoms.extend([atom for atom in res.get_unpacked_list() if atom.element != "H"])
+    if not len(center_atoms):
+        raise ValueError("No matching cluster centers found")
+    
+    search = NeighborSearch(center_atoms)
+    seen = set()
+    centers = []
+    for res in found:
+        if res not in seen:
+            centers.append(merge_centers(res, search, seen, merge_cutoff))
+    return centers
+
+
 def box_outlier_thres(data, coeff=1.5):
     """
     Compute the threshold for the boxplot outlier detection method
@@ -267,18 +301,22 @@ def get_next_neighbors(
     spheres: list of sets
         Sets of residues separated by spheres
     """
-    seen = {start}
-    spheres = [{start}]
+    seen = start.copy()
+    spheres = [start]
     lig_adds = [set()]
     for i in range(0, sphere_count):
         # get candidate atoms in the new sphere
         nxt = set()
         lig_add = set()
         if i == 0 and first_sphere_radius > 0:
-            is_metal_like = (len(start.get_unpacked_list()) == 1)
-            search = NeighborSearch([atom for atom in start.get_parent().get_parent().get_atoms() if atom.element != "H" and atom not in start])
+            start_atoms = []
+            for res in start:
+                start_atoms.extend(res.get_unpacked_list())
+
+            is_metal_like = (len(start_atoms) == start)
+            search = NeighborSearch([atom for atom in start_atoms[0].get_parent().get_parent().get_parent().get_atoms() if atom.element != "H" and atom not in start_atoms])
             first_sphere = []
-            for center in start.get_unpacked_list():
+            for center in start_atoms:
                 first_sphere += search.search(center=center.get_coord(), radius=first_sphere_radius, level="A")
             for atom in first_sphere:
                 if atom.get_parent() not in seen:
@@ -335,14 +373,16 @@ def get_next_neighbors(
         spheres.append(nxt)
         lig_adds.append(lig_add)
 
-    res_id = start.get_full_id()
-    chain_name = res_id[2]
-    metal_index = str(res_id[3][1])
-    metal_id = chain_name + metal_index
+    metal_id = []
+    for res in start:
+        res_id = res.get_full_id()
+        chain_name = res_id[2]
+        metal_index = str(res_id[3][1])
+        metal_id.append(chain_name + metal_index)
     for i in range(len(spheres)):
         spheres[i] = spheres[i] | lig_adds[i]
     
-    return metal_id, seen, spheres
+    return "_".join(sorted(metal_id)), seen, spheres
 
 
 def scale_hydrogen(a, b, scale):
@@ -393,20 +433,12 @@ def build_hydrogen(chain, parent, template, atom):
     else:
         pos = scale_hydrogen(parent["C"], template["N"], 1.09 / 1.32)
 
-    res_id = parent.id
-    if not chain.has_id(res_id):
-        res = Residue(res_id, parent.get_resname(), " ")
-        res.add(Atom("H1", pos, 0, 1, " ", "H1", None, "H"))
-        chain.add(res)
-    else:
-        if "H1" not in chain[res_id]:
-            chain[res_id].add(Atom("H1", pos, 0, 1, " ", "H1", None, "H"))
-        elif "H2" not in chain[res_id]:
-            chain[res_id].add(Atom("H2", pos, 0, 1, " ", "H2", None, "H"))
-        else:
-            chain[res_id].add(Atom("H3", pos, 0, 1, " ", "H3", None, "H"))
-            
-    return chain[res_id]
+    for name in ["H1", "H2", "H3"]:
+        if name not in parent:
+            break
+    atom = Atom(name, pos, 0, 1, " ", name, None, "H")
+    parent.add(atom)
+    return atom
 
 
 def build_heavy(chain, parent, template, atom):
@@ -655,6 +687,7 @@ def extract_clusters(
     out,
     center_residues,
     sphere_count=2,
+    merge_cutoff=4.0,
     ligands=[],
     capping=0,
     charge=False,
@@ -699,38 +732,41 @@ def extract_clusters(
     model = structure[0]
     neighbors = voronoi(model, center_residues, ligands, smooth_method, **smooth_params)
 
+    centers = get_center_residues(model, center_residues, merge_cutoff)
+
     aa_charge = {}
     res_count = {}
     cluster_paths = []
-    for res in model.get_residues():
-        if res.get_resname() in center_residues:
-            metal_id, residues, spheres = get_next_neighbors(
-                res, neighbors, sphere_count, ligands, first_sphere_radius, smooth_method, **smooth_params
-            )
-            cluster_path = f"{out}/{metal_id}"
-            cluster_paths.append(cluster_path)
-            os.makedirs(cluster_path, exist_ok=True)
+    for c in centers:
+        metal_id, residues, spheres = get_next_neighbors(
+            c, neighbors, sphere_count, ligands, first_sphere_radius, smooth_method, **smooth_params
+        )
+        cluster_path = f"{out}/{metal_id}"
+        cluster_paths.append(cluster_path)
+        os.makedirs(cluster_path, exist_ok=True)
 
-            if charge:
-                aa_charge[metal_id] = compute_charge(spheres, structure, ligand_charge)
-            if count:
-                res_count[metal_id] = count_residues(spheres)
-            if capping:
-                cap_residues = cap_chains(model, residues, capping)
+        if charge:
+            aa_charge[metal_id] = compute_charge(spheres, structure, ligand_charge)
+        if count:
+            res_count[metal_id] = count_residues(spheres)
+        if capping:
+            cap_residues = cap_chains(model, residues, capping)
+            if capping == 2:
                 spheres[-1] |= cap_residues
 
-            sphere_paths = []
-            for i in range(sphere_count + 1):
-                if spheres[i]:
-                    sphere_path = f"{cluster_path}/{i}.pdb"
-                    sphere_paths.append(sphere_path)
-                    write_pdb(io, spheres[i], sphere_path)
-            # if capping:
-            #     for cap in cap_residues:
-            #         cap.get_parent().detach_child(cap.get_id())
-            if xyz:
-                struct_to_file.to_xyz(f"{cluster_path}/{metal_id}.xyz", *sphere_paths)
-                struct_to_file.combine_pdbs(f"{cluster_path}/{metal_id}.pdb", center_residues, *sphere_paths, hetero_pdb=hetero_pdb)
+        sphere_paths = []
+        for i in range(sphere_count + 1):
+            if spheres[i]:
+                sphere_path = f"{cluster_path}/{i}.pdb"
+                sphere_paths.append(sphere_path)
+                write_pdb(io, spheres[i], sphere_path)
+        if capping:
+            for cap in cap_residues:
+                cap.get_parent().detach_child(cap.get_id())
+        if xyz:
+            struct_to_file.to_xyz(f"{cluster_path}/{metal_id}.xyz", *sphere_paths)
+            struct_to_file.combine_pdbs(f"{cluster_path}/{metal_id}.pdb", center_residues, *sphere_paths, hetero_pdb=hetero_pdb)
+
     if charge:
         with open(f"{out}/charge.csv", "w") as f:
             f.write(f"Name,{','.join(str(x + 1) for x in range(sphere_count))}\n")

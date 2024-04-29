@@ -116,7 +116,7 @@ def get_charge(structure_dir=None):
             # Parse charge.csv section 2
             elif section == 2:
                 ligand, value = line.split(',')
-                res_name, res_id_full = ligand.split('_')
+                res_name, res_id_full = ligand.split()[0].split('_')
                 chain = res_id_full[0]
                 res_id = int(res_id_full[1:])
                 for i in range(num_sphere + 1):

@@ -80,6 +80,7 @@ def run(config):
         smooth_method = smooth_method_options[smooth_choice]
 
         center_residues = config_data.get('center_residues', [])
+        merge_cutoff = config_data.get('merge_distance_cutoff', 4.0)
         charge = config_data.get('compute_charges', True)
         count = config_data.get('count_residues', True)
         xyz = config_data.get('write_xyz', True)
@@ -143,8 +144,8 @@ def run(config):
                 import qp
                 pdbl = pdb.lower()
                 prepared_flag = False
-                for path in qp.__path__:
-                    prepared_prot_path = os.path.join(path, f"prepared/{pdbl}/Protoss")
+                for qp_path in qp.__path__:
+                    prepared_prot_path = os.path.join(qp_path, f"prepared/{pdbl}/Protoss")
                     if os.path.exists(prepared_prot_path):
                         prepared_flag = True
                 if prepared_flag:
@@ -170,6 +171,7 @@ def run(config):
                     add_hydrogens.download(job, f"{prot_path}/{pdb}_protoss.pdb", "protein")
                     add_hydrogens.download(job, f"{prot_path}/{pdb}_ligands.sdf", "ligands")
                     add_hydrogens.download(job, f"{prot_path}/{pdb}_log.txt", "log")
+                    add_hydrogens.repair_ligands(f"{prot_path}/{pdb}_protoss.pdb", path)
 
         if coordination:
             click.echo("> Extracting clusters")
@@ -193,8 +195,8 @@ def run(config):
                 ligand_charge = dict()
 
             cluster_paths = coordination_spheres.extract_clusters(
-                path, f"{output}/{pdb}", center_residues,
-                limit, ligands, capping, charge, count, xyz, first_sphere_radius, 
+                path, f"{output}/{pdb}", center_residues, limit, 
+                merge_cutoff, ligands, capping, charge, count, xyz, first_sphere_radius, 
                 ligand_charge=ligand_charge,
                 smooth_method=smooth_method, hetero_pdb=hetero_pdb,
                 **smooth_params

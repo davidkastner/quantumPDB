@@ -116,6 +116,50 @@ def download(job, out, key="protein"):
         f.write(protoss.text)
 
 
+def repair_ligands(path, orig):
+    parser = PDBParser(QUIET=True)
+    prot_structure = parser.get_structure("Prot", path)
+    orig_structure = parser.get_structure("Orig", orig)
+
+    for res in prot_structure[0].get_residues():
+        if res.get_resname() == "MOL":
+            resid = res.get_id()
+            chain = res.get_parent()
+            chain.detach_child(resid)
+
+            missing = []
+            found = False
+            for r in orig_structure[0][chain.get_id()].get_residues():
+                if r.get_id()[1] == resid[1]:
+                    found = True
+                if found:
+                    if r.get_id() not in chain:
+                        chain.add(r)
+                        missing.append(r)
+                    else:
+                        break
+
+            for r in missing:
+                for a in r.get_unpacked_list():
+                    if a.element == "H":
+                        r.detach_child(atom.get_id())
+            
+            for atom in res.get_unpacked_list():
+                if atom.element != "H":
+                    continue
+                closest = None
+                for r in missing:
+                    for a in r.get_unpacked_list():
+                        if closest is None or atom - a < dist:
+                            closest = r
+                            dist = atom - a
+                closest.add(atom)
+
+    io = PDBIO()
+    io.set_structure(prot_structure)
+    io.save(path)
+
+
 def flip_coordinated_HIS(points, res):
     """
     Flip the imidazole ring of HIS if it can be coordinated with the metal
@@ -274,7 +318,10 @@ def adjust_activesites(path, metals):
     points = []
     for res in structure[0].get_residues():
         if res.get_resname() in metals:
-            points.append(res.get_unpacked_list()[0])
+            atoms = res.get_unpacked_list()
+            if len(atoms) > 1:
+                continue # skip if not metal-like
+            points.append(atoms[0])
 
     for res in structure[0].get_residues():
         if res.get_resname() == "HIS":
@@ -350,7 +397,7 @@ def compute_charge(path_ligand, path_pdb):
         n_atom = 0
         for line in l:
             if "V2000" in line:
-                n_atom = int(line.split()[0])
+                n_atom = int(line.split()[0][:3])
             if line.startswith("M  RGP"):
                 # R# atom is found in the addition between CSO and TAN
                 # It's not a real atom and recorded in the RGP entry
