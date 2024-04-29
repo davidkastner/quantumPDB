@@ -396,12 +396,10 @@ def prune_atoms(center, residues, spheres, max_atom_count):
     for c in center:
         center_atoms.extend(c.get_unpacked_list())
     def dist(res):
-        return min(atom - x for x in center_atoms
-                   for atom in res.get_unpacked_list())
+        return min(atom - x for x in center_atoms for atom in res.get_unpacked_list())
                    
     prune = set()
     for res in sorted(residues, key=dist, reverse=True):
-        print(res.get_full_id(), dist(res))
         prune.add(res)
         atom_cnt -= len(res)
         if atom_cnt <= max_atom_count:
@@ -410,6 +408,8 @@ def prune_atoms(center, residues, spheres, max_atom_count):
     residues -= prune
     for s in spheres:
         s -= prune
+    while not spheres[-1]:
+        spheres.pop()
 
 
 def scale_hydrogen(a, b, scale):
@@ -654,7 +654,7 @@ def compute_charge(spheres, structure, ligand_charge):
     }
 
     charge = []
-    for i, s in enumerate(spheres[1:]):
+    for s in spheres[1:]:
         c = 0
         for res in s:
             res_id = res.get_full_id()
@@ -663,24 +663,19 @@ def compute_charge(spheres, structure, ligand_charge):
             if ligand_key not in ligand_charge:
                 if resname in pos and all(res.has_id(h) for h in pos[resname]):
                     c += 1
-                    # print(res_id, resname, i+1, 1)
                 elif resname in neg and all(not res.has_id(h) for h in neg[resname]):
                     c -= 1
-                    # print(res_id, resname, i+1, -1)
                 if Polypeptide.is_aa(res) and resname != "PRO" and all(not res.has_id(h) for h in ["H", "H2"]):
                     # TODO: termini
                     c -= 1
-                    # print(res_id, resname, i+1, "B")
 
                 # Check for charged N-terminus
                 if res_id in n_terminals:
                     c += 1
-                    # print(res_id, resname, i+1, "N")
 
                 # Check for charged C-terminus
                 if res.has_id("OXT"):
                     c -= 1
-                    # print(res_id, resname, i+1, "C")
 
         charge.append(c)
     return charge
@@ -785,11 +780,10 @@ def extract_clusters(
                 spheres[-1] |= cap_residues
 
         sphere_paths = []
-        for i in range(sphere_count + 1):
-            if spheres[i]:
-                sphere_path = f"{cluster_path}/{i}.pdb"
-                sphere_paths.append(sphere_path)
-                write_pdb(io, spheres[i], sphere_path)
+        for i, s in enumerate(spheres):
+            sphere_path = f"{cluster_path}/{i}.pdb"
+            sphere_paths.append(sphere_path)
+            write_pdb(io, s, sphere_path)
         if capping:
             for cap in cap_residues:
                 cap.get_parent().detach_child(cap.get_id())
@@ -799,13 +793,16 @@ def extract_clusters(
 
     if charge:
         with open(f"{out}/charge.csv", "w") as f:
-            f.write(f"Name,{','.join(str(x + 1) for x in range(sphere_count))}\n")
+            f.write(f"Name,{','.join(str(i + 1) for i in range(sphere_count))}\n")
             for k, v in aa_charge.items():
-                f.write(f"{k},{','.join(str(x) for x in v)}\n")
+                f.write(k)
+                for s in v:
+                    f.write(f",{str(s)}")
+                f.write(f"\n")
 
     if count:
         with open(f"{out}/count.csv", "w") as f:
-            f.write(f"Name,{','.join(str(x + 1) for x in range(sphere_count))}\n")
+            f.write(f"Name,{','.join(str(i + 1) for i in range(sphere_count))}\n")
             for k, v in res_count.items():
                 f.write(k)
                 for sphere in v:
