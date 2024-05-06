@@ -7,7 +7,7 @@
     >>> coordination_spheres.extract_clusters(
     ...     "path/to/PDB.pdb", 
     ...     "path/to/out/dir/", 
-    ...     metals=["FE", "FE2"], # PDB IDs of active site metals
+    ...     center_residues=["FE", "FE2"], # List of resnames of the residues to use as the cluster center
     ...     sphere_count=2,              # Number of spheres to extract
     ...     ligands=["AKG"]       # PDB IDs of additional ligands
     ... )
@@ -147,7 +147,7 @@ def calc_dist(point_a, point_b):
     return np.linalg.norm(point_a - point_b)
 
 
-def voronoi(model, metals, ligands, smooth_method, **smooth_params):
+def voronoi(model, center_residues, ligands, smooth_method, **smooth_params):
     """
     Computes the Voronoi tessellation of a protein structure.
 
@@ -165,7 +165,7 @@ def voronoi(model, metals, ligands, smooth_method, **smooth_params):
     points = []
     for res in model.get_residues():
         if Polypeptide.is_aa(res) or \
-            res.get_resname() in metals or \
+            res.get_resname() in center_residues or \
             (res.get_resname() in ligands):
             for atom in res.get_unpacked_list(): # includes atoms from multiple conformations
                 atoms.append(atom)
@@ -185,6 +185,40 @@ def voronoi(model, metals, ligands, smooth_method, **smooth_params):
             neighbors.setdefault(atoms[a], []).append((atoms[b], dist))
             neighbors.setdefault(atoms[b], []).append((atoms[a], dist))
     return neighbors
+
+
+def merge_centers(cur, search, seen, radius=4.0):
+    center = {cur}
+    seen.add(cur)
+    nxt = set()
+    for atom in cur.get_unpacked_list():
+        if atom.element == "H":
+            continue
+        for res in search.search(atom.get_coord(), radius, "R"):
+            nxt.add(res)
+    for res in nxt:
+        if res not in seen:
+            center |= merge_centers(res, search, seen, radius)
+    return center
+
+
+def get_center_residues(model, center_residues, merge_cutoff=4.0):
+    found = set()
+    center_atoms = []
+    for res in model.get_residues():
+        if res.get_resname() in center_residues:
+            found.add(res)
+            center_atoms.extend([atom for atom in res.get_unpacked_list() if atom.element != "H"])
+    if not len(center_atoms):
+        raise ValueError("No matching cluster centers found")
+    
+    search = NeighborSearch(center_atoms)
+    seen = set()
+    centers = []
+    for res in found:
+        if res not in seen:
+            centers.append(merge_centers(res, search, seen, merge_cutoff))
+    return centers
 
 
 def box_outlier_thres(data, coeff=1.5):
@@ -212,17 +246,17 @@ def box_outlier_thres(data, coeff=1.5):
     return Q1 - coeff * IQR, Q3 + coeff * IQR
 
 
-def check_nitrogen(atom, metal):
+def check_NC(atom, metal):
     """
-    Check if a nitrogen atom in the first sphere is coordinated.
+    Check if a nitrogen / carbon atom in the first sphere is coordinated.
 
-    If the nitrogen atom is in the backbone, or it's the nearest atom to the metal
+    If the nitrogen / carbon atom is in the backbone, or it's the nearest atom to the metal
     among all atoms in its residue, it's considered coordinated.
 
     Parameters
     ----------
     atom: Bio.PDB.Atom
-        The nitrogen atom to be checked
+        The nitrogen / carbon atom to be checked
     metal:
         The metal atom (coordination center)
 
@@ -271,27 +305,34 @@ def get_next_neighbors(
     spheres: list of sets
         Sets of residues separated by spheres
     """
-    seen = {start}
-    spheres = [{start}]
+    seen = start.copy()
+    spheres = [start]
     lig_adds = [set()]
     for i in range(0, sphere_count):
         # get candidate atoms in the new sphere
         nxt = set()
         lig_add = set()
         if i == 0 and first_sphere_radius > 0:
-            metal = start.get_unpacked_list()[0]
-            search = NeighborSearch([atom for atom in start.get_parent().get_parent().get_atoms() if atom.element != "H" and atom != metal])
-            first_sphere = search.search(center=metal.get_coord(), radius=first_sphere_radius, level="A")
+            start_atoms = []
+            for res in start:
+                start_atoms.extend(res.get_unpacked_list())
+
+            is_metal_like = (len(start_atoms) == start)
+            search = NeighborSearch([atom for atom in start_atoms[0].get_parent().get_parent().get_parent().get_atoms() if atom.element != "H" and atom not in start_atoms])
+            first_sphere = []
+            for center in start_atoms:
+                first_sphere += search.search(center=center.get_coord(), radius=first_sphere_radius, level="A")
             for atom in first_sphere:
-                element = atom.element
-                if element in "OS" or (element == "N" and check_nitrogen(atom, metal)):
-                    # only consider coordinated atoms
-                    res = atom.get_parent()
-                    seen.add(res)
-                    if Polypeptide.is_aa(res):
-                        nxt.add(res)
-                    else:
-                        lig_add.add(res)
+                if atom.get_parent() not in seen:
+                    element = atom.element
+                    if not is_metal_like or element in "OS" or (element in "NC" and check_NC(atom, center)):
+                        # only consider coordinated atoms
+                        res = atom.get_parent()
+                        seen.add(res)
+                        if Polypeptide.is_aa(res):
+                            nxt.add(res)
+                        else:
+                            lig_add.add(res)
         else:
             candidates = []
             frontiers = spheres[-1] if spheres[-1] else spheres[0]
@@ -336,14 +377,43 @@ def get_next_neighbors(
         spheres.append(nxt)
         lig_adds.append(lig_add)
 
-    res_id = start.get_full_id()
-    chain_name = res_id[2]
-    metal_index = str(res_id[3][1])
-    metal_id = chain_name + metal_index
+    metal_id = []
+    for res in start:
+        res_id = res.get_full_id()
+        chain_name = res_id[2]
+        metal_index = str(res_id[3][1])
+        metal_id.append(chain_name + metal_index)
     for i in range(len(spheres)):
         spheres[i] = spheres[i] | lig_adds[i]
     
-    return metal_id, seen, spheres
+    return "_".join(sorted(metal_id)), seen, spheres
+
+
+def prune_atoms(center, residues, spheres, max_atom_count):
+    atom_cnt = 0
+    for res in residues:
+        atom_cnt += len(res)
+    if atom_cnt <= max_atom_count:
+        return
+
+    center_atoms = []
+    for c in center:
+        center_atoms.extend(c.get_unpacked_list())
+    def dist(res):
+        return min(atom - x for x in center_atoms for atom in res.get_unpacked_list())
+                   
+    prune = set()
+    for res in sorted(residues, key=dist, reverse=True):
+        prune.add(res)
+        atom_cnt -= len(res)
+        if atom_cnt <= max_atom_count:
+            break
+
+    residues -= prune
+    for s in spheres:
+        s -= prune
+    while not spheres[-1]:
+        spheres.pop()
 
 
 def scale_hydrogen(a, b, scale):
@@ -394,14 +464,12 @@ def build_hydrogen(chain, parent, template, atom):
     else:
         pos = scale_hydrogen(parent["C"], template["N"], 1.09 / 1.32)
 
-    res_id = ("H_" + parent.get_resname(), template.get_id()[1], " ")
-    if not chain.has_id(res_id):
-        res = Residue(res_id, parent.get_resname(), " ")
-        res.add(Atom("H1", pos, 0, 1, " ", "H1", None, "H"))
-        chain.add(res)
-    else:
-        chain[res_id].add(Atom("H2", pos, 0, 1, " ", "H2", None, "H"))
-    return chain[res_id]
+    for name in ["H1", "H2", "H3"]:
+        if name not in parent:
+            break
+    atom = Atom(name, pos, 0, 1, " ", name, None, "H")
+    parent.add(atom)
+    return atom
 
 
 def build_heavy(chain, parent, template, atom):
@@ -544,7 +612,7 @@ def write_pdb(io, sphere, out):
     io.save(out, ResSelect())
 
 
-def compute_charge(spheres, structure):
+def compute_charge(spheres, structure, ligand_charge):
     """
     Computes the total charge of coordinating AAs
 
@@ -554,6 +622,8 @@ def compute_charge(spheres, structure):
         Sets of residues separated by spheres
     structure: Bio.PDB.Structure
         The protein structure
+    ligand_charge: dict
+        Key, value pairs of ligand names and charges
 
     Returns
     -------
@@ -577,12 +647,14 @@ def compute_charge(spheres, structure):
         "MLZ": []
     }
     neg = {
-        "ASP": ["HD2"],
-        "GLU": ["HE2", "HOE1"],
+        "ASP": ["HD2", "HOD1", "HOD2"],
+        "GLU": ["HE2", "HOE1", "HOE2"],
         "CYS": ["HG"],
         "TYR": ["HH"],
         "OCS": [],
-        "CSD": ["HD1", "HD2"]
+        "CSD": ["HD1", "HD2"],
+        "KCX": ["HQ1", "HQ2", "HOQ1", "HOQ2"],
+        "HIS": ["HD1", "HE2"]
     }
 
     charge = []
@@ -591,21 +663,23 @@ def compute_charge(spheres, structure):
         for res in s:
             res_id = res.get_full_id()
             resname = res.get_resname()
-            if resname in pos and all(res.has_id(h) for h in pos[resname]):
-                c += 1
-            elif resname in neg and all(not res.has_id(h) for h in neg[resname]):
-                c -= 1
-            if Polypeptide.is_aa(res) and resname != "PRO" and all(not res.has_id(h) for h in ["H", "H2"]):
-                # TODO: termini
-                c -= 1
+            ligand_key = f"{resname}_{res_id[2]}{res_id[3][1]}"
+            if ligand_key not in ligand_charge:
+                if resname in pos and all(res.has_id(h) for h in pos[resname]):
+                    c += 1
+                elif resname in neg and all(not res.has_id(h) for h in neg[resname]):
+                    c -= 1
+                if Polypeptide.is_aa(res) and resname != "PRO" and all(not res.has_id(h) for h in ["H", "H2"]):
+                    # TODO: termini
+                    c -= 1
 
-            # Check for charged N-terminus
-            if res_id in n_terminals:
-                c += 1
+                # Check for charged N-terminus
+                if res_id in n_terminals:
+                    c += 1
 
-            # Check for charged C-terminus
-            if res.has_id("OXT"):
-                c -= 1
+                # Check for charged C-terminus
+                if res.has_id("OXT"):
+                    c -= 1
 
         charge.append(c)
     return charge
@@ -637,15 +711,19 @@ def count_residues(spheres):
 def extract_clusters(
     path,
     out,
-    metals,
+    center_residues,
+    merge_cutoff=4.0,
     sphere_count=2,
+    first_sphere_radius=3.0,
+    max_atom_count=None,
     ligands=[],
     capping=0,
     charge=False,
     count=False,
     xyz=False,
-    first_sphere_radius=3.0,
+    ligand_charge=dict(),
     smooth_method="box_plot",
+    hetero_pdb=False,
     **smooth_params
 ):
     """
@@ -658,8 +736,8 @@ def extract_clusters(
         Path to PDB file
     out: str
         Path to output directory
-    metals: list
-        List of active site metal IDs
+    center_residues: list
+        List of resnames of the residues to use as the cluster center
     sphere_count: int
         Number of coordinations spheres to extract
     ligands: list
@@ -679,51 +757,61 @@ def extract_clusters(
     io.set_structure(structure)
 
     model = structure[0]
-    neighbors = voronoi(model, metals, ligands, smooth_method, **smooth_params)
+    neighbors = voronoi(model, center_residues, ligands, smooth_method, **smooth_params)
+
+    centers = get_center_residues(model, center_residues, merge_cutoff)
 
     aa_charge = {}
     res_count = {}
-    for res in model.get_residues():
-        if res.get_resname() in metals:
-            metal_id, residues, spheres = get_next_neighbors(
-                res, neighbors, sphere_count, ligands, first_sphere_radius, smooth_method, **smooth_params
-            )
+    cluster_paths = []
+    for c in centers:
+        metal_id, residues, spheres = get_next_neighbors(
+            c, neighbors, sphere_count, ligands, first_sphere_radius, smooth_method, **smooth_params
+        )
+        cluster_path = f"{out}/{metal_id}"
+        cluster_paths.append(cluster_path)
+        os.makedirs(cluster_path, exist_ok=True)
 
-            os.makedirs(f"{out}/{metal_id}", exist_ok=True)
-
-            if charge:
-                aa_charge[metal_id] = compute_charge(spheres, structure)
-            if count:
-                res_count[metal_id] = count_residues(spheres)
-            if capping:
-                cap_residues = cap_chains(model, residues, capping)
+        if max_atom_count is not None:
+            prune_atoms(c, residues, spheres, max_atom_count)
+        if charge:
+            aa_charge[metal_id] = compute_charge(spheres, structure, ligand_charge)
+        if count:
+            res_count[metal_id] = count_residues(spheres)
+        if capping:
+            cap_residues = cap_chains(model, residues, capping)
+            if capping == 2:
                 spheres[-1] |= cap_residues
 
-            sphere_paths = []
-            for i in range(sphere_count + 1):
-                if spheres[i]:
-                    sphere_path = f"{out}/{metal_id}/{i}.pdb"
-                    sphere_paths.append(sphere_path)
-                    write_pdb(io, spheres[i], sphere_path)
-            if capping:
-                for cap in cap_residues:
-                    cap.get_parent().detach_child(cap.get_id())
-            if xyz:
-                struct_to_file.to_xyz(f"{out}/{metal_id}/{metal_id}.xyz", *sphere_paths)
-                struct_to_file.combine_pdbs(f"{out}/{metal_id}/{metal_id}.pdb", metals, *sphere_paths)
+        sphere_paths = []
+        for i, s in enumerate(spheres):
+            sphere_path = f"{cluster_path}/{i}.pdb"
+            sphere_paths.append(sphere_path)
+            write_pdb(io, s, sphere_path)
+        if capping:
+            for cap in cap_residues:
+                cap.get_parent().detach_child(cap.get_id())
+        if xyz:
+            struct_to_file.to_xyz(f"{cluster_path}/{metal_id}.xyz", *sphere_paths)
+            struct_to_file.combine_pdbs(f"{cluster_path}/{metal_id}.pdb", center_residues, *sphere_paths, hetero_pdb=hetero_pdb)
 
     if charge:
         with open(f"{out}/charge.csv", "w") as f:
-            f.write(f"Name,{','.join(str(x + 1) for x in range(sphere_count))}\n")
+            f.write(f"Name,{','.join(str(i + 1) for i in range(sphere_count))}\n")
             for k, v in aa_charge.items():
-                f.write(f"{k},{','.join(str(x) for x in v)}\n")
+                f.write(k)
+                for s in v:
+                    f.write(f",{str(s)}")
+                f.write(f"\n")
 
     if count:
         with open(f"{out}/count.csv", "w") as f:
-            f.write(f"Name,{','.join(str(x + 1) for x in range(sphere_count))}\n")
+            f.write(f"Name,{','.join(str(i + 1) for i in range(sphere_count))}\n")
             for k, v in res_count.items():
                 f.write(k)
                 for sphere in v:
                     s = ", ".join(f"{r} {c}" for r, c in sorted(sphere.items()))
                     f.write(f',"{s}"')
                 f.write("\n")
+
+    return cluster_paths

@@ -15,13 +15,14 @@ from operator import itemgetter
 from qp.manager import failure_checkup
 from qp.manager import job_scripts
 
+
 def compress_sequence(seq):
     """Condenses frozen atoms to make it more readable."""
     ranges = []
     buffer = []  # Stores standalone numbers temporarily
     for k, g in groupby(enumerate(seq), lambda ix: ix[0] - ix[1]):
         group = list(map(itemgetter(1), g))
-        if len(group) > 1:  # It's a range
+        if len(group) > 1:
             if buffer:
                 ranges.append(f"xyz {','.join(map(str, buffer))}")
                 buffer.clear()
@@ -34,6 +35,7 @@ def compress_sequence(seq):
 
     return '\n'.join(ranges)
 
+
 def find_heavy():
     """Freeze heavy atoms for the geometry optimization."""
     xyz_file = next(f for f in os.listdir() if f.endswith('.xyz'))
@@ -43,11 +45,13 @@ def find_heavy():
 
     return compress_sequence(non_hydrogens)
 
-def residue_exists(first_sphere_path, ligand_name):
+
+def residue_exists(sphere_path, res_name, chain, res_id):
     """Returns True if ligand_name exists in the pdb file."""
-    with open(first_sphere_path, 'r') as f:
+    with open(sphere_path, 'r') as f:
         for line in f:
-            if line.startswith("HETATM") and ligand_name in line:
+            if line.startswith("HETATM") and res_name == line[17:20].strip() \
+                and chain == line[21] and res_id == int(line[22:26]):
                 return True
     return False
 
@@ -63,24 +67,9 @@ def get_electronic(pdb_id, master_list):
             print(f"No data found for pdb_id: {pdb_id}")
             return None
 
-        # Check for a value in the 'literature_oxidation' column, if not found, use 'pdb_oxidation'
-        if not pd.isna(row['literature_oxidation'].iloc[0]) and row['literature_oxidation'].iloc[0] != '':
-            oxidation = int(row['literature_oxidation'].iloc[0])
-        else:
-            oxidation = int(row['pdb_oxidation'].iloc[0])
-
-        # Determine the multiplicity
-        spin = row['spin'].iloc[0]
-        if oxidation == 2 and spin == "high":
-            multiplicity = 5
-        elif oxidation == 2 and spin == "low":
-            multiplicity = 1
-        elif oxidation == 3 and spin == "high":
-            multiplicity = 6
-        elif oxidation == 3 and spin == "low":
-            multiplicity = 2
-        else:
-            print(f"\033[93mWARNING: Spin {spin} and oxidation {oxidation} are not supported for {pdb_id}.\033[0m")
+        # Extract multiplicity and oxidation state directly
+        multiplicity = int(row['multiplicity'].iloc[0])
+        oxidation = int(row['oxidation'].iloc[0])
 
         return oxidation, multiplicity
 
@@ -89,18 +78,21 @@ def get_electronic(pdb_id, master_list):
         sys.exit()
 
 
-def get_charge():
+
+def get_charge(structure_dir=None):
     """Extract the charge values from charge.csv"""
-    current_dir = os.getcwd()
-    
-    # Construct relative paths
-    charge_dir = os.path.abspath(os.path.join(current_dir, "../../"))
-    structure_dir = os.path.abspath(os.path.join(current_dir, "../"))
+    if structure_dir is None:
+        current_dir = os.getcwd()
+        charge_dir = os.path.abspath(os.path.join(current_dir, "../../"))
+        structure_dir = os.path.abspath(os.path.join(current_dir, "../"))
+    else:
+        charge_dir = os.path.abspath(os.path.join(structure_dir, "../"))
     charge_csv_path = os.path.join(charge_dir, "charge.csv")
-    first_sphere_path = os.path.join(structure_dir, "1.pdb")
+    spin_csv_path = os.path.join(charge_dir, "spin.csv")
     
     charge = 0
     section = 1
+    num_sphere = 0
     chain_identifier = os.path.basename(structure_dir)
     chain = os.path.basename(structure_dir)[0]
 
@@ -116,17 +108,39 @@ def get_charge():
             # Parse charge.csv section 1
             if section == 1 and line.startswith(chain_identifier):
                 parts = line.split(',')
+                num_sphere = len(parts) - 1
                 current_chain_identifier = parts[0]
                 if current_chain_identifier == chain_identifier:
                     charge += sum([int(x) for x in parts[1:]])
 
             # Parse charge.csv section 2
-            elif section == 2 and '_' + chain in line:
+            elif section == 2:
                 ligand, value = line.split(',')
-                if residue_exists(first_sphere_path, ligand.split('_')[0]):
-                    charge += int(value)
+                res_name, res_id_full = ligand.split()[0].split('_')
+                chain = res_id_full[0]
+                res_id = int(res_id_full[1:])
+                for i in range(num_sphere + 1):
+                    sphere_path = os.path.join(structure_dir, f"{i}.pdb")
+                    if residue_exists(sphere_path, res_name, chain, res_id):
+                        charge += int(value)
+
+    spin = 0
+    if os.path.exists(spin_csv_path):
+        with open(spin_csv_path, 'r') as spin_csv_content:
+            for line in spin_csv_content:
+                line = line.strip()
+                if not line:
+                    continue
+                ligand, value = line.split(',')
+                res_name, res_id_full = ligand.split('_')
+                chain = res_id_full[0]
+                res_id = int(res_id_full[1:])
+                for i in range(num_sphere + 1):
+                    sphere_path = os.path.join(structure_dir, f"{i}.pdb")
+                    if residue_exists(sphere_path, res_name, chain, res_id):
+                        spin += int(value)
     
-    return charge
+    return charge, spin
 
 
 def get_master_list(url):
@@ -140,7 +154,6 @@ def get_master_list(url):
             file.write(response.content)
         print("> Protein master list downloaded successfully")
         return os.path.abspath(master_list_file)
-    
     else:
         print("Failed to retrieve the file.")
         sys.exit(1)
@@ -157,7 +170,7 @@ def create_submission_marker(submission_marker_path, job_name, submission_comman
         marker.write(f"Output: {submission_output}\n")
 
 
-def submit_jobs(job_count, master_list_path, minimization, basis, method, guess, gpus, memory):
+def submit_jobs(job_count, master_list_path, optimization, basis, method, guess, gpus, memory):
     """Generate and submit jobs to queueing system, returning True if any jobs were submitted."""
     base_dir = os.getcwd()
     submitted_jobs = 0
@@ -196,19 +209,20 @@ def submit_jobs(job_count, master_list_path, minimization, basis, method, guess,
             os.chdir(qm_path)
             
             oxidation, multiplicity = get_electronic(pdb.lower(), master_list_path)
-            charge = get_charge()
+            charge, extra_spin = get_charge()
+            multiplicity += extra_spin
             total_charge = charge + oxidation
             
             # Get heavy atoms to fix if geometry optimization was requested
-            heavy_list = find_heavy() if minimization else ""
-            constraint_freeze = f"$constraint_freeze\n{heavy_list}\n$end" if minimization else ""
+            heavy_list = find_heavy() if optimization else ""
+            constraint_freeze = f"$constraint_freeze\n{heavy_list}\n$end" if optimization else ""
             
             coord_name = os.path.basename(coord_file)
             pdb_name = os.path.basename(pdb)
             structure_name = os.path.basename(structure)
             job_name = f"{pdb_name}{structure_name}"
             
-            qmscript = job_scripts.write_qmscript(minimization, coord_name, basis, method, total_charge, multiplicity, guess, constraint_freeze)
+            qmscript = job_scripts.write_qmscript(optimization, coord_name, basis, method, total_charge, multiplicity, guess, constraint_freeze)
             jobscript = job_scripts.write_jobscript(job_name, gpus, memory)
             
             with open('qmscript.in', 'w') as f:
@@ -251,7 +265,11 @@ def count_running_jobs():
     return job_count
 
 
-def manage_jobs(target_job_count, master_list_path, minimization, basis, method, guess, gpus, memory, check_interval=300):
+def manage_jobs(target_job_count, master_list_path, output, optimization, basis, method, guess, gpus, memory, check_interval=300):
+    """Main function for job manager."""
+    # Change into the directory of the generated cluster models
+    os.chdir(output)
+    
     while True:
         current_job_count = count_running_jobs()
         sleep_time_seconds = 300
@@ -260,11 +278,11 @@ def manage_jobs(target_job_count, master_list_path, minimization, basis, method,
         if current_job_count < target_job_count:
             jobs_needed = target_job_count - current_job_count
             print(f"   > Attempting to submit {jobs_needed} jobs to reach the target of {target_job_count}.")
-            submitted_jobs = submit_jobs(jobs_needed, master_list_path, minimization, basis, method, guess, gpus, memory)
+            submitted_jobs = submit_jobs(jobs_needed, master_list_path, optimization, basis, method, guess, gpus, memory)
             
             # Check if any new jobs were submitted
             if submitted_jobs == 0:
-                print("\033[1;31mComplete.\033[0m\n") # Bold red
+                print("Done.")
                 sys.exit(0)
 
             # Wait a moment to let the system update
@@ -276,29 +294,3 @@ def manage_jobs(target_job_count, master_list_path, minimization, basis, method,
             print(f"   > Sleeping for {int(sleep_time_seconds / 60)} minutes before checking queue")
             time.sleep(sleep_time_seconds)
 
-
-if __name__ == '__main__':
-
-    job_count = int(input("Enter the request batch size: "))
-    method = input("What functional would you like to use (e.g. uwpbeh)? ").lower()
-    minimization = False
-
-    if method == "uwpbeh":
-        basis = "lacvps_ecp"
-        guess = "generate"
-        gpus = 1
-        memory = "8G"
-    elif method == "ugfn2xtb":
-        basis = "gfn2xtb"
-        guess = "hcore"
-        gpus = 1
-        memory = "8G"
-    elif method == "gfn2xtb":
-        basis = "gfn2xtb"
-        guess = "hcore"
-        gpus = 1
-        memory = "8G"
-
-    url = "https://docs.google.com/spreadsheets/d/1St_4YEKcWzrs7yS1GTehfAKabtGCJeuM0sC0u1JG8ZE/gviz/tq?tqx=out:csv&sheet=Sheet1"
-    master_list_path = get_master_list(url)
-    manage_jobs(job_count, master_list_path, minimization, basis, method, guess, gpus, memory)

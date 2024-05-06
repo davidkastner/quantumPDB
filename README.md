@@ -23,8 +23,6 @@ QuantumPDB
 ## 1. Overview
 The purpose of quantumPDB (qp) is to serve as a toolkit for working with our database of proteins to setup and facilitate DFT-calculation and cluster model creation.
 
-File Structure overview: [Miro Board](https://miro.com/app/board/uXjVPSPcRKQ=/?share_link_id=972866970692)
-
 ![Software Diagram](https://raw.githubusercontent.com/davidkastner/quantumPDB/main/docs/_static/QuantumPDB.png)
 
 ## 2. Installation

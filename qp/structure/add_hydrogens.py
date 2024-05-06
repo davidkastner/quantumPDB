@@ -116,14 +116,58 @@ def download(job, out, key="protein"):
         f.write(protoss.text)
 
 
+def repair_ligands(path, orig):
+    parser = PDBParser(QUIET=True)
+    prot_structure = parser.get_structure("Prot", path)
+    orig_structure = parser.get_structure("Orig", orig)
+
+    for res in prot_structure[0].get_residues():
+        if res.get_resname() == "MOL":
+            resid = res.get_id()
+            chain = res.get_parent()
+            chain.detach_child(resid)
+
+            missing = []
+            found = False
+            for r in orig_structure[0][chain.get_id()].get_residues():
+                if r.get_id()[1] == resid[1]:
+                    found = True
+                if found:
+                    if r.get_id() not in chain:
+                        chain.add(r)
+                        missing.append(r)
+                    else:
+                        break
+
+            for r in missing:
+                for a in r.get_unpacked_list():
+                    if a.element == "H":
+                        r.detach_child(atom.get_id())
+            
+            for atom in res.get_unpacked_list():
+                if atom.element != "H":
+                    continue
+                closest = None
+                for r in missing:
+                    for a in r.get_unpacked_list():
+                        if closest is None or atom - a < dist:
+                            closest = r
+                            dist = atom - a
+                closest.add(atom)
+
+    io = PDBIO()
+    io.set_structure(prot_structure)
+    io.save(path)
+
+
 def flip_coordinated_HIS(points, res):
     """
     Flip the imidazole ring of HIS if it can be coordinated with the metal
 
     The conformation and tautomerism states of HIS is adjusted by Protoss. 
     However, sometimes the coordinated nitrogen will be flipped away from 
-    where it's supposed to be. This procedure detect if the nitrogen (NE2) is
-    more favorable to be nearer to the metal than its neighbor carbon (CE1) and
+    where it's supposed to be. This procedure detect if the nitrogen (NE2/ND1) is
+    more favorable to be nearer to the metal than its neighbor carbon (CE1/CD2) and
     re-flip the ring and re-arrange the hydrogen.
 
     Parameters
@@ -133,39 +177,46 @@ def flip_coordinated_HIS(points, res):
     res: Bio.PDB.Residue.Residue
         A HIS residue
     """
-    flip_flag = False
+    flip_flag = ""
     try:
         CE1 = res["CE1"]
         NE2 = res["NE2"]
+        CD2 = res["CD2"]
+        ND1 = res["ND1"]
+        CB = res["CB"]
+        CG = res["CG"]
     except IndexError:
         print("Non standard atom names of HIS")
         return
     for p in points:
         dist_CE1_metal = p - CE1
         dist_NE2_metal = p - NE2
-        if dist_CE1_metal < dist_NE2_metal and dist_CE1_metal < 3.5:
-            flip_flag = True
+        dist_CD2_metal = p - CD2
+        dist_ND1_metal = p - ND1
+        if dist_CE1_metal < dist_NE2_metal and dist_CE1_metal < 3.5 and dist_CE1_metal < dist_ND1_metal:
+            flip_flag = "E"
+            break
+        elif dist_CD2_metal < dist_ND1_metal and dist_CD2_metal < 3.5 and dist_CD2_metal < dist_NE2_metal:
+            flip_flag = "D"
             break
     if flip_flag:
         old_coords = dict()
-        try:
-            for atom_name in ["HD2", "HE1", "CD2", "ND1", "CE1", "NE2", "CG", "CB"]:
+        for atom_name in ["HD2", "HE1", "HD1", "HE2", "CD2", "ND1", "CE1", "NE2", "CG", "CB"]:
+            if atom_name in res:
                 old_coords[atom_name] = res[atom_name].get_coord()
-        except IndexError:
-            print("Non standard atom names of HIS")
-            return
         
         coord_CB, coord_CG = old_coords["CB"], old_coords["CG"]
         axis = coord_CG - coord_CB
-        for atom_name in ["HD2", "HE1", "CD2", "ND1", "CE1", "NE2"]:
-            coord = old_coords[atom_name]
-            loc = coord - coord_CB
-            proj = axis * np.dot(axis, loc) / np.dot(axis, axis)
-            flipped_loc = 2 * proj - loc
-            flipped_coord = flipped_loc + coord_CB
-            res[atom_name].set_coord(flipped_coord)
+        for atom_name in ["HD2", "HE1", "HD1", "HE2", "CD2", "ND1", "CE1", "NE2"]:
+            if atom_name in res:
+                coord = old_coords[atom_name]
+                loc = coord - coord_CB
+                proj = axis * np.dot(axis, loc) / np.dot(axis, axis)
+                flipped_loc = 2 * proj - loc
+                flipped_coord = flipped_loc + coord_CB
+                res[atom_name].set_coord(flipped_coord)
 
-        if "HE2" in res and "HD1" not in res:
+        if flip_flag == "E" and "HE2" in res and "HD1" not in res:
             coord_CE1 = res["CE1"].get_coord()
             coord_ND1 = res["ND1"].get_coord()
             vec_ND1_CE1 = coord_CE1 - coord_ND1
@@ -174,6 +225,17 @@ def flip_coordinated_HIS(points, res):
             vec_ND1_HD1 = - bisector / np.linalg.norm(bisector) # * 1.00
             res["HE2"].set_coord(vec_ND1_HD1 + coord_ND1)
             res["HE2"].name = "HD1"
+
+        if flip_flag == "D" and "HD1" in res and "HE2" not in res:
+            coord_CE1 = res["CE1"].get_coord()
+            coord_NE2 = res["NE2"].get_coord()
+            coord_CD2 = res["CD2"].get_coord()
+            vec_NE2_CE1 = coord_CE1 - coord_NE2
+            vec_NE2_CD2 = coord_CD2 - coord_NE2
+            bisector = vec_NE2_CE1 + vec_NE2_CD2
+            vec_NE2_HE2 = - bisector / np.linalg.norm(bisector) # * 1.00
+            res["HD1"].set_coord(vec_NE2_HE2 + coord_NE2)
+            res["HD1"].name = "HE2"
 
 
 def add_hydrogen_CSO(res, structure):
@@ -256,7 +318,10 @@ def adjust_activesites(path, metals):
     points = []
     for res in structure[0].get_residues():
         if res.get_resname() in metals:
-            points.append(res.get_unpacked_list()[0])
+            atoms = res.get_unpacked_list()
+            if len(atoms) > 1:
+                continue # skip if not metal-like
+            points.append(atoms[0])
 
     for res in structure[0].get_residues():
         if res.get_resname() == "HIS":
@@ -332,7 +397,7 @@ def compute_charge(path_ligand, path_pdb):
         n_atom = 0
         for line in l:
             if "V2000" in line:
-                n_atom = int(line.split()[0])
+                n_atom = int(line.split()[0][:3])
             if line.startswith("M  RGP"):
                 # R# atom is found in the addition between CSO and TAN
                 # It's not a real atom and recorded in the RGP entry
@@ -353,3 +418,29 @@ def compute_charge(path_ligand, path_pdb):
                     cnt += 1
         charge[name] -= (n_atom - cnt)
     return charge
+
+
+def compute_spin(path_ligand):
+    with open(path_ligand, "r") as f:
+        sdf = f.read()
+
+    ligands = [
+        [t for t in s.splitlines() if t != ""]
+        for s in sdf.split("$$$$")
+        if s != "\n" and s != ""
+    ]
+    spin = {}
+    for l in ligands:
+        title = l[0].split("_")
+        name_id = [
+            (res_name, chain_id, res_id) 
+            for res_name, chain_id, res_id 
+            in zip(title[::3], title[1::3], title[2::3])
+        ]
+        name = " ".join([f"{res_name}_{chain_id}{res_id}" for res_name, chain_id, res_id in name_id])
+        for res_name, chain_id, res_id in name_id:
+            if res_name == "NO":
+                spin[name] = 1
+            elif res_name == "OXY":
+                spin[name] = 2
+    return spin
