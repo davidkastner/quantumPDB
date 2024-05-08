@@ -1,5 +1,6 @@
 import pytest
 import os
+import glob
 import shutil
 import filecmp
 
@@ -31,12 +32,26 @@ def test_protoss(tmpdir, sample_pdb):
     assert os.path.getsize(out) > 0, "Found empty PDB file"
 
 
+@pytest.mark.parametrize("sample_pdb", ["2fd8"], indirect=True)
+def test_repair_ligands(tmpdir, sample_pdb):
+    pdb, path = sample_pdb
+    pdb_path = os.path.join(path, f"{pdb}_modeller.pdb")
+    expected_prot = os.path.join(path, "Protoss", f"{pdb}_protoss.pdb")
+    input_prot = os.path.join(path, f"{pdb}_protoss_raw.pdb")
+    output_prot = os.path.join(tmpdir, f"{pdb}_protoss.pdb")
+
+    shutil.copy(input_prot, output_prot)
+    add_hydrogens.repair_ligands(output_prot, pdb_path)
+    assert filecmp.cmp(expected_prot, output_prot), "Repaired Protoss PDB does not match expected"
+
+
 @pytest.mark.parametrize("sample_pdb", ["1sp9", "2q4a", "3a8g", "3x20", "6f2a"], indirect=True)
 def test_adjust_activesites(tmpdir, sample_pdb):
     pdb, path = sample_pdb
     expected_prot = os.path.join(path, "Protoss", f"{pdb}_protoss.pdb")
     input_prot = os.path.join(path, "Protoss", f"{pdb}_protoss_old.pdb")
     output_prot = os.path.join(tmpdir, f"{pdb}_protoss_old.pdb")
+
     shutil.copy(input_prot, output_prot)
     add_hydrogens.adjust_activesites(output_prot, ["FE", "FE2"])
     assert filecmp.cmp(expected_prot, output_prot), "Adjusted Protoss PDB does not match expected"
@@ -62,7 +77,7 @@ def test_compute_charge(tmpdir, sample_pdb):
 # ========== missing_loops ==========
 
 @pytest.mark.skipif(MISSING_LICENSE, reason="MODELLER license not found")
-@pytest.mark.parametrize("sample_pdb", ["1lm6", "1sp9", "2q4a", "2r6s", "3x20", "4ilv"], indirect=True)
+@pytest.mark.parametrize("sample_pdb", ["1lm6", "1sp9", "2q4a", "2r6s", "3a8g", "4ilv"], indirect=True)
 def test_write_alignment(tmpdir, sample_pdb):
     pdb, path = sample_pdb
     pdb_path = os.path.join(path, f"{pdb}.pdb")
@@ -111,7 +126,7 @@ def test_build_model(tmpdir, sample_pdb):
 def test_to_xyz(tmpdir, sample_cluster):
     pdb, metal_ids, path = sample_cluster
     for metal in metal_ids:
-        sphere_paths = [os.path.join(path, metal, f"{i}.pdb") for i in range(4)]
+        sphere_paths = sorted(glob.glob(os.path.join(path, metal, "?.pdb")))
         expected_xyz = os.path.join(path, metal, f"{metal}.xyz")
         output_xyz = os.path.join(tmpdir, f"{metal}.xyz")
         struct_to_file.to_xyz(output_xyz, *sphere_paths)
@@ -129,7 +144,7 @@ def test_to_xyz(tmpdir, sample_cluster):
 def test_combine_pdbs(tmpdir, sample_cluster):
     pdb, metal_ids, path = sample_cluster
     for metal in metal_ids:
-        sphere_paths = [os.path.join(path, metal, f"{i}.pdb") for i in range(4)]
+        sphere_paths = sorted(glob.glob(os.path.join(path, metal, "?.pdb")))
         expected_pdb = os.path.join(path, metal, f"{metal}.pdb")
         output_pdb = os.path.join(tmpdir, f"{metal}.pdb")
         struct_to_file.combine_pdbs(output_pdb, ["FE", "FE2"], *sphere_paths)
