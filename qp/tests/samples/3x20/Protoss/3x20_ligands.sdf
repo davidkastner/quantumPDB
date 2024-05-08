@@ -1,5 +1,5 @@
 CL_A_304
-prProtoss 03042417073D 1   1.00000     0.00000     0
+prProtoss 05082411173D 1   1.00000     0.00000     0
 Protoss beta proteinsplus
   1  0  0  0  0  0            999 V2000
   105.9520    2.4420   17.9560 Cl  0  5  0  0  0  0  0  0  0  0  0  0
@@ -7,7 +7,7 @@ M  CHG  1   1  -1
 M  END
 $$$$
 CL_A_305
-prProtoss 03042417073D 1   1.00000     0.00000     0
+prProtoss 05082411173D 1   1.00000     0.00000     0
 Protoss beta proteinsplus
   1  0  0  0  0  0            999 V2000
    95.8650   15.6460    7.6460 Cl  0  5  0  0  0  0  0  0  0  0  0  0
@@ -15,7 +15,7 @@ M  CHG  1   1  -1
 M  END
 $$$$
 CL_B_302
-prProtoss 03042417073D 1   1.00000     0.00000     0
+prProtoss 05082411173D 1   1.00000     0.00000     0
 Protoss beta proteinsplus
   1  0  0  0  0  0            999 V2000
   106.1410   42.1990   -9.3260 Cl  0  5  0  0  0  0  0  0  0  0  0  0
@@ -23,7 +23,7 @@ M  CHG  1   1  -1
 M  END
 $$$$
 CL_B_303
-prProtoss 03042417073D 1   1.00000     0.00000     0
+prProtoss 05082411173D 1   1.00000     0.00000     0
 Protoss beta proteinsplus
   1  0  0  0  0  0            999 V2000
   114.5850   51.0270   16.6800 Cl  0  5  0  0  0  0  0  0  0  0  0  0
@@ -31,7 +31,7 @@ M  CHG  1   1  -1
 M  END
 $$$$
 TAN_A_302
-prProtoss 03042417073D 1   1.00000     0.00000     0
+prProtoss 05082411173D 1   1.00000     0.00000     0
 Protoss beta proteinsplus
  17 16  0  0  0  0            999 V2000
   105.7550   24.9630   15.8650 N   0  0  0  0  0  0  0  0  0  0  0  0

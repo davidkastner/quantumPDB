@@ -19,6 +19,7 @@ KEYWDS    FE(II)/ALPHA-KETOGLUTARATE, DIOXYGENASES, ENZYME, FEII ALPHAKG FORM,
 KEYWDS   2 OXYDOREDUCTASE, OXIDOREDUCTASE                                       
 EXPDTA    X-RAY DIFFRACTION                                                     
 AUTHOR    T.ISABET,E.A.STURA,P.LEGRAND,A.ZAPARUCHA,K.BASTARD                    
+REVDAT   3   08-MAY-24 6F2A    1       LINK                                     
 REVDAT   2   21-NOV-18 6F2A    1       JRNL                                     
 REVDAT   1   14-NOV-18 6F2A    0                                                
 JRNL        AUTH   K.BASTARD,T.ISABET,E.A.STURA,P.LEGRAND,A.ZAPARUCHA           
@@ -895,13 +896,13 @@ SHEET    1 AC2 2 LEU D 256  GLY D 258  0
 SHEET    2 AC2 2 PRO D 263  ILE D 265 -1  O  PHE D 264   N  SER D 257           
 LINK         NE2 HIS A 178                FE   FE2 A 401     1555   1555  2.54  
 LINK         OE1 GLU A 180                FE   FE2 A 401     1555   1555  2.48  
+LINK        FE   FE2 A 401                 N   LYS A 402     1555   1555  2.59  
 LINK         NE2 HIS B 178                FE   FE2 B 401     1555   1555  2.39  
 LINK         OE1 GLU B 180                FE   FE2 B 401     1555   1555  2.29  
 LINK         NE2 HIS C 178                FE   FE2 C 401     1555   1555  2.15  
 LINK         OE1 GLU C 180                FE   FE2 C 401     1555   1555  2.48  
 LINK         NE2 HIS D 178                FE   FE2 D 401     1555   1555  2.51  
 LINK         OE1 GLU D 180                FE   FE2 D 401     1555   1555  2.43  
-LINK        FE   FE2 A 401                 N   LYS A 402     1555   1555  2.59  
 LINK        FE   FE2 D 401                 N   LYS D 402     1555   1555  2.73  
 LINK        FE   FE2 D 401                 O   HOH D 575     1555   1555  2.74  
 CISPEP   1 GLY A  251    PRO A  252          0         3.18                     
