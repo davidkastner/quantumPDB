@@ -50,7 +50,7 @@ def test_adjust_activesites(tmpdir, sample_pdb):
     pdb, path = sample_pdb
     expected_prot = os.path.join(path, "Protoss", f"{pdb}_protoss.pdb")
     input_prot = os.path.join(path, "Protoss", f"{pdb}_protoss_old.pdb")
-    output_prot = os.path.join(tmpdir, f"{pdb}_protoss_old.pdb")
+    output_prot = os.path.join(tmpdir, f"{pdb}_protoss.pdb")
 
     shutil.copy(input_prot, output_prot)
     add_hydrogens.adjust_activesites(output_prot, ["FE", "FE2"])
