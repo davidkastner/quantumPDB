@@ -66,10 +66,18 @@ def run(config):
 
     if coordination:
         from qp.cluster import coordination_spheres
-        limit = config_data.get('number_of_spheres', 2)
+        center_residues = config_data.get('center_residues', [])
+        sphere_count = config_data.get('number_of_spheres', 2)
         first_sphere_radius = config_data.get('radius_of_first_sphere', 4.0)
+        max_atom_count = config_data.get('max_atom_count', None)
+        merge_cutoff = config_data.get('merge_distance_cutoff', 0.0)
+
         ligands = config_data.get('additional_ligands', [])
         capping = config_data.get('capping_method', 1)
+        charge = config_data.get('compute_charges', True)
+        count = config_data.get('count_residues', True)
+        xyz = config_data.get('write_xyz', True)
+        hetero_pdb = config_data.get('write_hetero_pdb', False)
 
         # Prompt user for their preferred cluster smoothing method
         smooth_choice = config_data.get('smoothing_method', 2)
@@ -77,14 +85,6 @@ def run(config):
         smooth_method_options = {0: "box_plot", 1: "dbscan", 2: "dummy_atom", 3: False}
         smooth_params = smooth_options[smooth_choice]
         smooth_method = smooth_method_options[smooth_choice]
-
-        center_residues = config_data.get('center_residues', [])
-        merge_cutoff = config_data.get('merge_distance_cutoff', 4.0)
-        max_atom_count = config_data.get('max_atom_count', None)
-        charge = config_data.get('compute_charges', True)
-        count = config_data.get('count_residues', True)
-        xyz = config_data.get('write_xyz', True)
-        hetero_pdb = config_data.get('write_hetero_pdb', False)
 
         if capping or charge:
             protoss = True
@@ -194,16 +194,9 @@ def run(config):
                 ligand_charge = dict()
 
             cluster_paths = coordination_spheres.extract_clusters(
-                path, f"{output}/{pdb}", center_residues, merge_cutoff, limit, 
-                first_sphere_radius, max_atom_count, ligands, capping, charge, count, xyz, 
-                ligand_charge=ligand_charge,
-                smooth_method=smooth_method, hetero_pdb=hetero_pdb,
-                add_hydrogens.adjust_activesites(path, metals)
-
-            coordination_spheres.extract_clusters(
-                path, f"{o}/{pdb}", metals,
-                limit, ligands, capping, charge, count, xyz, first_sphere_radius,
-                smooth_method=smooth_method,
+                path, f"{output}/{pdb}", center_residues, sphere_count, 
+                first_sphere_radius, max_atom_count, merge_cutoff, smooth_method,
+                ligands, capping, charge, ligand_charge, count, xyz, hetero_pdb,
                 **smooth_params
             )
 

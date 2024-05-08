@@ -25,9 +25,6 @@ def fetch_pdb(pdb, out):
         f.write(r.text)
 
 
-import os
-import csv
-
 def parse_input(input_path, output_path):
     """
     Parses the input PDBs and returns a list of tuples
