@@ -9,6 +9,7 @@ from qp.cluster import coordination_spheres
 
 def check_clusters(path, out, metal_ids):
     for metal in metal_ids:
+        assert os.path.isdir(os.path.join(path, metal)), f"Cluster center {metal} not found"
         sphere_count = len(glob.glob(os.path.join(path, metal, "?.pdb")))
         for i in range(sphere_count):
             expected_pdb = os.path.join(path, metal, f"{i}.pdb")
@@ -90,10 +91,11 @@ def test_merge_centers(tmpdir, sample_cluster):
     pdb, metal_ids, path = sample_cluster
     pdb_path = os.path.join(path, "Protoss", f"{pdb}_protoss.pdb")
     coordination_spheres.extract_clusters(
-        pdb_path, tmpdir, ["NI", "BGC", "GAL", "GLC", "XYS"],
-        merge_cutoff=2.0,
+        pdb_path, tmpdir, ["BGC", "GAL", "NGA", "SIA", "NI"],
+        merge_cutoff=4.0,
         smooth_method="dummy_atom", mean_distance=3
     )
+    check_clusters(path, tmpdir, metal_ids)
 
 
 @pytest.mark.parametrize("sample_cluster", [("2fd8", ("B501_B502_B503",))], indirect=True)
@@ -105,3 +107,4 @@ def test_prune_atoms(tmpdir, sample_cluster):
         max_atom_count=102, merge_cutoff=2.0,
         smooth_method="dummy_atom", mean_distance=3
     )
+    check_clusters(path, tmpdir, metal_ids)

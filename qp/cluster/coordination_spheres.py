@@ -329,8 +329,11 @@ def get_next_neighbors(
             for atom in first_sphere:
                 if atom.get_parent() not in seen:
                     element = atom.element
-                    if not is_metal_like or element in "OS" or (element in "NC" and check_NC(atom, center)):
-                        # only consider coordinated atoms
+                    if (
+                        not is_metal_like 
+                        or element in "OS" 
+                        or (element in "NC" and any(check_NC(atom, center) for center in start_atoms))
+                    ): # only consider coordinated atoms
                         res = atom.get_parent()
                         seen.add(res)
                         if Polypeptide.is_aa(res):

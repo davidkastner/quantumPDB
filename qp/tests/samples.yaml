@@ -38,7 +38,7 @@ write_xyz: true
 
 # input: [2chb, 4z42]
 # center_residues: [BGC, GAL, NGA, SIA, NI]
-# merge_distance_cutoff: 2.0
+# merge_distance_cutoff: 4.0
 
 ########################################
 

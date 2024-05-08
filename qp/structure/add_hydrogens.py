@@ -193,10 +193,10 @@ def flip_coordinated_HIS(points, res):
         dist_NE2_metal = p - NE2
         dist_CD2_metal = p - CD2
         dist_ND1_metal = p - ND1
-        if dist_CE1_metal < dist_NE2_metal and dist_CE1_metal < 3.5 and dist_CE1_metal < dist_ND1_metal:
+        if dist_CE1_metal < dist_NE2_metal and dist_CE1_metal < 3.0 and dist_CE1_metal < dist_ND1_metal:
             flip_flag = "E"
             break
-        elif dist_CD2_metal < dist_ND1_metal and dist_CD2_metal < 3.5 and dist_CD2_metal < dist_NE2_metal:
+        elif dist_CD2_metal < dist_ND1_metal and dist_CD2_metal < 3.0 and dist_CD2_metal < dist_NE2_metal:
             flip_flag = "D"
             break
     if flip_flag:
