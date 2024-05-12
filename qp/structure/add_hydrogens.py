@@ -150,10 +150,9 @@ def repair_ligands(path, orig):
                 closest = None
                 for r in missing:
                     for a in r.get_unpacked_list():
-                        if closest is None or atom - a < dist:
-                            closest = r
-                            dist = atom - a
-                closest.add(atom)
+                        if closest is None or atom - a < atom - closest:
+                            closest = a
+                closest.get_parent().add(atom)
 
     io = PDBIO()
     io.set_structure(prot_structure)
@@ -188,17 +187,17 @@ def flip_coordinated_HIS(points, res):
     except IndexError:
         print("Non standard atom names of HIS")
         return
-    for p in points:
-        dist_CE1_metal = p - CE1
-        dist_NE2_metal = p - NE2
-        dist_CD2_metal = p - CD2
-        dist_ND1_metal = p - ND1
-        if dist_CE1_metal < dist_NE2_metal and dist_CE1_metal < 3.5 and dist_CE1_metal < dist_ND1_metal:
-            flip_flag = "E"
-            break
-        elif dist_CD2_metal < dist_ND1_metal and dist_CD2_metal < 3.5 and dist_CD2_metal < dist_NE2_metal:
-            flip_flag = "D"
-            break
+
+    closest = sorted(points, key=lambda p: min(p - x for x in [CE1, NE2, CD2, ND1]))[0]
+    dist_CE1_metal = closest - CE1
+    dist_NE2_metal = closest - NE2
+    dist_CD2_metal = closest - CD2
+    dist_ND1_metal = closest - ND1
+    if dist_CE1_metal < dist_NE2_metal and dist_CE1_metal < 3.5 and dist_CE1_metal < dist_ND1_metal:
+        flip_flag = "E"
+    elif dist_CD2_metal < dist_ND1_metal and dist_CD2_metal < 3.5 and dist_CD2_metal < dist_NE2_metal:
+        flip_flag = "D"
+
     if flip_flag:
         old_coords = dict()
         for atom_name in ["HD2", "HE1", "HD1", "HE2", "CD2", "ND1", "CE1", "NE2", "CG", "CB"]:
@@ -324,7 +323,7 @@ def adjust_activesites(path, metals):
             points.append(atoms[0])
 
     for res in structure[0].get_residues():
-        if res.get_resname() == "HIS":
+        if res.get_resname() == "HIS" and points:
             flip_coordinated_HIS(points, res)
         if res.get_resname() == "CSO":
             add_hydrogen_CSO(res, structure)

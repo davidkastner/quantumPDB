@@ -1,0 +1,8 @@
+PDB residue entry with clash will be removed: 526 GOL
+PDB entry filter removed HETATM67295  C1  GOL A 526      24.117  30.172  68.834  0.70  0.00           C  
+PDB entry filter removed HETATM67295  O1  GOL A 526      23.441  31.434  68.861  0.70  0.00           O  
+PDB entry filter removed HETATM67295  C2  GOL A 526      25.607  30.336  69.205  0.70  0.00           C  
+PDB entry filter removed HETATM67295  O2  GOL A 526      25.789  30.101  70.610  0.70  0.00           O  
+PDB entry filter removed HETATM67295  C3  GOL A 526      26.543  29.381  68.425  0.70  0.00           C  
+PDB entry filter removed HETATM67295  O3  GOL A 526      26.365  29.320  67.008  0.70  0.00           O  
+PDB entry filter removed 6 atom entries

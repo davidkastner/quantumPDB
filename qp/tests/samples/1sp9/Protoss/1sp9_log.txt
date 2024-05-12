@@ -1,0 +1,14 @@
+PDB residue entry with clash will be removed: 428 PHE
+PDB entry filter removed ATOM  67295  N   PHE A 428      -2.125  32.110  14.343  1.00  0.00           N  
+PDB entry filter removed ATOM  67295  CA  PHE A 428      -2.522  33.512  14.484  1.00  0.00           C  
+PDB entry filter removed ATOM  67295  CB  PHE A 428      -1.548  34.418  13.719  1.00  0.00           C  
+PDB entry filter removed ATOM  67295  CG  PHE A 428      -0.110  33.966  13.781  1.00  0.00           C  
+PDB entry filter removed ATOM  67295  CD1 PHE A 428       0.555  33.861  15.006  1.00  0.00           C  
+PDB entry filter removed ATOM  67295  CD2 PHE A 428       0.583  33.639  12.608  1.00  0.00           C  
+PDB entry filter removed ATOM  67295  CE1 PHE A 428       1.896  33.433  15.069  1.00  0.00           C  
+PDB entry filter removed ATOM  67295  CE2 PHE A 428       1.922  33.211  12.655  1.00  0.00           C  
+PDB entry filter removed ATOM  67295  CZ  PHE A 428       2.580  33.107  13.894  1.00  0.00           C  
+PDB entry filter removed ATOM  67295  C   PHE A 428      -3.935  33.771  13.976  0.00  0.00           C  
+PDB entry filter removed ATOM  67295  O   PHE A 428      -4.262  34.897  13.594  1.00  0.00           O  
+PDB entry filter removed ATOM  67295  OXT PHE A 428      -4.383  34.946  14.048  1.00  0.00           O  
+PDB entry filter removed 12 atom entries

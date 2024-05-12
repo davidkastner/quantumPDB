@@ -25,9 +25,6 @@ def fetch_pdb(pdb, out):
         f.write(r.text)
 
 
-import os
-import csv
-
 def parse_input(input_path, output_path):
     """
     Parses the input PDBs and returns a list of tuples
@@ -60,14 +57,14 @@ def parse_input(input_path, output_path):
                     reader = csv.DictReader(csvfile)
                     for row in reader:
                         pdb = row['pdb_id']
-                        pdb_all.append((pdb, f"{output_path}/{pdb}/{pdb}.pdb"))
+                        pdb_all.append((pdb, os.path.join(output_path, pdb, f"{pdb}.pdb")))
             else:
                 with open(pdb_id, "r") as f:
                     pdb_all.extend(
-                        [(pdb, f"{output_path}/{pdb}/{pdb}.pdb") for pdb in f.read().splitlines()]
+                        [(pdb, os.path.join(output_path, pdb, f"{pdb}.pdb")) for pdb in f.read().splitlines()]
                     )
         else:
-            pdb_all.append((pdb_id, f"{output_path}/{pdb_id}/{pdb_id}.pdb"))
+            pdb_all.append((pdb_id, os.path.join(output_path, pdb_id, f"{pdb_id}.pdb")))
 
     return pdb_all
 

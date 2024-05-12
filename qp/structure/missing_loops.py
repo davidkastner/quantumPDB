@@ -26,6 +26,7 @@
     >>> missing_loops.build_model(
     ...     residues, 
     ...     pdb, 
+    ...     "path/to/PDB.pdb", 
     ...     "path/to/ALI.ali", 
     ...     "path/to/OUT.pdb"
     ... )
@@ -43,11 +44,8 @@ from modeller.automodel import AutoModel
 from modeller import alignment, model
 
 
-
 log.none()
-e = Environ()  #: MODELLER environment
-e.io.hetatm = True
-e.io.water = True
+
 
 #: Amino acid 3 to 1 lookup table
 def define_residues():
@@ -237,38 +235,38 @@ def write_alignment(residues, pdb, path, out):
         f.write(f">P1;{pdb}_fill\nsequence:::::::::\n{seq_fill}*\n")
 
 
-def transfer_numbering(e, ali, pdb, out):
-        """
-        Transfer residue numbers and chain ids from reference model to the built model.
+def transfer_numbering(e, ali, path, out):
+    """
+    Transfer residue numbers and chain ids from reference model to the built model.
 
-        By default, Modeller will restart the number at 1 and rename the chains.
-        This function, we transfer the numbering over from the template PDB.
-        However, it can cause some issues with the numbering in some cases.
-        We use fix_numbering() to fix those issues.
+    By default, Modeller will restart the number at 1 and rename the chains.
+    This function, we transfer the numbering over from the template PDB.
+    However, it can cause some issues with the numbering in some cases.
+    We use fix_numbering() to fix those issues.
 
-        See Also
-        --------
-        qp.structure.missing_loops.fix_numbering()
+    See Also
+    --------
+    qp.structure.missing_loops.fix_numbering()
 
-        """
-        # Read the alignment for the transfer
-        aln = alignment(e, file=ali)
+    """
+    # Read the alignment for the transfer
+    aln = alignment(e, file=ali)
 
-        # Read the template and target models:
-        mdl_reference = model(e, file=pdb)  # Assuming 'pdb' is the reference pdb file
-        mdl_built = model(e, file=os.path.basename(out))
+    # Read the template and target models:
+    mdl_reference = model(e, file=path)
+    mdl_built = model(e, file=os.path.basename(out))
 
-        # Transfer the residue and chain ids and write out the modified MODEL:
-        mdl_built.res_num_from(mdl_reference, aln)
-        file=os.path.basename(out)
-        mdl_built.write(file)
+    # Transfer the residue and chain ids and write out the modified MODEL:
+    mdl_built.res_num_from(mdl_reference, aln)
+    file=os.path.basename(out)
+    mdl_built.write(file)
 
-        with open(file, 'r') as f:
-            content = f.read()
+    with open(file, 'r') as f:
+        content = f.read()
 
-        corrected_content = fix_numbering(content)
-        with open(file, 'w') as f:
-            f.write(corrected_content)
+    corrected_content = fix_numbering(content)
+    with open(file, 'w') as f:
+        f.write(corrected_content)
 
 
 def fix_numbering(pdb_content):
@@ -329,7 +327,7 @@ def fix_numbering(pdb_content):
     return pdb_content
 
 
-def build_model(residues, pdb, ali, out, optimize=1):
+def build_model(residues, pdb, path, ali, out, optimize=1):
     """
     Runs MODELLER for the given alignment file
 
@@ -340,6 +338,8 @@ def build_model(residues, pdb, ali, out, optimize=1):
         ``((sequence number, insertion code), one letter code, flag)``
     pdb: str
         PDB code
+    path: str
+        Path to PDB file
     ali: str
         Path to alignment file
     out: str
@@ -389,6 +389,9 @@ def build_model(residues, pdb, ali, out, optimize=1):
             *[self.residue_range(x, y) for x, y in missing]
         )
 
+    e = Environ()
+    e.io.hetatm = True
+    e.io.water = True
     a = CustomModel(e, alnfile=ali, knowns=pdb, sequence=f"{pdb}_fill")
     a.starting_model = 1
     a.ending_model = 1
@@ -401,7 +404,7 @@ def build_model(residues, pdb, ali, out, optimize=1):
         a.make()
         for ext in ["ini", "rsr", "sch", "D00000001", "V99990001"]:
             os.remove(f"{pdb}_fill.{ext}")
-        transfer_numbering(e, ali, pdb, out)
+        transfer_numbering(e, ali, path, out)
 
     os.chdir(cwd)
 

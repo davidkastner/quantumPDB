@@ -31,6 +31,9 @@ from qp.structure import struct_to_file
 from sklearn.cluster import DBSCAN
 
 
+RANDOM_SEED = 66265
+
+
 def get_grid_coord_idx(coord, coord_min, mean_distance):
     """
     Compute a point's position in a 1D grid
@@ -116,6 +119,7 @@ def fill_dummy(points, mean_distance=3, noise_amp=0.2):
             get_grid_coord_idx(z, z_min, mean_distance)
         ] = False
     flags = flags.flatten()
+    np.random.seed(RANDOM_SEED)
     noise = mean_distance * noise_amp * (np.random.rand(len(x_grids), len(y_grids), len(z_grids), 3) - 0.5)
     dummy = np.stack(np.meshgrid(x_grids, y_grids, z_grids, indexing="ij"), axis=-1)
     dummy = (dummy + noise).reshape(-1, 3)
@@ -183,7 +187,10 @@ def voronoi(model, center_residues, ligands, smooth_method, **smooth_params):
     return neighbors
 
 
-def merge_centers(cur, search, seen, radius=4.0):
+def merge_centers(cur, search, seen, radius=0.0):
+    if radius == 0.0:
+        return {cur}
+
     center = {cur}
     seen.add(cur)
     nxt = set()
@@ -192,13 +199,14 @@ def merge_centers(cur, search, seen, radius=4.0):
             continue
         for res in search.search(atom.get_coord(), radius, "R"):
             nxt.add(res)
+            
     for res in nxt:
         if res not in seen:
             center |= merge_centers(res, search, seen, radius)
     return center
 
 
-def get_center_residues(model, center_residues, merge_cutoff=4.0):
+def get_center_residues(model, center_residues, merge_cutoff=0.0):
     found = set()
     center_atoms = []
     for res in model.get_residues():
@@ -313,7 +321,7 @@ def get_next_neighbors(
             for res in start:
                 start_atoms.extend(res.get_unpacked_list())
 
-            is_metal_like = (len(start_atoms) == start)
+            is_metal_like = (len(start_atoms) == len(start))
             search = NeighborSearch([atom for atom in start_atoms[0].get_parent().get_parent().get_parent().get_atoms() if atom.element != "H" and atom not in start_atoms])
             first_sphere = []
             for center in start_atoms:
@@ -321,8 +329,11 @@ def get_next_neighbors(
             for atom in first_sphere:
                 if atom.get_parent() not in seen:
                     element = atom.element
-                    if not is_metal_like or element in "OS" or (element in "NC" and check_NC(atom, center)):
-                        # only consider coordinated atoms
+                    if (
+                        not is_metal_like 
+                        or element in "OS" 
+                        or (element in "NC" and any(check_NC(atom, center) for center in start_atoms))
+                    ): # only consider coordinated atoms
                         res = atom.get_parent()
                         seen.add(res)
                         if Polypeptide.is_aa(res):
@@ -456,7 +467,7 @@ def build_hydrogen(chain, parent, template, atom):
         Residue containing added hydrogen
     """
     if atom == "N":
-        pos = scale_hydrogen(parent["N"], template["C"], 1 / 1.32) # TODO verify scaling
+        pos = scale_hydrogen(parent["N"], template["C"], 1 / 1.32)
     else:
         pos = scale_hydrogen(parent["C"], template["N"], 1.09 / 1.32)
 
@@ -495,7 +506,7 @@ def build_heavy(chain, parent, template, atom):
         pos["HH32"] = template["HA3"].get_coord()
     else:
         pos["HH31"] = template["HA"].get_coord()
-        pos["HH32"] = scale_hydrogen(template["CA"], template["CB"], 1.09 / 1.54) # TODO verify scaling
+        pos["HH32"] = scale_hydrogen(template["CA"], template["CB"], 1.09 / 1.54)
     
     if atom == "N":
         pos["C"] = template["C"].get_coord()
@@ -708,17 +719,17 @@ def extract_clusters(
     path,
     out,
     center_residues,
-    merge_cutoff=4.0,
     sphere_count=2,
-    first_sphere_radius=3.0,
+    first_sphere_radius=4.0,
     max_atom_count=None,
-    ligands=[],
-    capping=0,
-    charge=False,
-    count=False,
-    xyz=False,
-    ligand_charge=dict(),
+    merge_cutoff=0.0,
     smooth_method="box_plot",
+    ligands=[],
+    capping=1,
+    charge=True,
+    ligand_charge=dict(),
+    count=True,
+    xyz=True,
     hetero_pdb=False,
     **smooth_params
 ):
@@ -741,7 +752,7 @@ def extract_clusters(
     capping: int
         Whether to cap chains with nothing (0), H (1), or ACE/NME (2)
     charge: bool
-        If true, total charge of coordinating AAs will written to out/charge.csv
+        If true, total charge of coordinating AAs will be written to out/charge.csv
     count: bool
         If true, residue counts will be written to out/count.csv
     xyz: bool
@@ -794,16 +805,16 @@ def extract_clusters(
     if charge:
         with open(f"{out}/charge.csv", "w") as f:
             f.write(f"Name,{','.join(str(i + 1) for i in range(sphere_count))}\n")
-            for k, v in aa_charge.items():
+            for k, v in sorted(aa_charge.items()):
                 f.write(k)
                 for s in v:
-                    f.write(f",{str(s)}")
+                    f.write(f",{s}")
                 f.write(f"\n")
 
     if count:
         with open(f"{out}/count.csv", "w") as f:
             f.write(f"Name,{','.join(str(i + 1) for i in range(sphere_count))}\n")
-            for k, v in res_count.items():
+            for k, v in sorted(res_count.items()):
                 f.write(k)
                 for sphere in v:
                     s = ", ".join(f"{r} {c}" for r, c in sorted(sphere.items()))

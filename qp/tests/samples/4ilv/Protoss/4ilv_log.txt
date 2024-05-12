@@ -1,0 +1,19 @@
+PDB residue entry with clash will be removed: 231 GLN
+PDB residue entry with clash will be removed: 230 ALA
+PDB entry filter removed ATOM  67295  N   GLN A 231      71.629   4.341   4.401  1.00 44.20           N  
+PDB entry filter removed ATOM  67295  CA  GLN A 231      72.138   5.543   3.749  1.00 44.68           C  
+PDB entry filter removed ATOM  67295  CB  GLN A 231      73.561   5.855   4.236  1.00 39.04           C  
+PDB entry filter removed ATOM  67295  CG  GLN A 231      73.707   6.120   5.741  1.00 44.02           C  
+PDB entry filter removed ATOM  67295  CD  GLN A 231      75.147   6.452   6.130  1.00 40.63           C  
+PDB entry filter removed ATOM  67295  OE1 GLN A 231      76.050   5.625   5.986  1.00 44.63           O  
+PDB entry filter removed ATOM  67295  NE2 GLN A 231      75.366   7.675   6.598  1.00 40.11           N  
+PDB entry filter removed ATOM  67295  C   GLN A 231      72.117   5.399   2.220  1.00 43.45           C  
+PDB entry filter removed ATOM  67295  O   GLN A 231      72.281   6.375   1.489  1.00 82.87           O  
+PDB entry filter removed ATOM  67295  OXT GLN A 231      72.531   6.368   1.529  1.00  0.00           O  
+PDB entry filter removed ATOM  67295  N   ALA B 230     107.637 -17.997  31.372  1.00 49.77           N  
+PDB entry filter removed ATOM  67295  CA  ALA B 230     107.334 -18.148  29.952  1.00 47.72           C  
+PDB entry filter removed ATOM  67295  CB  ALA B 230     108.540 -18.649  29.194  1.00 52.75           C  
+PDB entry filter removed ATOM  67295  C   ALA B 230     106.148 -19.089  29.768  1.00 40.87           C  
+PDB entry filter removed ATOM  67295  O   ALA B 230     105.200 -18.769  29.049  1.00 93.59           O  
+PDB entry filter removed ATOM  67295  OXT ALA B 230     105.758 -19.326  28.594  1.00  0.00           O  
+PDB entry filter removed 16 atom entries
