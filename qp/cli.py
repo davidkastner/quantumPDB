@@ -72,6 +72,7 @@ def run(config):
         max_atom_count = config_data.get('max_atom_count', None)
         merge_cutoff = config_data.get('merge_distance_cutoff', 0.0)
 
+        include_ligands = config_data.get('include_ligands', 2)
         ligands = config_data.get('additional_ligands', [])
         capping = config_data.get('capping_method', 1)
         charge = config_data.get('compute_charges', True)
@@ -200,7 +201,7 @@ def run(config):
             cluster_paths = coordination_spheres.extract_clusters(
                 path, f"{output}/{pdb}", center_residues, sphere_count, 
                 first_sphere_radius, max_atom_count, merge_cutoff, smooth_method,
-                ligands, capping, charge, ligand_charge, count, xyz, hetero_pdb,
+                ligands, capping, charge, ligand_charge, count, xyz, hetero_pdb, include_ligands,
                 **smooth_params
             )
 

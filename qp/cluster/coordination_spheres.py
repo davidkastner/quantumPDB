@@ -285,6 +285,7 @@ def get_next_neighbors(
     start, neighbors, sphere_count, ligands,
     first_sphere_radius=3,
     smooth_method="boxplot", 
+    include_ligands=2,
     **smooth_params):
     """
     Iteratively determines spheres around a given starting atom
@@ -297,8 +298,14 @@ def get_next_neighbors(
         Adjacency list of neighboring atoms
     sphere_count: int
         Number of spheres to extract
-    ligands:
+    ligands: list
         A list of ligands to include
+    smooth_method: ("boxplot" | "dbscan" | "dummy_atom")
+        The method used to smoothen the spheres
+    include_ligands: int
+        the mode of including ligands in the sphere
+    smooth_params:
+        params of the specific smooth method
 
     Returns
     -------
@@ -339,7 +346,11 @@ def get_next_neighbors(
                         if Polypeptide.is_aa(res):
                             nxt.add(res)
                         else:
-                            lig_add.add(res)
+                            if (
+                                include_ligands != 1 or
+                                res.get_resname() != "HOH" # mode 1: exclude all waters
+                            ):
+                                lig_add.add(res)
         else:
             candidates = []
             frontiers = spheres[-1] if spheres[-1] else spheres[0]
@@ -378,7 +389,12 @@ def get_next_neighbors(
                     if Polypeptide.is_aa(par):
                         nxt.add(par)
                     else:
-                        if par.get_resname() in ligands or i == 0:
+                        if (
+                            (include_ligands == 0 and par.get_resname() in ligands) or 
+                            # mode 0: only include ligands in the first sphere unless specified
+                            (include_ligands == 1 and par.get_resname() != "HOH") or # mode 1: exclude all waters
+                            include_ligands == 2 # mode 2: include everything
+                        ):
                             lig_add.add(par)
 
         spheres.append(nxt)
@@ -731,6 +747,7 @@ def extract_clusters(
     count=True,
     xyz=True,
     hetero_pdb=False,
+    include_ligands=2,
     **smooth_params
 ):
     """
@@ -747,16 +764,32 @@ def extract_clusters(
         List of resnames of the residues to use as the cluster center
     sphere_count: int
         Number of coordinations spheres to extract
+    first_sphere_radius: float
+        the radius cutoff of the first sphere
+    max_atom_count: int
+        the maximum number of atoms in the whole cluster
+    merge_cutoff: int
+        the distance cutoff when merging two centers of spheres
+    smooth_method: ("boxplot" | "dbscan" | "dummy_atom")
+        The method used to smoothen the spheres
     ligands: list
         Other ligand IDs to include, in addition to AAs and waters
     capping: int
         Whether to cap chains with nothing (0), H (1), or ACE/NME (2)
     charge: bool
         If true, total charge of coordinating AAs will be written to out/charge.csv
+    ligand_charge: dict
+        The dict containing each ligand's name and charge
     count: bool
         If true, residue counts will be written to out/count.csv
     xyz: bool
         If true, XYZ files will be written according to the output PDBs
+    hetero_pdb: bool
+        If true, keep all the heteroatoms in the cluster PDB output
+    include_ligands: int
+        the mode of including ligands in the sphere
+    smooth_params:
+        params of the specific smooth method 
     """
     parser = PDBParser(QUIET=True)
     structure = parser.get_structure("PDB", path)
@@ -773,7 +806,7 @@ def extract_clusters(
     cluster_paths = []
     for c in centers:
         metal_id, residues, spheres = get_next_neighbors(
-            c, neighbors, sphere_count, ligands, first_sphere_radius, smooth_method, **smooth_params
+            c, neighbors, sphere_count, ligands, first_sphere_radius, smooth_method, include_ligands, **smooth_params
         )
         cluster_path = f"{out}/{metal_id}"
         cluster_paths.append(cluster_path)
