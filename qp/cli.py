@@ -201,7 +201,7 @@ def run(config):
             cluster_paths = coordination_spheres.extract_clusters(
                 path, f"{output}/{pdb}", center_residues, sphere_count, 
                 first_sphere_radius, max_atom_count, merge_cutoff, smooth_method,
-                ligands, capping, charge, ligand_charge, count, xyz, hetero_pdb, include_ligands
+                ligands, capping, charge, ligand_charge, count, xyz, hetero_pdb, include_ligands,
                 **smooth_params
             )
 

@@ -747,7 +747,7 @@ def extract_clusters(
     count=True,
     xyz=True,
     hetero_pdb=False,
-    include_ligand=2,
+    include_ligands=2,
     **smooth_params
 ):
     """
@@ -806,7 +806,7 @@ def extract_clusters(
     cluster_paths = []
     for c in centers:
         metal_id, residues, spheres = get_next_neighbors(
-            c, neighbors, sphere_count, ligands, first_sphere_radius, smooth_method, **smooth_params
+            c, neighbors, sphere_count, ligands, first_sphere_radius, smooth_method, include_ligands, **smooth_params
         )
         cluster_path = f"{out}/{metal_id}"
         cluster_paths.append(cluster_path)
