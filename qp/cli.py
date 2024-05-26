@@ -4,6 +4,7 @@
 """
 
 import os
+import sys
 import yaml
 import click
 
@@ -66,19 +67,10 @@ def run(config):
 
     if coordination:
         from qp.cluster import coordination_spheres
-        center_residues = config_data.get('center_residues', [])
-        sphere_count = config_data.get('number_of_spheres', 2)
+        limit = config_data.get('number_of_spheres', 2)
         first_sphere_radius = config_data.get('radius_of_first_sphere', 4.0)
-        max_atom_count = config_data.get('max_atom_count', None)
-        merge_cutoff = config_data.get('merge_distance_cutoff', 0.0)
-
-        include_ligands = config_data.get('include_ligands', 2)
         ligands = config_data.get('additional_ligands', [])
         capping = config_data.get('capping_method', 1)
-        charge = config_data.get('compute_charges', True)
-        count = config_data.get('count_residues', True)
-        xyz = config_data.get('write_xyz', True)
-        hetero_pdb = config_data.get('write_hetero_pdb', False)
 
         # Prompt user for their preferred cluster smoothing method
         smooth_choice = config_data.get('smoothing_method', 2)
@@ -86,6 +78,14 @@ def run(config):
         smooth_method_options = {0: "box_plot", 1: "dbscan", 2: "dummy_atom", 3: False}
         smooth_params = smooth_options[smooth_choice]
         smooth_method = smooth_method_options[smooth_choice]
+
+        center_residues = config_data.get('center_residues', [])
+        merge_cutoff = config_data.get('merge_distance_cutoff', 4.0)
+        max_atom_count = config_data.get('max_atom_count', None)
+        charge = config_data.get('compute_charges', True)
+        count = config_data.get('count_residues', True)
+        xyz = config_data.get('write_xyz', True)
+        hetero_pdb = config_data.get('write_hetero_pdb', False)
 
         if capping or charge:
             protoss = True
@@ -134,7 +134,7 @@ def run(config):
 
                 ali_path = f"{output}/{pdb}/{pdb}.ali"
                 missing_loops.write_alignment(residues, pdb, path, ali_path)
-                missing_loops.build_model(residues, pdb, path, ali_path, mod_path, optimize)
+                missing_loops.build_model(residues, pdb, ali_path, mod_path, optimize)
 
         prot_path = f"{output}/{pdb}/Protoss"
         if protoss:
@@ -155,13 +155,9 @@ def run(config):
                     copy(os.path.join(prepared_prot_path, f"{pdbl}_ligands.sdf"), f"{prot_path}/{pdb}_ligands.sdf")
                     click.echo("> Using pre-prepared protoss file")
                 else:
-                    from qp.structure.add_hydrogens import clean_partial_occupancy
                     click.echo("> Running Protoss")
                     if modeller:
                         path = mod_path
-                    cleaned_path = path[:-4] + "_new.pdb"
-                    if clean_partial_occupancy(path, cleaned_path, center_residues):
-                        path = cleaned_path
                     try:
                         pid = add_hydrogens.upload(path)
                     except ValueError:
@@ -199,9 +195,10 @@ def run(config):
                 ligand_charge = dict()
 
             cluster_paths = coordination_spheres.extract_clusters(
-                path, f"{output}/{pdb}", center_residues, sphere_count, 
-                first_sphere_radius, max_atom_count, merge_cutoff, smooth_method,
-                ligands, capping, charge, ligand_charge, count, xyz, hetero_pdb, include_ligands,
+                path, f"{output}/{pdb}", center_residues, merge_cutoff, limit, 
+                first_sphere_radius, max_atom_count, ligands, capping, charge, count, xyz, 
+                ligand_charge=ligand_charge,
+                smooth_method=smooth_method, hetero_pdb=hetero_pdb,
                 **smooth_params
             )
 
@@ -229,36 +226,56 @@ def run(config):
 
 @cli.command()
 @click.option("--config", "-c", required=True, type=click.Path(exists=True), help="Path to the configuration YAML file")
-@click.option("--failure_checkup", "-f", is_flag=True, help="Find failed structures")
-def submit(config, failure_checkup):
+def submit(config):
     """Handles the submission of jobs for the quantumPDB."""
 
-    from qp.manager import job_manager
-    
-    if config:
-        config_data = read_config(config)
-        optimization = config_data.get('optimization', False)
-        method = config_data.get('method', 'wpbeh')
-        basis = config_data.get('basis', 'lacvps_ecp')
-        guess = config_data.get('guess', 'generate')
-        gpus = config_data.get('gpus', 1)
-        memory = config_data.get('memory', '8G')
+    config_data = read_config(config)
 
-        # Check if a config file and end if it was a PDB
-        output = config_data.get('output_dir', '') # Ensure execution from the correct directory
-        input = config_data.get('input', [])
-        if not os.path.exists(input):
-            raise FileNotFoundError(f"Could not find input file named {input}.")
-        input = os.path.abspath(input)
-
-        job_count = click.prompt("> Jobs count to be submitted in this batch", default=80)
-        job_manager.manage_jobs(job_count, input, output, optimization, basis, method, guess, gpus, memory)
-
-
-    if failure_checkup:
+    # Check what jobs failed and why
+    if config_data.get('checkup', False):
         from qp.manager import failure_checkup
-        qm_job_dir = input("What is the name of your QM job directory? ")
-        failure_counts = failure_checkup.check_all_jobs(qm_job_dir)
+        # Get the location of the dataset and change into it
+        config_data = read_config(config)
+        output = config_data.get('output_dir', '')
+        output = os.path.abspath(output)
+        os.chdir(output)
+
+        # Get the name of the QM output
+        method = config_data.get('method', 'wpbeh')
+        failure_counts = failure_checkup.check_all_jobs(method)
+        failure_checkup.plot_failures(failure_counts)
+        sys.exit()
+
+    from qp.manager import job_manager
+    optimization = config_data.get('optimization', False)
+    method = config_data.get('method', 'wpbeh')
+    basis = config_data.get('basis', 'lacvps_ecp')
+    guess = config_data.get('guess', 'generate')
+    gpus = config_data.get('gpus', 1)
+    memory = config_data.get('memory', '8G')
+
+    # Check if a config file and end if it was a PDB
+    output = config_data.get('output_dir', '') # Ensure execution from the correct directory
+    input = config_data.get('input', [])
+    if not os.path.exists(input):
+        raise FileNotFoundError(f"Could not find input file named {input}.")
+    input = os.path.abspath(input)
+
+    job_count = click.prompt("> Jobs count to be submitted in this batch", default=80)
+    job_manager.manage_jobs(job_count, input, output, optimization, basis, method, guess, gpus, memory)
+
+    # Check what jobs failed and why
+    if config_data.get('checkup', False):
+        from qp.manager import failure_checkup
+        # Get the location of the dataset and change into it
+        config_data = read_config(config)
+        output = config_data.get('output_dir', '')
+        output = os.path.abspath(output)
+        os.chdir(output)
+
+        # Get the name of the QM output
+        method = config_data.get('method', 'wpbeh')
+        failure_counts = failure_checkup.check_all_jobs(method)
         failure_checkup.plot_failures(failure_counts)
 
 

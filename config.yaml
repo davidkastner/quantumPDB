@@ -1,22 +1,32 @@
-# Parse configuration parameters
-input: ./input.csv                          # Path to protein csv, single PDB, or list of PDBs [PDB1, PDB2, PDB3]
-output_dir: ./dataset/v1                    # Path to save the generated clusters
+# Initialization parameters
+input: ./akg_proteins.csv                   # Path to protein csv, single PDB, or list of PDBs [PDB1, PDB2, PDB3]
+output_dir: ./dataset/2_dftgrid3                  # Path to save the generated clusters
 modeller: true                              # Model missing loops
 protoss: true                               # Assign protonation states
 coordination: true                          # Generate clusters
-skip: all                                   # Check for an existing job
+skip: all                                   # Skip 'modeller', 'protoss', or 'all' jobs if they already exist
 optimize_select_residues: 1                 # Modeller to model no (0), missing (1), or all (2) residues
 
-# Parameters for coordination spheres                       
+# Cluster model parameters
+max_atom_count: 500                    
 center_residues: [FE, FE2]                  # Residue name to use as the cluster center
 number_of_spheres: 2                        # Coordination spheres to generate
 radius_of_first_sphere: 4.0                 # Distance based cut off to determine first sphere
-include_ligands: 2                          # Only ligands and waters in the first sphere (0), Only non-water ligands (1), Everything (2)
-additional_ligands: []                      # Residues beyond first sphere to include if include_ligands is 0
+additional_ligands: []                      # Residues beyond first sphere to include
+include_ligands: 2                          # Only ligands and waters in first sphere (0), Only non-water ligands (1), Everything (2)
 capping_method: 1                           # Cap residues with None (0), hydrogens (1), ACE/NME (2)
 smoothing_method: 2                         # Smoothing method Box plot (0), DBSCAN (1), [Dummy Atom] (2), None (3)
 
-# Additional parameters                                         
+# Output parameters                               
 compute_charges: true                       # Calculate charges using Protoss output
 count_residues: true                        # Count the number of residues
 write_xyz: true                             # Write out xyz files
+
+# QM parameters
+optimization: false                         # Optimization (true) or single point (false)
+method: uwpbeh                              # Functional to use
+basis: lacvps_ecp                           # Basis set to use
+guess: generate                             # Method for initial guess
+gpus: 1                                     # How many GPUs to use
+memory: 4G                                  # How much memory to use
+checkup: true                               # Check how status of qm jobs
