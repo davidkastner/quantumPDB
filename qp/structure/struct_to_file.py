@@ -45,8 +45,6 @@ def combine_pdbs(out_path, metals, *input_paths, hetero_pdb=False):
         for path in input_paths:
             with open(path) as infile:
                 for line in infile:
-                    if not hetero_pdb and line.startswith("HETATM") and all(metal not in line for metal in metals):
-                        continue
                     if line.startswith("END"):
                         continue
                     outfile.write(line)
