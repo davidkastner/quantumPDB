@@ -55,19 +55,30 @@ def upload(path):
     pid: str
         ProteinsPlus ID
     """
-    pp = requests.post(
-        "https://proteins.plus/api/pdb_files_rest",
-        files={"pdb_file[pathvar]": open(path, "rb")},
-    )
-    if pp.status_code == 400:
-        raise ValueError("Bad request")
-    loc = json.loads(pp.text)["location"]
+    retries = 5
+    delay = 60  # seconds
 
-    r = requests.get(loc)
-    while r.status_code == 202:
-        time.sleep(1)
-        r = requests.get(loc)
-    return json.loads(r.text)["id"]
+    for _ in range(retries):
+        try:
+            pp = requests.post(
+                "https://proteins.plus/api/pdb_files_rest",
+                files={"pdb_file[pathvar]": open(path, "rb")},
+            )
+            if pp.status_code == 400:
+                raise ValueError("Bad request")
+            loc = json.loads(pp.text)["location"]
+
+            r = requests.get(loc)
+            while r.status_code == 202:
+                time.sleep(1)
+                r = requests.get(loc)
+
+            return json.loads(r.text)["id"]  # Exit if successful
+        except KeyError:
+            print(f"KeyError encountered. Retrying in {delay} seconds...")
+            time.sleep(delay)
+
+    raise KeyError(f"Failed to upload the file and retrieve 'id' after {retries} attempts.")
 
 
 def submit(pid):
@@ -84,14 +95,25 @@ def submit(pid):
     job: str
         URL of the Protoss job location
     """
-    protoss = requests.post(
-        "https://proteins.plus/api/protoss_rest",
-        json={"protoss": {"pdbCode": pid}},
-        headers={"Accept": "application/json"},
-    )
-    if protoss.status_code == 400:
-        raise ValueError("Invalid PDB code")
-    return json.loads(protoss.text)["location"]
+    retries = 5
+    delay = 60  # seconds
+
+    for _ in range(retries):
+        try:
+            protoss = requests.post(
+                "https://proteins.plus/api/protoss_rest",
+                json={"protoss": {"pdbCode": pid}},
+                headers={"Accept": "application/json"},
+            )
+            if protoss.status_code == 400:
+                raise ValueError("Invalid PDB code")
+            return json.loads(protoss.text)["location"]  # Exit if successful
+        except KeyError:
+            print(f"KeyError encountered. Retrying in {delay} seconds...")
+            time.sleep(delay)
+
+    raise KeyError(f"Failed to submit the PDB code and retrieve 'location' after {retries} attempts.")
+
 
 
 def download(job, out, key="protein"):
@@ -107,15 +129,27 @@ def download(job, out, key="protein"):
     key: str
         Determines which file to download ("protein", "ligand", or "log")
     """
-    r = requests.get(job)
-    while r.status_code == 202:
-        time.sleep(1)
-        r = requests.get(job)
+    # Sometimes the Protoss server doesn't respond correctly with the first query
+    retries = 5
+    delay = 60  # seconds
 
-    protoss = requests.get(json.loads(r.text)[key])
-    os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
-    with open(out, "w") as f:
-        f.write(protoss.text)
+    for _ in range(retries):
+        try:
+            r = requests.get(job)
+            while r.status_code == 202:
+                time.sleep(1)
+                r = requests.get(job)
+
+            protoss = requests.get(json.loads(r.text)[key])
+            os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
+            with open(out, "w") as f:
+                f.write(protoss.text)
+            return  # Exit if successful
+        except KeyError:
+            time.sleep(delay)
+            continue  # Retry on failure
+
+    raise KeyError(f"Failed to download the file with key '{key}' after {retries} attempts.")
 
 
 def repair_ligands(path, orig):
