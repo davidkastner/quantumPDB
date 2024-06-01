@@ -164,12 +164,12 @@ def voronoi(model, center_residues, ligands, smooth_method, **smooth_params):
     atoms = []
     points = []
     for res in model.get_residues():
-        if Polypeptide.is_aa(res) or \
-            res.get_resname() in center_residues or \
-            (res.get_resname() in ligands):
-            for atom in res.get_unpacked_list(): # includes atoms from multiple conformations
-                atoms.append(atom)
-                points.append(atom.get_coord())
+        # if Polypeptide.is_aa(res) or \
+        #     res.get_resname() in center_residues or \
+        #     (res.get_resname() in ligands):
+        for atom in res.get_unpacked_list(): # includes atoms from multiple conformations
+            atoms.append(atom)
+            points.append(atom.get_coord())
 
     points_count = len(points)
     if smooth_method == "dummy_atom":
