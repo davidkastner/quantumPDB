@@ -231,9 +231,6 @@ def submit_jobs(job_count, master_list_path, optimization, basis, method, guess,
                 f.write(jobscript)
             
             time.sleep(.25) # Gives user time to abort with ctrl + C
-            
-            # Debug: Print job script content
-            print(f"Job Script for {job_name}:\n{jobscript}")
 
             # Execute the job submission command and capture its output
             submission_command = 'sbatch jobscript.sh'
