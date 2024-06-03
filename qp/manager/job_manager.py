@@ -232,8 +232,13 @@ def submit_jobs(job_count, master_list_path, optimization, basis, method, guess,
             
             time.sleep(.25) # Gives user time to abort with ctrl + C
             
+            # Debug: Print job script content
+            print(f"Job Script for {job_name}:\n{jobscript}")
+
             # Execute the job submission command and capture its output
-            submission_command = 'qsub jobscript.sh'
+            submission_command = 'sbatch jobscript.sh'
+            print(f"Running command: {submission_command}")
+
             result = subprocess.run(submission_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             submission_output = result.stdout.strip() if result.returncode == 0 else result.stderr.strip()
             print(f"      > {submission_output}")
@@ -243,7 +248,6 @@ def submit_jobs(job_count, master_list_path, optimization, basis, method, guess,
 
             submitted_jobs += 1
 
-            
             # Existing condition to break early if job_count is reached
             if submitted_jobs == job_count:
                 print(f"   > Submitted {job_count} jobs")
@@ -257,7 +261,7 @@ def count_running_jobs():
 
     try:
         user_name = getpass.getuser()
-        cmd = f"qstat -u {user_name} | grep {user_name} | wc -l"
+        cmd = f"squeue -u {user_name} | grep {user_name} | wc -l"
         result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
         job_count = int(result.stdout.strip())
     except subprocess.CalledProcessError:
