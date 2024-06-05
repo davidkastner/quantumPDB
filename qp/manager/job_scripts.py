@@ -47,6 +47,8 @@ def write_jobscript(job_name, gpus, memory):
 #SBATCH --gres=gpu:volta:{gpus}
 #SBATCH --ntasks-per-node={gpus * 20}
 
+source /etc/profile
+
 #---TC setup---
 module load terachem/1.9-2023.11-dev
 LD_LIBRARY_PATH=/usr/local/pkg/cuda/cuda-11.8/lib64/stubs:${{LD_LIBRARY_PATH}}
