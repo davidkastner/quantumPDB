@@ -294,4 +294,3 @@ def manage_jobs(target_job_count, master_list_path, output, optimization, basis,
             # Max requested jobs are already running
             print(f"   > Sleeping for {int(sleep_time_seconds / 60)} minutes before checking queue")
             time.sleep(sleep_time_seconds)
-
