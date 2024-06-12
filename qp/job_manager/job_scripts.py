@@ -1,9 +1,25 @@
 """Stored job submission scripts"""
 
-def write_qmscript(optimization, coord_file, basis, method, total_charge, multiplicity, guess, pcm_radii_file, constraint_freeze):
+def write_qmscript(optimization, coord_file, basis, method, total_charge, multiplicity, guess, pcm_radii_file, constraint_freeze, dielectric, use_charge_embedding):
     """Generate TeraChem job submission scripts."""
+    
+    minimization_keywords = """new_minimizer yes\nrun minimize\n""" if optimization else ""
 
-    minimization_keywords = """new_minimizer yes\nrun minimize\n""" if optimization == True else ""
+    if use_charge_embedding:
+        pcm_section = ""
+        pointcharges_section = """pointcharges ptchrges.xyz
+pointcharges_self_interaction true
+"""
+    else:
+        pcm_section = f"""pcm cosmo
+epsilon {dielectric}
+pcm_radii read
+pcm_radii_file {pcm_radii_file}
+pcm_matrix no
+"""
+        pointcharges_section = ""
+
+
     qmscript_content = f"""levelshift yes
 levelshiftvala 0.25
 levelshiftvalb 0.25
@@ -16,19 +32,14 @@ guess {guess}
 maxit 500 
 dftd d3
 scrdir ./scr
-pcm cosmo
-epsilon 10
-pcm_matrix no
 scf diis+a
-pcm_radii read
-pcm_radii_file {pcm_radii_file}
-ml_prop yes
+{pcm_section}{pointcharges_section}ml_prop yes
 end
 
 {constraint_freeze}
 """
-
     return qmscript_content
+
 
 
 def write_sge_jobscript(job_name, gpus, memory):
