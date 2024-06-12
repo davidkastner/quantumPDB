@@ -7,7 +7,6 @@ import time
 import getpass
 import datetime
 import subprocess
-from qp.qm_jobs import job_scripts
 
 def create_submission_marker(submission_marker_path, job_name, submission_command, submission_output):
     """Creates a comprehensive summary of submission information that doubles as a tracker."""

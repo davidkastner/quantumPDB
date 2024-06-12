@@ -7,7 +7,7 @@ import shutil
 import pandas as pd
 from itertools import groupby
 from operator import itemgetter
-from qp.qm_jobs import job_scripts
+from qp.job_manager import job_scripts
 
 def compress_sequence(seq):
     """Condenses frozen atoms to make it more readable."""

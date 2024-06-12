@@ -233,8 +233,8 @@ def run(config):
 def submit(config, failure_checkup):
     """Handles the submission of jobs for the quantumPDB."""
 
-    from qp.qm_jobs import create
-    from qp.qm_jobs import submit
+    from qp.job_manager import create
+    from qp.job_manager import submit
     
     if config:
         config_data = read_config(config)
@@ -265,7 +265,7 @@ def submit(config, failure_checkup):
 
 
     if failure_checkup:
-        from qp.qm_jobs import failure_checkup
+        from qp.job_manager import failure_checkup
         qm_job_dir = input("What is the name of your QM job directory? ")
         failure_counts = failure_checkup.check_all_jobs(qm_job_dir)
         failure_checkup.plot_failures(failure_counts)

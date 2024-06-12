@@ -1,6 +1,6 @@
 import os
 from glob import glob
-from qp.qm_jobs.create import get_charge
+from qp.job_manager.create import get_charge
 
 
 ATOM_ELECTRON_MAP = {
