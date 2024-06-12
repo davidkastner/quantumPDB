@@ -3,6 +3,14 @@
 import os
 import shutil
 import numpy as np
+from qp.job_manager import ff14SB_dict
+from scipy.spatial import KDTree
+
+def calculate_centroid(coords):
+    """
+    Calculate the centroid of the given coordinates.
+    """
+    return np.mean(coords, axis=0)
 
 def rename_and_clean_resnames(input_pdb, output_pdb):
     """
@@ -70,17 +78,6 @@ def rename_and_clean_resnames(input_pdb, output_pdb):
                     line = 'ATOM  ' + line[6:]
             outfile.write(line)
 
-def read_ff_dict(dict_file):
-    ff_dict = {}
-    with open(dict_file, 'r') as f:
-        for line in f:
-            parts = line.strip().split()
-            residue_name = parts[0]
-            atom_name = parts[1]
-            charge_value = float(parts[2])
-            ff_dict.setdefault(residue_name, {})[atom_name] = charge_value
-    return ff_dict
-
 def parse_pdb(input_pdb, output_pdb, ff_dict):
     with open(input_pdb, 'r') as infile, open(output_pdb, 'w') as outfile:
         for line in infile:
@@ -123,15 +120,16 @@ def remove_atoms_from_pdb(pdb_lines, xyz_coords, threshold):
     """
     Remove atoms from the PDB file whose coordinates are within the threshold distance of any XYZ coordinates.
     """
+    threshold_sq = threshold ** 2
+    xyz_tree = KDTree(xyz_coords)
+
     new_pdb_lines = []
     for line in pdb_lines:
         if line.startswith('ATOM'):
-            x = float(line[30:38])
-            y = float(line[38:46])
-            z = float(line[46:54])
+            x, y, z = map(float, [line[30:38], line[38:46], line[46:54]])
             pdb_coord = np.array([x, y, z])
-            min_distance = min(np.linalg.norm(pdb_coord - xyz_coord) for xyz_coord in xyz_coords)
-            if min_distance > threshold:
+            distances, _ = xyz_tree.query(pdb_coord, k=1)
+            if distances ** 2 > threshold_sq:
                 new_pdb_lines.append(line)
         else:
             new_pdb_lines.append(line)
@@ -154,33 +152,43 @@ def remove_qm_atoms(pdb_file, xyz_file, output_pdb_file, threshold=0.5):
 
     write_pdb(output_pdb_file, remaining_lines)
 
-def parse_pdb_to_xyz(pdb_file_path, output_file_path):
+def parse_pdb_to_xyz(pdb_file_path, output_file_path, qm_centroid, cutoff_distance):
     """
-    Write terachem file test
+    Write terachem file test with distance cutoff for point charges.
     """
+    cutoff_distance_sq = cutoff_distance ** 2
+
     with open(pdb_file_path, 'r') as pdb_file:
         lines = pdb_file.readlines()
 
     atom_count = 0
-    with open(output_file_path, 'w') as output_file:
-        for line in lines:
-            if line.startswith('ATOM'):
+    atom_lines = []
+    for line in lines:
+        if line.startswith('ATOM'):
+            charges = float(line[60:66])
+            x_coord = float(line[30:38])
+            y_coord = float(line[38:46])
+            z_coord = float(line[46:54])
+            atom_coord = np.array([x_coord, y_coord, z_coord])
+            if np.sum((atom_coord - qm_centroid) ** 2) <= cutoff_distance_sq:
+                atom_lines.append(line)
                 atom_count += 1
 
-        output_file.write(str(atom_count) + '\n')
-        output_file.write('Generated from PDB file\n')  # XYZ format allows a comment line
+    with open(output_file_path, 'w') as output_file:
+        output_file.write(f"{atom_count}\nGenerated from PDB file\n")
+        for line in atom_lines:
+            charges = float(line[60:66])
+            x_coord = float(line[30:38])
+            y_coord = float(line[38:46])
+            z_coord = float(line[46:54])
+            output_file.write(f"{charges} {x_coord} {y_coord} {z_coord}\n")
 
-        for line in lines:
-            if line.startswith('ATOM'):
-                charges = float(line[60:66])
-                x_coord = float(line[30:38])
-                y_coord = float(line[38:46])
-                z_coord = float(line[46:54])
-                output_file.write(f"{charges} {x_coord} {y_coord} {z_coord}\n")
-
-if __name__ == "__main__":
+def get_charge_embedding(charge_embedding_cutoff):
     # Setup a temporary directory to store files
     temporary_files_dir = "ptchrges_temp"
+    # Check if the directory exists
+    if os.path.exists(temporary_files_dir):
+        shutil.rmtree(temporary_files_dir)
     os.mkdir(temporary_files_dir)
 
     pdb_name = os.getcwd().split('/')[-3]
@@ -188,7 +196,7 @@ if __name__ == "__main__":
     protoss_pdb_path = os.path.join("/".join(os.getcwd().split('/')[:-2]),"Protoss",protoss_pdb_name)
     chain_name = os.getcwd().split('/')[-2]
     renamed_his_pdb_file = f'{temporary_files_dir}/{chain_name}_rename_his.pdb'
-    dict_file = 'ff14SB.dict' # residue names, atom names, and charge values
+    ff_dict = ff14SB_dict.get_ff14SB_dict()  # residue names, atom names, and charge values
     charges_pdb = f'{temporary_files_dir}/{chain_name}_added_charges.pdb'
     xyz_file = f'{chain_name}.xyz'
     pdb_no_qm_atoms = f'{temporary_files_dir}/{chain_name}_without_qm_atoms.pdb'
@@ -196,13 +204,21 @@ if __name__ == "__main__":
 
     # Rename histidines
     rename_and_clean_resnames(protoss_pdb_path, renamed_his_pdb_file)
-    # Read the dictionary file into a dictionary
-    ff_dict = read_ff_dict(dict_file)
+
     # Parse the PDB file and dump charge information into the B-factor column
     parse_pdb(renamed_his_pdb_file, charges_pdb, ff_dict)
+
     # Remove QM atoms
     remove_qm_atoms(charges_pdb, xyz_file, pdb_no_qm_atoms, threshold=0.5)
-    parse_pdb_to_xyz(pdb_no_qm_atoms, final_point_charges_file)
 
+    # Calculate the centroid of the QM region
+    qm_coords = read_xyz(xyz_file)
+    qm_centroid = calculate_centroid(qm_coords)
+    
+    # Parse the PDB to XYZ with distance cutoff
+    parse_pdb_to_xyz(pdb_no_qm_atoms, final_point_charges_file, qm_centroid, charge_embedding_cutoff)
 
     shutil.rmtree(temporary_files_dir)
+
+if __name__ == "__main__":
+    get_charge_embedding()

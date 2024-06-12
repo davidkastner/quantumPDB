@@ -8,6 +8,7 @@ import pandas as pd
 from itertools import groupby
 from operator import itemgetter
 from qp.job_manager import job_scripts
+from qp.job_manager import charge_embedding
 
 def compress_sequence(seq):
     """Condenses frozen atoms to make it more readable."""
@@ -135,8 +136,9 @@ def get_charge(structure_dir=None):
     return charge, spin
 
 
-def create_jobs(pdb_list_path, output_dir, optimization, basis, method, guess, gpus, memory, scheduler, pcm_radii_file):
+def create_jobs(pdb_list_path, output_dir, optimization, basis, method, guess, use_charge_embedding, charge_embedding_cutoff, gpus, memory, scheduler, pcm_radii_file, dielectric):
     """Generate and submit jobs to queueing system, returning True if any jobs were submitted."""
+    
     orig_dir = os.getcwd()
     os.chdir(output_dir)
     base_dir = os.getcwd()
@@ -177,16 +179,19 @@ def create_jobs(pdb_list_path, output_dir, optimization, basis, method, guess, g
             job_name = f"{pdb_name}{structure_name}"
             
             if scheduler == "slurm":
-                qmscript = job_scripts.write_qmscript(optimization, coord_file, basis, method, total_charge, multiplicity, guess, pcm_radii_file, constraint_freeze)
+                qmscript = job_scripts.write_qmscript(optimization, coord_file, basis, method, total_charge, multiplicity, guess, pcm_radii_file, constraint_freeze, dielectric, use_charge_embedding)
                 jobscript = job_scripts.write_slurm_jobscript(job_name, gpus, memory)
             if scheduler == "sge":
-                qmscript = job_scripts.write_qmscript(optimization, coord_file, basis, method, total_charge, multiplicity, guess, pcm_radii_file, constraint_freeze)
+                qmscript = job_scripts.write_qmscript(optimization, coord_file, basis, method, total_charge, multiplicity, guess, pcm_radii_file, constraint_freeze, dielectric, use_charge_embedding)
                 jobscript = job_scripts.write_sge_jobscript(job_name, gpus, memory)
             
             with open('qmscript.in', 'w') as f:
                 f.write(qmscript)
             with open('jobscript.sh', 'w') as f:
                 f.write(jobscript)
+
+            if use_charge_embedding:
+                charge_embedding.get_charge_embedding(charge_embedding_cutoff)
 
             print(f"      > Created QM job files for {pdb}/{structure_name}/{method}/")
             

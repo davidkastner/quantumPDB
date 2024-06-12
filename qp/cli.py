@@ -247,6 +247,9 @@ def submit(config, failure_checkup):
         scheduler = config_data.get('scheduler', 'slurm')
         pcm_radii_file = config_data.get('pcm_radii_file', 'pcm_radii')
         job_count = config_data.get('job_count', 80)
+        charge_embedding = config_data.get('charge_embedding', False)
+        charge_embedding_cutoff = config_data.get('charge_embedding_cutoff', 20)
+        dielectric = config_data.get('dielectric', 10)
         submit_jobs = config_data.get('submit_jobs', False)
 
         # Check if a config file and end if it was a PDB
@@ -258,7 +261,7 @@ def submit(config, failure_checkup):
         input = os.path.abspath(input)
 
         click.echo("   > Creating job files for QM calculations")
-        create.create_jobs(input, output, optimization, basis, method, guess, gpus, memory, scheduler, pcm_radii_file)
+        create.create_jobs(input, output, optimization, basis, method, guess, charge_embedding, charge_embedding_cutoff, gpus, memory, scheduler, pcm_radii_file, dielectric)
         if submit_jobs:
             click.echo("\n   > Submitting QM calculations")
             submit.manage_jobs(output, job_count, method, scheduler)

@@ -29,7 +29,7 @@ basis: lacvps_ecp                      # Basis set to use
 guess: generate                        # Method for initial guess
 gpus: 1                                # How many GPUs to use
 memory: 4G                             # How much memory to use
-checkup: true                          # Check how status of qm jobs
+dielectric : 10                        # The dieletric to use if using implicit solvent  
 charge_embedding: true                 # Prepare QM with charge embedding
 scheduler: slurm                       # What scheduler do you use (e.g., slurm, sge)
 pcm_radii_file: /path/to/pcm_radii     # The path to the pcm_radii file if using terachem
@@ -37,3 +37,4 @@ pcm_radii_file: /path/to/pcm_radii     # The path to the pcm_radii file if using
 # Submit QM jobs
 submit_jobs: true                      # Submit the created jobs
 job_count: 10                          # The number of jobs to maintain on the scheduler
+checkup: false                         # Check how status of qm jobs
