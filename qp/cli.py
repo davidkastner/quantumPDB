@@ -233,7 +233,8 @@ def run(config):
 def submit(config, failure_checkup):
     """Handles the submission of jobs for the quantumPDB."""
 
-    from qp.manager import job_manager
+    from qp.qm_jobs import create
+    from qp.qm_jobs import submit
     
     if config:
         config_data = read_config(config)
@@ -243,20 +244,28 @@ def submit(config, failure_checkup):
         guess = config_data.get('guess', 'generate')
         gpus = config_data.get('gpus', 1)
         memory = config_data.get('memory', '8G')
+        scheduler = config_data.get('scheduler', 'slurm')
+        pcm_radii_file = config_data.get('pcm_radii_file', 'pcm_radii')
+        job_count = config_data.get('job_count', 80)
+        submit_jobs = config_data.get('submit_jobs', False)
 
         # Check if a config file and end if it was a PDB
         output = config_data.get('output_dir', '') # Ensure execution from the correct directory
         input = config_data.get('input', [])
+        
         if not os.path.exists(input):
             raise FileNotFoundError(f"Could not find input file named {input}.")
         input = os.path.abspath(input)
 
-        job_count = click.prompt("> Jobs count to be submitted in this batch", default=80)
-        job_manager.manage_jobs(job_count, input, output, optimization, basis, method, guess, gpus, memory)
+        click.echo("   > Creating job files for QM calculations")
+        create.create_jobs(input, output, optimization, basis, method, guess, gpus, memory, scheduler, pcm_radii_file)
+        if submit_jobs:
+            click.echo("\n   > Submitting QM calculations")
+            submit.manage_jobs(output, job_count, method, scheduler)
 
 
     if failure_checkup:
-        from qp.manager import failure_checkup
+        from qp.qm_jobs import failure_checkup
         qm_job_dir = input("What is the name of your QM job directory? ")
         failure_counts = failure_checkup.check_all_jobs(qm_job_dir)
         failure_checkup.plot_failures(failure_counts)
