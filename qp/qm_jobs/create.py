@@ -3,18 +3,11 @@
 import os
 import sys
 import glob
-import time
 import shutil
-import getpass
-import datetime
-import requests
-import subprocess
 import pandas as pd
 from itertools import groupby
 from operator import itemgetter
-from qp.manager import failure_checkup
-from qp.manager import job_scripts
-
+from qp.qm_jobs import job_scripts
 
 def compress_sequence(seq):
     """Condenses frozen atoms to make it more readable."""
@@ -76,7 +69,6 @@ def get_electronic(pdb_id, master_list):
     except Exception as e:
         print(f"Error: {e}")
         sys.exit()
-
 
 
 def get_charge(structure_dir=None):
@@ -143,37 +135,11 @@ def get_charge(structure_dir=None):
     return charge, spin
 
 
-def get_master_list(url):
-    """Retrieve a copy of the master list csv from shared Google Spreadsheet."""
-
-    master_list_file = "master_list.csv"
-
-    response = requests.get(url)
-    if response.status_code == 200:
-        with open(master_list_file, 'wb') as file:
-            file.write(response.content)
-        print("> Protein master list downloaded successfully")
-        return os.path.abspath(master_list_file)
-    else:
-        print("Failed to retrieve the file.")
-        sys.exit(1)
-
-
-def create_submission_marker(submission_marker_path, job_name, submission_command, submission_output):
-    """Creates a comprehensive summary of submission information that doubles as a tracker."""
-
-    with open(submission_marker_path, 'w') as marker:
-        marker.write(f"Jobname: {job_name}\n")
-        marker.write(f"Author: {getpass.getuser()}\n")
-        marker.write(f"Time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-        marker.write(f"Command: {submission_command}\n")
-        marker.write(f"Output: {submission_output}\n")
-
-
-def submit_jobs(job_count, master_list_path, optimization, basis, method, guess, gpus, memory):
+def create_jobs(pdb_list_path, output_dir, optimization, basis, method, guess, gpus, memory, scheduler, pcm_radii_file):
     """Generate and submit jobs to queueing system, returning True if any jobs were submitted."""
+    orig_dir = os.getcwd()
+    os.chdir(output_dir)
     base_dir = os.getcwd()
-    submitted_jobs = 0
     
     pdb_dirs = sorted([d for d in os.listdir() if os.path.isdir(d) and not d == 'Protoss'])
     for pdb in pdb_dirs:
@@ -186,18 +152,6 @@ def submit_jobs(job_count, master_list_path, optimization, basis, method, guess,
         for structure in structure_dirs:
             qm_path = os.path.join(structure, method)
             os.makedirs(qm_path, exist_ok=True)
-
-            submission_marker_path = os.path.join(qm_path, '.submit_record')
-            qm_output_file = os.path.join(qm_path, 'qmscript.out')
-            log_files = os.path.join(qm_path, 'Z*')
-            
-            # Remove previous slurm log files
-            for file in glob.glob(log_files):
-                os.remove(file)
-
-            # Placeholder for submitted jobs to prevent resubmission
-            if os.path.exists(submission_marker_path) or os.path.exists(qm_output_file):
-                continue
             
             xyz_files = glob.glob(os.path.join(structure, '*.xyz'))
             if len(xyz_files) != 1:
@@ -208,7 +162,7 @@ def submit_jobs(job_count, master_list_path, optimization, basis, method, guess,
             shutil.copy(xyz_files[0], coord_file)
             os.chdir(qm_path)
             
-            oxidation, multiplicity = get_electronic(pdb.lower(), master_list_path)
+            oxidation, multiplicity = get_electronic(pdb.lower(), pdb_list_path)
             charge, extra_spin = get_charge()
             multiplicity += extra_spin
             total_charge = charge + oxidation
@@ -217,80 +171,27 @@ def submit_jobs(job_count, master_list_path, optimization, basis, method, guess,
             heavy_list = find_heavy() if optimization else ""
             constraint_freeze = f"$constraint_freeze\n{heavy_list}\n$end" if optimization else ""
             
-            coord_name = os.path.basename(coord_file)
+            coord_file = os.path.basename(coord_file)
             pdb_name = os.path.basename(pdb)
             structure_name = os.path.basename(structure)
             job_name = f"{pdb_name}{structure_name}"
             
-            qmscript = job_scripts.write_qmscript(optimization, coord_name, basis, method, total_charge, multiplicity, guess, constraint_freeze)
-            jobscript = job_scripts.write_jobscript(job_name, gpus, memory)
+            if scheduler == "slurm":
+                qmscript = job_scripts.write_qmscript(optimization, coord_file, basis, method, total_charge, multiplicity, guess, pcm_radii_file, constraint_freeze)
+                jobscript = job_scripts.write_slurm_jobscript(job_name, gpus, memory)
+            if scheduler == "sge":
+                qmscript = job_scripts.write_qmscript(optimization, coord_file, basis, method, total_charge, multiplicity, guess, pcm_radii_file, constraint_freeze)
+                jobscript = job_scripts.write_sge_jobscript(job_name, gpus, memory)
             
             with open('qmscript.in', 'w') as f:
                 f.write(qmscript)
             with open('jobscript.sh', 'w') as f:
                 f.write(jobscript)
-            
-            time.sleep(.25) # Gives user time to abort with ctrl + C
-            
-            # Execute the job submission command and capture its output
-            submission_command = 'qsub jobscript.sh'
-            result = subprocess.run(submission_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            submission_output = result.stdout.strip() if result.returncode == 0 else result.stderr.strip()
-            print(f"      > {submission_output}")
-            create_submission_marker(submission_marker_path, job_name, submission_command, submission_output)
 
+            print(f"      > Created QM job files for {pdb}/{structure_name}/{method}/")
+            
             os.chdir(base_dir)
-
-            submitted_jobs += 1
-
-            
-            # Existing condition to break early if job_count is reached
-            if submitted_jobs == job_count:
-                print(f"   > Submitted {job_count} jobs")
-                return submitted_jobs
-            
-    return 0
-
-
-def count_running_jobs():
-    """Counts jobs submitted by the user that are currently running or in the queue."""
-
-    try:
-        user_name = getpass.getuser()
-        cmd = f"qstat -u {user_name} | grep {user_name} | wc -l"
-        result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
-        job_count = int(result.stdout.strip())
-    except subprocess.CalledProcessError:
-        job_count = 0
-    return job_count
-
-
-def manage_jobs(target_job_count, master_list_path, output, optimization, basis, method, guess, gpus, memory, check_interval=300):
-    """Main function for job manager."""
-    # Change into the directory of the generated cluster models
-    os.chdir(output)
     
-    while True:
-        current_job_count = count_running_jobs()
-        sleep_time_seconds = 300
-        print(f"   > Currently, there are {current_job_count} jobs running or queued.")
-
-        if current_job_count < target_job_count:
-            jobs_needed = target_job_count - current_job_count
-            print(f"   > Attempting to submit {jobs_needed} jobs to reach the target of {target_job_count}.")
-            submitted_jobs = submit_jobs(jobs_needed, master_list_path, optimization, basis, method, guess, gpus, memory)
+    os.chdir(orig_dir)
+    return
             
-            # Check if any new jobs were submitted
-            if submitted_jobs == 0:
-                print("Done.")
-                sys.exit(0)
-
-            # Wait a moment to let the system update
-            print(f"   > Sleeping for {int(sleep_time_seconds / 60)} minutes before checking queue")
-            time.sleep(sleep_time_seconds)
-        
-        else:
-            # Max requested jobs are already running
-            print(f"   > Sleeping for {int(sleep_time_seconds / 60)} minutes before checking queue")
-            time.sleep(sleep_time_seconds)
-

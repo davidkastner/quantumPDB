@@ -12,8 +12,7 @@ import subprocess
 import pandas as pd
 from itertools import groupby
 from operator import itemgetter
-from qp.manager import failure_checkup
-from qp.manager import job_scripts
+from qp.qm_jobs import job_scripts
 
 
 def compress_sequence(seq):
@@ -143,22 +142,6 @@ def get_charge(structure_dir=None):
     return charge, spin
 
 
-def get_master_list(url):
-    """Retrieve a copy of the master list csv from shared Google Spreadsheet."""
-
-    master_list_file = "master_list.csv"
-
-    response = requests.get(url)
-    if response.status_code == 200:
-        with open(master_list_file, 'wb') as file:
-            file.write(response.content)
-        print("> Protein master list downloaded successfully")
-        return os.path.abspath(master_list_file)
-    else:
-        print("Failed to retrieve the file.")
-        sys.exit(1)
-
-
 def create_submission_marker(submission_marker_path, job_name, submission_command, submission_output):
     """Creates a comprehensive summary of submission information that doubles as a tracker."""
 
@@ -267,7 +250,7 @@ def count_running_jobs():
 
 
 def manage_jobs(target_job_count, master_list_path, output, optimization, basis, method, guess, gpus, memory, check_interval=300):
-    """Main function for job manager."""
+    """Main function for managing QM jobs."""
     # Change into the directory of the generated cluster models
     os.chdir(output)
     
