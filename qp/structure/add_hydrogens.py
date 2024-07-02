@@ -500,7 +500,7 @@ def compute_charge(path_ligand, path_pdb):
         n_atom = 0
         for line in l:
             if "V2000" in line:
-                n_atom = int(line.split()[0][:3])
+                n_atom = int(line[:3]) # https://discover.3ds.com/sites/default/files/2020-08/biovia_ctfileformats_2020.pdf
             if line.startswith("M  RGP"):
                 # R# atom is found in the addition between CSO and TAN
                 # It's not a real atom and recorded in the RGP entry
