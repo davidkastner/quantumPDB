@@ -697,7 +697,8 @@ def compute_charge(spheres, structure, ligand_charge):
                     c -= 1
 
                 # Check for charged N-terminus
-                if res_id in n_terminals:
+                if res_id in n_terminals \
+                    and res.has_id("N"): # exclude sugar chain terminus
                     c += 1
 
                 # Check for charged C-terminus

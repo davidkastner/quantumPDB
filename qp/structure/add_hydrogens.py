@@ -500,7 +500,7 @@ def compute_charge(path_ligand, path_pdb):
         n_atom = 0
         for line in l:
             if "V2000" in line:
-                n_atom = int(line.split()[0][:3])
+                n_atom = int(line[:3]) # https://discover.3ds.com/sites/default/files/2020-08/biovia_ctfileformats_2020.pdf
             if line.startswith("M  RGP"):
                 # R# atom is found in the addition between CSO and TAN
                 # It's not a real atom and recorded in the RGP entry
@@ -517,7 +517,7 @@ def compute_charge(path_ligand, path_pdb):
             # to detect removed atoms
             # NO is corrected from NH2OH, thus the deleted 3 hydrogen shouldn't affect the charge
             for line in pdb_lines:
-                if line[17:20].strip() == res_name and line[21] == chain_id and line[22:26].strip() == res_id:
+                if line[17:20].strip() == res_name and line[21] == chain_id and line[22:26].strip() == res_id and line[0:3] != "TER":
                     cnt += 1
         charge[name] -= (n_atom - cnt)
     return charge

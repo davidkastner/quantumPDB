@@ -20,8 +20,9 @@ def to_xyz(out, *paths):
     parser = PDBParser(QUIET=True)
     for p in paths:
         structure = parser.get_structure("PDB", p)
-        for atom in structure[0].get_atoms():
-            atoms.append((atom.element, atom.get_coord()))
+        if structure:
+            for atom in structure[0].get_atoms():
+                atoms.append((atom.element, atom.get_coord()))
 
     with open(out, "w") as f:
         f.write(f"{len(atoms)}\n\n")
