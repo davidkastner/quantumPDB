@@ -517,8 +517,9 @@ def compute_charge(path_ligand, path_pdb):
             # to detect removed atoms
             # NO is corrected from NH2OH, thus the deleted 3 hydrogen shouldn't affect the charge
             for line in pdb_lines:
-                if line[17:20].strip() == res_name and line[21] == chain_id and line[22:26].strip() == res_id:
+                if line[17:20].strip() == res_name and line[21] == chain_id and line[22:26].strip() == res_id and line[0:3] != "TER":
                     cnt += 1
+        print(name, n_atom - cnt)
         charge[name] -= (n_atom - cnt)
     return charge
 
