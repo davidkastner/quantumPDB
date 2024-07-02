@@ -689,25 +689,20 @@ def compute_charge(spheres, structure, ligand_charge):
             ligand_key = f"{resname}_{res_id[2]}{res_id[3][1]}"
             if ligand_key not in ligand_charge:
                 if resname in pos and all(res.has_id(h) for h in pos[resname]):
-                    print(resname, "pos")
                     c += 1
                 elif resname in neg and all(not res.has_id(h) for h in neg[resname]):
-                    print(resname, "neg")
                     c -= 1
                 if Polypeptide.is_aa(res) and resname != "PRO" and all(not res.has_id(h) for h in ["H", "H2"]):
                     # TODO: termini
-                    print(resname, "backbone")
                     c -= 1
 
                 # Check for charged N-terminus
                 if res_id in n_terminals \
                     and res.has_id("N"): # exclude sugar chain terminus
-                    print(resname, "N")
                     c += 1
 
                 # Check for charged C-terminus
                 if res.has_id("OXT"):
-                    print(resname, "C")
                     c -= 1
 
         charge.append(c)
