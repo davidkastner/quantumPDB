@@ -412,7 +412,25 @@ def get_next_neighbors(
     return "_".join(sorted(metal_id)), seen, spheres
 
 
-def prune_atoms(center, residues, spheres, max_atom_count):
+def prune_atoms(center, residues, spheres, max_atom_count, ligands):
+    """
+    Prune residues from the cluster model to meet the max atom count constraint,
+    while keeping specified ligands and co-factors.
+
+    Parameters
+    ----------
+    center: set
+        Set of central residues
+    residues: set
+        Set of residues in the cluster
+    spheres: list of sets
+        List of residue sets, each corresponding to a coordination sphere
+    max_atom_count: int
+        Maximum allowed atom count in the cluster
+    ligands_to_keep: list
+        List of ligand names to keep in the cluster
+    """
+
     atom_cnt = 0
     for res in residues:
         atom_cnt += len(res)
@@ -427,10 +445,12 @@ def prune_atoms(center, residues, spheres, max_atom_count):
                    
     prune = set()
     for res in sorted(residues, key=dist, reverse=True):
-        prune.add(res)
-        atom_cnt -= len(res)
-        if atom_cnt <= max_atom_count:
-            break
+        # Check if the residue is in the ligands_to_keep list
+        if res.get_resname() not in ligands:
+            prune.add(res)
+            atom_cnt -= len(res)
+            if atom_cnt <= max_atom_count:
+                break
 
     residues -= prune
     for s in spheres:
@@ -814,7 +834,7 @@ def extract_clusters(
         os.makedirs(cluster_path, exist_ok=True)
 
         if max_atom_count is not None:
-            prune_atoms(c, residues, spheres, max_atom_count)
+            prune_atoms(c, residues, spheres, max_atom_count, ligands)
         if charge:
             aa_charge[metal_id] = compute_charge(spheres, structure, ligand_charge)
         if count:
