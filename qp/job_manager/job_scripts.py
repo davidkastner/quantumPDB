@@ -42,7 +42,7 @@ end
 
 
 
-def write_sge_jobscript(job_name, gpus, memory):
+def write_slurm_jobscript(job_name, gpus, memory):
     """Generate bash submission scripts with conditional sleep time."""
 
     jobscript_content = f"""#! /bin/bash
@@ -63,7 +63,7 @@ terachem qmscript.in > qmscript.out
 
     return jobscript_content
 
-def write_slurm_jobscript(job_name, gpus, memory):
+def write_sge_jobscript(job_name, gpus, memory):
     """Generate bash submission scripts with conditional sleep time."""
 
     jobscript_content = f"""#!/bin/bash

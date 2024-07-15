@@ -33,6 +33,7 @@ import os
 import requests
 import json
 import time
+import shutil
 from warnings import warn
 import numpy as np
 from Bio.PDB import PDBParser, PDBIO, Select, Polypeptide
@@ -410,7 +411,7 @@ def partial_res_info(res, res_info):
     return f'resname {resname}_{chain}{resid} with averaged occupancy {res_info[res]["avg_occupancy"]:.2f} and {res_info[res]["num_atom"]} atoms'
 
 
-def clean_partial_occupancy(path, path_new, center_residues):
+def clean_partial_occupancy(path, center_residues):
     parser = PDBParser(QUIET=True)
     io = PDBIO()
     structure = parser.get_structure("PDB", path)
@@ -457,8 +458,9 @@ def clean_partial_occupancy(path, path_new, center_residues):
     class ResSelect(Select):
         def accept_residue(self, residue):
             return (residue not in kept_partial_res) or kept_partial_res[residue]["kept"]
-
-    io.save(path_new, ResSelect())
+    
+    shutil.copy(path, f"{path[:-4]}_old.pdb")
+    io.save(path, ResSelect())
     return True
 
 

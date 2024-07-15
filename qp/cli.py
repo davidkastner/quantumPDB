@@ -63,6 +63,7 @@ def run(config):
     if modeller:
         from qp.structure import missing_loops
         optimize = config_data.get('optimize_select_residues', 1)
+        convert_to_oxo = config_data.get('convert_to_oxo', False)
 
     if coordination:
         from qp.cluster import coordination_spheres
@@ -136,6 +137,11 @@ def run(config):
                 missing_loops.write_alignment(residues, pdb, path, ali_path)
                 missing_loops.build_model(residues, pdb, path, ali_path, mod_path, optimize)
 
+            if convert_to_oxo:
+                click.echo("> Requested to convert AKG to reactive OXO and SUC")
+                from qp.structure.convert_to_oxo import add_oxo_and_suc
+                add_oxo_and_suc(mod_path)
+
         prot_path = f"{output}/{pdb}/Protoss"
         if protoss:
             if skip in ["protoss", "all"] and os.path.isfile(f"{prot_path}/{pdb}_protoss.pdb"):
@@ -159,9 +165,8 @@ def run(config):
                     click.echo("> Running Protoss")
                     if modeller:
                         path = mod_path
-                    cleaned_path = path[:-4] + "_new.pdb"
-                    if clean_partial_occupancy(path, cleaned_path, center_residues):
-                        path = cleaned_path
+                    clean_partial_occupancy(path, center_residues)
+
                     try:
                         pid = add_hydrogens.upload(path)
                     except ValueError:
@@ -171,11 +176,18 @@ def run(config):
                         #      number of atoms in output exceeds 99999
                         err["Protoss"].append(pdb)
                         continue
+                    
+                    protoss_pdb = f"{prot_path}/{pdb}_protoss.pdb"
                     job = add_hydrogens.submit(pid)
-                    add_hydrogens.download(job, f"{prot_path}/{pdb}_protoss.pdb", "protein")
+                    add_hydrogens.download(job, protoss_pdb, "protein")
                     add_hydrogens.download(job, f"{prot_path}/{pdb}_ligands.sdf", "ligands")
                     add_hydrogens.download(job, f"{prot_path}/{pdb}_log.txt", "log")
-                    add_hydrogens.repair_ligands(f"{prot_path}/{pdb}_protoss.pdb", path)
+                    add_hydrogens.repair_ligands(protoss_pdb, path)
+
+            if convert_to_oxo:
+                from qp.structure.convert_to_oxo import remove_oxo_hydrogens
+                remove_oxo_hydrogens(protoss_pdb)
+
 
         if coordination:
             click.echo("> Extracting clusters")
