@@ -138,7 +138,8 @@ def run(config):
                 missing_loops.build_model(residues, pdb, path, ali_path, mod_path, optimize)
 
             if convert_to_oxo:
-                click.echo("> Requested to convert AKG to reactive OXO and SUC")
+                click.echo("> Converting AKG to reactive OXO and SUC state")
+                click.echo("> OXO conversion requires a fresh `qp run` to work!\n")
                 from qp.structure.convert_to_oxo import add_oxo_and_suc
                 add_oxo_and_suc(mod_path)
 
@@ -178,15 +179,19 @@ def run(config):
                         continue
                     
                     protoss_pdb = f"{prot_path}/{pdb}_protoss.pdb"
+                    ligands_sdf = f"{prot_path}/{pdb}_ligands.sdf"
                     job = add_hydrogens.submit(pid)
                     add_hydrogens.download(job, protoss_pdb, "protein")
-                    add_hydrogens.download(job, f"{prot_path}/{pdb}_ligands.sdf", "ligands")
+                    add_hydrogens.download(job, ligands_sdf, "ligands")
                     add_hydrogens.download(job, f"{prot_path}/{pdb}_log.txt", "log")
                     add_hydrogens.repair_ligands(protoss_pdb, path)
 
             if convert_to_oxo:
-                from qp.structure.convert_to_oxo import remove_oxo_hydrogens
+                click.echo("> Removing hydrogens from OXO's")
+                from qp.structure.convert_to_oxo import remove_oxo_hydrogens, update_ligands_sdf
                 remove_oxo_hydrogens(protoss_pdb)
+                click.echo("> Adding OXO to ligands.sdf")
+                update_ligands_sdf(protoss_pdb, ligands_sdf)
 
 
         if coordination:
@@ -218,7 +223,8 @@ def run(config):
             )
 
             if charge:
-                with open(f"{output}/{pdb}/charge.csv", "a") as f:
+                charge_csv_path = f"{output}/{pdb}/charge.csv"
+                with open(charge_csv_path, "a") as f:
                     f.write("\n")
                     for k, v in sorted(ligand_charge.items()):
                         f.write(f"{k},{v}\n")
