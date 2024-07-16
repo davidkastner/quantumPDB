@@ -33,20 +33,27 @@ def write_pdb(atoms, pdb_path):
             if atom['record'] != 'DELETE':
                 file.write(f"{atom['record']:<6}{atom['serial']:>5} {atom['name']:<4}{atom['altLoc']:<1}{atom['resName']:<3} {atom['chainID']:<1}{atom['resSeq']:>4}{atom['iCode']:<1}   {atom['x']:>8.3f}{atom['y']:>8.3f}{atom['z']:>8.3f}{atom['occupancy']:>6.2f}{atom['tempFactor']:>6.2f}          {atom['element']:>2}{atom['charge']:>2}\n")
 
-def find_and_convert_waters_to_oxo(atoms, iron_names, distance_cutoff=2.5):
-    oxo_placed = False
+def find_and_convert_ligands_to_oxo(atoms, iron_names, distance_cutoff=2.5):
+    ligands_to_convert = {'HOH': 'O', 'WAT': 'O', 'HOA': 'N', 'NO': 'N'}
+    oxo_placed = set()
+
     for iron in atoms:
         if iron['name'] in iron_names:
             iron_coord = np.array([iron['x'], iron['y'], iron['z']])
-            for water in atoms:
-                if water['resName'] in ['HOH', 'WAT'] and water['name'] == 'O':
-                    water_coord = np.array([water['x'], water['y'], water['z']])
-                    distance = np.linalg.norm(iron_coord - water_coord)
+            for ligand in atoms:
+                if ligand['resName'] in ligands_to_convert and ligand['name'] == ligands_to_convert[ligand['resName']]:
+                    ligand_coord = np.array([ligand['x'], ligand['y'], ligand['z']])
+                    distance = np.linalg.norm(iron_coord - ligand_coord)
                     if distance <= distance_cutoff:
-                        water['resName'] = 'OXO'
-                        water['x'], water['y'], water['z'] = iron_coord + 1.6 * (water_coord - iron_coord) / distance
-                        print(f'   > Converted {water["serial"]} HOH/WAT to OXO at distance {distance}')
-                        oxo_placed = True
+                        ligand['resName'] = 'OXO'
+                        ligand['name'] = 'O'
+                        ligand['element'] = 'O'
+                        ligand['x'], ligand['y'], ligand['z'] = iron_coord + 1.6 * (ligand_coord - iron_coord) / distance
+                        for other_atom in atoms:
+                            if other_atom['resSeq'] == ligand['resSeq'] and other_atom['chainID'] == ligand['chainID'] and other_atom['serial'] != ligand['serial']:
+                                other_atom['record'] = 'DELETE'
+                        oxo_placed.add(iron['serial'])
+                        print(f'   > Converted {ligand["serial"]} {ligand["resName"]}/{ligand["resName"]} to OXO at distance {round(distance, 2)}')
                         break
     return oxo_placed
 
@@ -57,9 +64,10 @@ def find_histidines(atoms, iron):
         if residue['resName'] == 'HIS' and residue['name'] == 'NE2':
             ne2_coord = np.array([residue['x'], residue['y'], residue['z']])
             distance = np.linalg.norm(iron_coord - ne2_coord)
-            if distance <= 2.5:
+            coordination_cutoff_for_his = 3.0
+            if distance <= coordination_cutoff_for_his:
                 histidines.append(residue)
-    print(f"   > Found {len(histidines)} histidines coordinating iron {iron['serial']}.")
+    print(f"   > Found {len(histidines)} His coordinating iron {iron['serial']}")
     return histidines
 
 def calculate_dihedral(p1, p2, p3, p4):
@@ -80,7 +88,7 @@ def calculate_dihedral(p1, p2, p3, p4):
 def place_oxo_manually(atoms, iron):
     histidines = find_histidines(atoms, iron)
     if len(histidines) != 2:
-        print(f"   > Error: Expected exactly two histidines coordinating the iron {iron['serial']}.")
+        print(f"   > Error: Expected two His coordinating iron {iron['serial']}")
         return False
 
     iron_coord = np.array([iron['x'], iron['y'], iron['z']])
@@ -89,7 +97,7 @@ def place_oxo_manually(atoms, iron):
     for ne2 in histidines:
         ne2_coord = np.array([ne2['x'], ne2['y'], ne2['z']])
         oxo_coord = iron_coord + 1.6 * (iron_coord - ne2_coord) / np.linalg.norm(iron_coord - ne2_coord)
-        print(f"  > Checking potential oxo site at {oxo_coord} opposite to histidine {ne2['serial']}.")
+        print(f"   > Checking potential oxo site opposite His {ne2['serial']}")
 
         clash_threshold = 1.8
         clash = False
@@ -98,18 +106,18 @@ def place_oxo_manually(atoms, iron):
                 distance = np.linalg.norm(np.array([atom['x'], atom['y'], atom['z']]) - oxo_coord)
                 if distance < clash_threshold:
                     clash = True
-                    print(f"  > Clash found with atom {atom['serial']} ({atom['name']} {atom['resName']}) at distance {distance}")
+                    print(f"   > Clash found with atom {atom['serial']} ({atom['name']} {atom['resName']}) at distance {round(distance, 2)}")
                     break
         if not clash:
             potential_oxos.append((oxo_coord, ne2['serial']))
-            print(f"   > Potential oxo site at {oxo_coord} from histidine {ne2['serial']}.")
+            print(f"   > Potential oxo site opposite His {ne2['serial']}.")
 
     # Find AKG coordinates for dihedral calculation
     try:
         akg_c2 = next(atom for atom in atoms if atom['resName'] == 'AKG' and atom['name'] == 'C2')
         akg_o5 = next(atom for atom in atoms if atom['resName'] == 'AKG' and atom['name'] == 'O5')
     except StopIteration:
-        print("   > Error: Could not find required AKG atoms (C2 and O5) for dihedral calculation.")
+        print("   > Error: Could not find AKG atoms (C2 and O5) for dihedral calculation.")
         return False
     
     c2_coord = np.array([akg_c2['x'], akg_c2['y'], akg_c2['z']])
@@ -123,18 +131,18 @@ def place_oxo_manually(atoms, iron):
         ne2_coord = np.array([ne2['x'], ne2['y'], ne2['z']])
         oxo_coord = iron_coord + 1.6 * (iron_coord - ne2_coord) / np.linalg.norm(iron_coord - ne2_coord)
         dihedral = abs(calculate_dihedral(c2_coord, o5_coord, iron_coord, oxo_coord))
-        print(f"   > Dihedral angle for potential site opposite histidine {ne2['serial']} at {oxo_coord}: {dihedral}")
+        print(f"   > Dihedral angle for potential OXO site opposite His {ne2['serial']}: {round(dihedral, 2)}")
 
     # Select the best site among the non-clashing ones
     for oxo_coord, _ in potential_oxos:
         dihedral = abs(calculate_dihedral(c2_coord, o5_coord, iron_coord, oxo_coord))
-        print(f"   > Dihedral angle for non-clashing site {oxo_coord}: {dihedral}")
+        print(f"   > Dihedral angle for non-clashing site: {round(dihedral, 2)}")
         if best_dihedral is None or abs(dihedral - 90) < abs(best_dihedral - 90):
             best_site = oxo_coord
             best_dihedral = dihedral
 
     if best_site is None:
-        print("   > Error: Could not determine the best site for OXO.")
+        print("   > Error: Could not determine the best site for OXO")
         return False
 
     oxo = {
@@ -155,7 +163,8 @@ def place_oxo_manually(atoms, iron):
         'charge': ''
     }
     atoms.append(oxo)
-    print(f'   > Placed OXO manually at {best_site} with dihedral {best_dihedral}')
+    rounded_best_site = [round(num, 2) for num in best_site]
+    print(f'   > OXO placed at {rounded_best_site} with dihedral {round(best_dihedral, 2)}\n')
     return True
 
 def convert_akg_to_suc(atoms):
@@ -184,24 +193,16 @@ def add_oxo_and_suc(pdb_path):
     
     iron_names = ['FE', 'FE2', 'FE3']
     
-    any_oxo_placed = False
-
+    oxo_placed = find_and_convert_ligands_to_oxo(atoms, iron_names)
+    
     for iron in atoms:
-        if iron['name'] in iron_names:
-            oxo_placed = find_and_convert_waters_to_oxo(atoms, iron_names)
-            if oxo_placed:
-                any_oxo_placed = True
+        if iron['name'] in iron_names and iron['serial'] not in oxo_placed:
+            oxo_placed_manually = place_oxo_manually(atoms, iron)
+            if oxo_placed_manually:
+                oxo_placed.add(iron['serial'])
 
-    # Only attempt manual placement if no oxo was placed from waters
-    if not any_oxo_placed:
-        for iron in atoms:
-            if iron['name'] in iron_names:
-                oxo_placed = place_oxo_manually(atoms, iron)
-                if oxo_placed:
-                    any_oxo_placed = True
-
-    if not any_oxo_placed:
-        print("   > Error: Could not place oxo group.")
+    if not oxo_placed:
+        print("   > Error: Could not place OXO")
 
     convert_akg_to_suc(atoms)
     atoms = [atom for atom in atoms if atom['record'] != 'DELETE']
@@ -225,3 +226,17 @@ def remove_oxo_hydrogens(protoss_pdb):
     io = PDBIO()
     io.set_structure(structure)
     io.save(protoss_pdb)
+
+def update_ligands_sdf(pdb_path, sdf_path):
+    atoms = read_pdb(pdb_path)
+    oxo_atoms = [atom for atom in atoms if atom['resName'] == 'OXO']
+
+    with open(sdf_path, 'a') as sdf_file:
+        for oxo in oxo_atoms:
+            sdf_file.write(f"{oxo['resName']}_{oxo['chainID']}_{oxo['resSeq']}\n")
+            sdf_file.write("Generated by script\n")
+            sdf_file.write(" QuantumPDB\n")
+            sdf_file.write(" 1 0  0  0  0  0            999 V2000\n")
+            sdf_file.write(f"   {oxo['x']:>10.4f}{oxo['y']:>10.4f}{oxo['z']:>10.4f} O   0  0  0  0  0  0  0  0  0  0  0  0\n")
+            sdf_file.write(f"M  CHG  1   1  -2\n")
+            sdf_file.write("M  END\n$$$$\n")
