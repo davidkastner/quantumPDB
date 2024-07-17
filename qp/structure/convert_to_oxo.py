@@ -102,7 +102,7 @@ def place_oxo_manually(atoms, iron):
         clash_threshold = 1.8
         clash = False
         for atom in atoms:
-            if atom['serial'] != iron['serial']:  # Exclude the iron itself from the clash detection
+            if atom['serial'] != iron['serial'] and not (atom['resName'] == 'AKG' and atom['name'] in ['C1', 'O1', 'O2']):  # Exclude specific AKG atoms from clash detection
                 distance = np.linalg.norm(np.array([atom['x'], atom['y'], atom['z']]) - oxo_coord)
                 if distance < clash_threshold:
                     clash = True
