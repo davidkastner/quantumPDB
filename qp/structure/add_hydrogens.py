@@ -34,6 +34,7 @@ import requests
 import json
 import time
 import shutil
+from queue import Queue
 from warnings import warn
 import numpy as np
 from Bio.PDB import PDBParser, PDBIO, Select, Polypeptide
@@ -396,7 +397,9 @@ def adjust_activesites(path, metals):
 
 
 def res_priority(res, res_info, center_residues):
-    if Polypeptide.is_aa(res, standard=True) or res.get_resname() in center_residues:
+    if res.get_resname() in center_residues:
+        return 8e7
+    elif Polypeptide.is_aa(res, standard=True):
         return 4e7
     else:
         return res_info[res]["num_atom"] + \
@@ -427,33 +430,55 @@ def clean_partial_occupancy(path, center_residues):
                     kept_partial_res[res] = {
                         "avg_occupancy": atom_occupancy,
                         "num_atom": len(res),
-                        "kept": True
+                        "kept": True,
+                        "search_radius": 1.0 if res.get_resname() in center_residues else 2.5 # allow for bonding to center, otherwise vdw
                     }
                 else:
                     kept_partial_res[res]["avg_occupancy"] += atom_occupancy
     if not partial_atom_list:
         return False
+    search = NeighborSearch(partial_atom_list)
     for res in kept_partial_res:
         kept_partial_res[res]["avg_occupancy"] /= kept_partial_res[res]["num_atom"]
+    check_queue = Queue()
     for res in kept_partial_res:
-        if not kept_partial_res[res]["kept"]:
+        check_queue.put(res)
+    while not check_queue.empty():
+        res = check_queue.get()
+        if not kept_partial_res[res]["kept"]: # deleted res
             continue
-        search = NeighborSearch(partial_atom_list)
+        recheck_res = set()
         for atom in res:
-            if not kept_partial_res[res]["kept"]:
-                break
-            for clash_res in search.search(center=atom.get_coord(), radius=3, level="R"):
-                if clash_res == res or not kept_partial_res[clash_res]["kept"]:
+            for clash_res in search.search(center=atom.get_coord(), radius=kept_partial_res[res]["search_radius"], level="R"):
+                if (
+                    clash_res == res or # self
+                    not kept_partial_res[clash_res]["kept"] # deleted res
+                ):
+                    continue
+                # if search center is not center res, reconsider res-clash_res pair from center res's point of view
+                if clash_res.get_resname() in center_residues:
+                    if clash_res not in kept_partial_res:
+                        # put center res in partial res list
+                        kept_partial_res[clash_res] = {
+                            "avg_occupancy": 1.0,
+                            "num_atom": len(res),
+                            "kept": True,
+                            "search_radius": 1.0
+                        }
+                    recheck_res.add(clash_res)
                     continue
                 p1 = res_priority(res, kept_partial_res, center_residues)
                 p2 = res_priority(clash_res, kept_partial_res, center_residues)
                 if p1 > p2:
                     kept_partial_res[clash_res]["kept"] = False
-                    warn(f"{partial_res_info(clash_res, kept_partial_res)} is deleted in comparison with {partial_res_info(res, kept_partial_res)}")
+                    print(f"{partial_res_info(clash_res, kept_partial_res)} is deleted in comparison with {partial_res_info(res, kept_partial_res)} in search radius {kept_partial_res[res]['search_radius']}")
                 elif p1 < p2:
                     kept_partial_res[res]["kept"] = False
-                    warn(f"{partial_res_info(res, kept_partial_res)} is deleted in comparison with {partial_res_info(clash_res, kept_partial_res)}")
+                    print(f"{partial_res_info(res, kept_partial_res)} is deleted in comparison with {partial_res_info(clash_res, kept_partial_res)} in search radius {kept_partial_res[res]['search_radius']}")
                     break
+        for res in recheck_res:
+            print("Recheck", res)
+            check_queue.put(res)
 
     class ResSelect(Select):
         def accept_residue(self, residue):
@@ -461,6 +486,7 @@ def clean_partial_occupancy(path, center_residues):
     
     shutil.copy(path, f"{path[:-4]}_old.pdb")
     io.save(path, ResSelect())
+    print("Partial occupancy cleaning finished")
     return True
 
 
