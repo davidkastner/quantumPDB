@@ -50,6 +50,27 @@ def residue_exists(sphere_path, res_name, chain, res_id):
     return False
 
 
+def ligand_in_spheres(ligand, structure_dir, num_sphere):
+    ligand_residues = ligand.split()
+    partial_found = False
+    for ligand_residue in ligand_residues:
+        res_name, res_id_full = ligand_residue.split('_')
+        chain = res_id_full[0]
+        res_id = int(res_id_full[1:])
+
+        for i in range(num_sphere + 1):
+            sphere_path = os.path.join(structure_dir, f"{i}.pdb")
+            if residue_exists(sphere_path, res_name, chain, res_id):
+                partial_found = True
+                break
+        else: # if ligand residue is not found in any sphere
+            if len(ligand_residues) > 1 and partial_found:
+                print(f"For oligomer ligand {ligand}, {ligand_residue} is partially found in spheres. This will cause unpredictable charge error!")
+                pass
+            return False
+    return True
+
+
 def get_electronic(pdb_id, master_list):
     """Query the local pdb master list CSV file."""
 
@@ -109,13 +130,8 @@ def get_charge(structure_dir=None):
             # Parse charge.csv section 2
             elif section == 2:
                 ligand, value = line.split(',')
-                res_name, res_id_full = ligand.split()[0].split('_')
-                chain = res_id_full[0]
-                res_id = int(res_id_full[1:])
-                for i in range(num_sphere + 1):
-                    sphere_path = os.path.join(structure_dir, f"{i}.pdb")
-                    if residue_exists(sphere_path, res_name, chain, res_id):
-                        charge += int(value)
+                if ligand_in_spheres(ligand, structure_dir, num_sphere):
+                    charge += int(value)                  
 
     spin = 0
     if os.path.exists(spin_csv_path):
@@ -125,13 +141,8 @@ def get_charge(structure_dir=None):
                 if not line:
                     continue
                 ligand, value = line.split(',')
-                res_name, res_id_full = ligand.split('_')
-                chain = res_id_full[0]
-                res_id = int(res_id_full[1:])
-                for i in range(num_sphere + 1):
-                    sphere_path = os.path.join(structure_dir, f"{i}.pdb")
-                    if residue_exists(sphere_path, res_name, chain, res_id):
-                        spin += int(value)
+                if ligand_in_spheres(ligand, structure_dir, num_sphere):
+                    spin += int(value)   
     
     return charge, spin
 
