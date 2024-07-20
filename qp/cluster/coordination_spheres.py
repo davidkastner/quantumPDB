@@ -687,7 +687,8 @@ def compute_charge(spheres, structure, ligand_charge):
         "ARG": ["HE", "HH11", "HH12", "HH21", "HH22"],
         "LYS": ["HZ1", "HZ2", "HZ3"],
         "HIS": ["HD1", "HD2", "HE1", "HE2"],
-        "MLZ": []
+        "MLZ": [],
+        "M3Z": []
     }
     neg = {
         "ASP": ["HD2", "HOD1", "HOD2"],

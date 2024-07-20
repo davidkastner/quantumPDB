@@ -6,7 +6,7 @@ protoss: true                          # Assign protonation states
 coordination: true                     # Generate clusters
 skip: all                              # Skip 'modeller', 'protoss', or 'all' jobs if they already exist
 optimize_select_residues: 1            # Modeller to model no (0), missing (1), or all (2) residues
-convert_to_oxo: false                   # Used to convert A-KG NHIEs to Succinate-Oxo NHIEs, usually False
+convert_to_oxo: true                   # Used to convert A-KG NHIEs to Succinate-Oxo NHIEs, usually False
 
 # Cluster model parameters
 max_atom_count: 750            
