@@ -137,11 +137,15 @@ def run(config):
                 missing_loops.write_alignment(residues, pdb, path, ali_path)
                 missing_loops.build_model(residues, pdb, path, ali_path, mod_path, optimize)
 
+            if convert_to_oxo:
+                click.echo("> Converting AKG to reactive OXO and SIN state")
+                click.echo("> OXO conversion requires a fresh `qp run` to work!\n")
+                from qp.structure.convert_to_oxo import add_oxo_and_sin
+                add_oxo_and_sin(mod_path)
+
         prot_path = f"{output}/{pdb}/Protoss"
         if protoss:
-            protoss_pdb = f"{prot_path}/{pdb}_protoss.pdb"
-            ligands_sdf = f"{prot_path}/{pdb}_ligands.sdf"
-            if skip in ["protoss", "all"] and os.path.isfile(protoss_pdb):
+            if skip in ["protoss", "all"] and os.path.isfile(f"{prot_path}/{pdb}_protoss.pdb"):
                 click.echo("> Protoss file found")
             else:
                 import qp
@@ -154,8 +158,8 @@ def run(config):
                 if prepared_flag:
                     os.makedirs(prot_path, exist_ok=True)
                     from shutil import copy
-                    copy(os.path.join(prepared_prot_path, f"{pdbl}_protoss.pdb"), protoss_pdb)
-                    copy(os.path.join(prepared_prot_path, f"{pdbl}_ligands.sdf"), ligands_sdf)
+                    copy(os.path.join(prepared_prot_path, f"{pdbl}_protoss.pdb"), f"{prot_path}/{pdb}_protoss.pdb")
+                    copy(os.path.join(prepared_prot_path, f"{pdbl}_ligands.sdf"), f"{prot_path}/{pdb}_ligands.sdf")
                     click.echo("> Using pre-prepared protoss file")
                 else:
                     from qp.structure.add_hydrogens import clean_partial_occupancy
@@ -174,6 +178,8 @@ def run(config):
                         err["Protoss"].append(pdb)
                         continue
                     
+                    protoss_pdb = f"{prot_path}/{pdb}_protoss.pdb"
+                    ligands_sdf = f"{prot_path}/{pdb}_ligands.sdf"
                     job = add_hydrogens.submit(pid)
                     add_hydrogens.download(job, protoss_pdb, "protein")
                     add_hydrogens.download(job, ligands_sdf, "ligands")
@@ -181,24 +187,11 @@ def run(config):
                     add_hydrogens.repair_ligands(protoss_pdb, path)
 
             if convert_to_oxo:
-                click.echo("> Converting AKG to reactive OXO and SIN state")
-                from qp.structure.convert_to_oxo import add_oxo_and_sin
-                add_oxo_and_sin(protoss_pdb)
                 click.echo("> Removing hydrogens from OXO's")
-                
-                from qp.structure.convert_to_oxo import remove_oxo_hydrogens, update_oxo_sdf, update_sin_sdf
+                from qp.structure.convert_to_oxo import remove_oxo_hydrogens, update_ligands_sdf
                 remove_oxo_hydrogens(protoss_pdb)
-                
                 click.echo("> Adding OXO to ligands.sdf")
-                update_oxo_sdf(protoss_pdb, ligands_sdf)
-                
-                click.echo("> Updating SIN in ligands.sdf")
-                sin_ligands_sdf = f"{prot_path}/{pdb}_ligands_sin.sdf"
-                click.echo("> Uploading new succinate structure to Protoss")
-                pid = add_hydrogens.upload(protoss_pdb)
-                job = add_hydrogens.submit(pid) # Send Protoss the new SIN ligands
-                add_hydrogens.download(job, sin_ligands_sdf, "ligands") # Get the .sdf file for the SIN ligands
-                update_sin_sdf(ligands_sdf, sin_ligands_sdf)
+                update_ligands_sdf(protoss_pdb, ligands_sdf)
 
 
         if coordination:

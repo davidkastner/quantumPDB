@@ -33,7 +33,7 @@ def write_pdb(atoms, pdb_path):
             if atom['record'] != 'DELETE':
                 file.write(f"{atom['record']:<6}{atom['serial']:>5} {atom['name']:<4}{atom['altLoc']:<1}{atom['resName']:<3} {atom['chainID']:<1}{atom['resSeq']:>4}{atom['iCode']:<1}   {atom['x']:>8.3f}{atom['y']:>8.3f}{atom['z']:>8.3f}{atom['occupancy']:>6.2f}{atom['tempFactor']:>6.2f}          {atom['element']:>2}{atom['charge']:>2}\n")
 
-def find_and_convert_ligands_to_oxo(atoms, iron_names, distance_cutoff=2.8):
+def find_and_convert_ligands_to_oxo(atoms, iron_names, distance_cutoff=2.5):
     ligands_to_convert = {'HOH': 'O', 'WAT': 'O', 'HOA': 'N', 'NO': 'N'}
     oxo_placed = set()
 
@@ -227,7 +227,7 @@ def remove_oxo_hydrogens(protoss_pdb):
     io.set_structure(structure)
     io.save(protoss_pdb)
 
-def update_oxo_sdf(pdb_path, sdf_path):
+def update_ligands_sdf(pdb_path, sdf_path):
     atoms = read_pdb(pdb_path)
     oxo_atoms = [atom for atom in atoms if atom['resName'] == 'OXO']
 
@@ -240,39 +240,3 @@ def update_oxo_sdf(pdb_path, sdf_path):
             sdf_file.write(f"   {oxo['x']:>10.4f}{oxo['y']:>10.4f}{oxo['z']:>10.4f} O   0  0  0  0  0  0  0  0  0  0  0  0\n")
             sdf_file.write(f"M  CHG  1   1  -2\n")
             sdf_file.write("M  END\n$$$$\n")
-
-def update_sin_sdf(akg_sdf_path, sin_sdf_path):
-    # Read the old SDF file and remove AKG entries
-    with open(akg_sdf_path, 'r') as old_sdf_file:
-        old_sdf_lines = old_sdf_file.readlines()
-
-    filtered_old_sdf_lines = []
-    i = 0
-    while i < len(old_sdf_lines):
-        if old_sdf_lines[i].startswith("AKG"):
-            while i < len(old_sdf_lines) and not old_sdf_lines[i].strip() == "$$$$":
-                i += 1
-            i += 1  # Skip the "$$$$"
-        else:
-            filtered_old_sdf_lines.append(old_sdf_lines[i])
-            i += 1
-
-    # Read the temporary SIN SDF file
-    with open(sin_sdf_path, 'r') as temp_sin_sdf_file:
-        sin_sdf_lines = temp_sin_sdf_file.readlines()
-
-    # Filter SIN entries
-    filtered_sin_sdf_lines = []
-    i = 0
-    while i < len(sin_sdf_lines):
-        if sin_sdf_lines[i].startswith("SIN"):
-            while i < len(sin_sdf_lines) and not sin_sdf_lines[i].strip() == "$$$$":
-                filtered_sin_sdf_lines.append(sin_sdf_lines[i])
-                i += 1
-            filtered_sin_sdf_lines.append(sin_sdf_lines[i])  # Append the "$$$$"
-        i += 1
-
-    # Write the updated SDF file with SIN entries
-    with open(akg_sdf_path, 'w') as sdf_file:
-        sdf_file.writelines(filtered_old_sdf_lines)
-        sdf_file.writelines(filtered_sin_sdf_lines)
