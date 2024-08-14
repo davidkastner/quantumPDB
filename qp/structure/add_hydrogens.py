@@ -532,7 +532,7 @@ def compute_charge(path_ligand, path_pdb):
             if line.startswith("M  RGP"):
                 # R# atom is found in the addition between CSO and TAN
                 # It's not a real atom and recorded in the RGP entry
-                n_atom -= sum([int(x) for x in line.split()[4::2]])
+                n_atom -= int(line.split()[2])
             if line.startswith("M  CHG"):
                 c += sum([int(x) for x in line.split()[4::2]])
                 break
