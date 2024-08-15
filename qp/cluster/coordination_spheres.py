@@ -21,10 +21,13 @@ performed by specifying ``capping`` in ``coordination_spheres.extract_clusters``
 """
 
 import os
+from typing import Set, Literal, Optional
 import numpy as np
 from Bio.PDB import PDBParser, Polypeptide, PDBIO, Select
 from Bio.PDB.Atom import Atom
 from Bio.PDB.Residue import Residue
+from Bio.PDB.Chain import Chain
+from Bio.PDB.Model import Model
 from Bio.PDB.NeighborSearch import NeighborSearch
 from scipy.spatial import Voronoi
 from qp.structure import struct_to_file
@@ -484,7 +487,12 @@ def scale_hydrogen(a, b, scale):
     return scale * (q - p) + p
 
 
-def build_hydrogen(chain, parent, template, atom):
+def get_normalized_vector(atom1: Atom, atom2: Atom) -> np.array:
+    v = atom2.get_coord() - atom1.get_coord()
+    return v / np.linalg.norm(v)
+
+
+def build_hydrogen(parent: Residue, template: Optional[Residue], atom: Literal["N", "C"]):
     """
     Cap with hydrogen, building based on the upstream or downstream residue
 
@@ -504,10 +512,25 @@ def build_hydrogen(chain, parent, template, atom):
     res: Bio.PDB.Residue
         Residue containing added hydrogen
     """
-    if atom == "N":
-        pos = scale_hydrogen(parent["N"], template["C"], 1 / 1.32)
+    if template is not None:
+        if atom == "N":
+            pos = scale_hydrogen(parent["N"], template["C"], 1 / 1.32)
+        else:
+            pos = scale_hydrogen(parent["C"], template["N"], 1.09 / 1.32)
     else:
-        pos = scale_hydrogen(parent["C"], template["N"], 1.09 / 1.32)
+        CA = parent["CA"]
+        if atom == "N":
+            N = parent["N"]
+            H = parent["H"]
+            bis = get_normalized_vector(N, CA) + get_normalized_vector(N, H)
+            bis /= np.linalg.norm(bis)
+            pos = N.get_coord() - bis
+        else:
+            C = parent["C"]
+            O = parent["O"]
+            bis = get_normalized_vector(C, CA) + get_normalized_vector(C, O)
+            bis /= np.linalg.norm(bis)
+            pos = C.get_coord() - bis * 1.09
 
     for name in ["H1", "H2", "H3"]:
         if name not in parent:
@@ -574,7 +597,20 @@ def build_heavy(chain, parent, template, atom):
     return res
 
 
-def cap_chains(model, residues, capping):
+def check_atom_valence(res: Residue, tree: NeighborSearch, atom: Literal["N", "C"], cn: int) -> bool:
+    neighbors = tree.search(res[atom].get_coord(), radius=1.8)
+    if len(neighbors) > cn:
+        return True
+    else:
+        for neighbor in neighbors:
+            if neighbor.get_name() == "C" and atom == "N":
+                return True
+            elif neighbor.get_name() == "N" and atom == "C":
+                return True
+    return False 
+
+
+def cap_chains(model: Model, residues: Set[Residue], capping: int) -> Set[Residue]:
     """
     Cap chain breaks for a set of extracted residues
 
@@ -604,6 +640,7 @@ def cap_chains(model, residues, capping):
 
         res_id = res.get_full_id()
         chain = model[res_id[2]]
+        chain_tree = NeighborSearch(list(chain.get_atoms()))
         chain_list = orig_chains[chain.get_id()]
         ind = chain_list.index(res)
 
@@ -616,9 +653,11 @@ def cap_chains(model, residues, capping):
                 and Polypeptide.is_aa(pre)
             ):  # ignores hetero residues
                 if capping == 1:
-                    cap_residues.add(build_hydrogen(chain, res, pre, "N"))
+                    cap_residues.add(build_hydrogen(res, pre, "N"))
                 else:
-                    cap_residues.add(build_heavy(chain, res, pre, "N"))
+                    cap_residues.add(build_heavy(res, pre, "N"))
+            elif not check_atom_valence(res, chain_tree, "N", 3):
+                cap_residues.add(build_hydrogen(res, None, "N"))
 
         if ind < len(chain_list) - 1:
             nxt = chain_list[ind + 1]
@@ -629,9 +668,11 @@ def cap_chains(model, residues, capping):
                 and Polypeptide.is_aa(nxt)
             ):
                 if capping == 1:
-                    cap_residues.add(build_hydrogen(chain, res, nxt, "C"))
+                    cap_residues.add(build_hydrogen(res, nxt, "C"))
                 else:
-                    cap_residues.add(build_heavy(chain, res, nxt, "C"))
+                    cap_residues.add(build_heavy(res, nxt, "C"))
+            elif not check_atom_valence(res, chain_tree, "N", 3):
+                cap_residues.add(build_hydrogen(res, None, "C"))
 
     return cap_residues
 
