@@ -655,7 +655,6 @@ def cap_chains(model: Model, residues: Set[Residue], capping: int) -> Set[Residu
                 else:
                     cap_residues.add(build_heavy(res, pre, "N"))
             elif not check_atom_valence(res, chain_tree, "N", 3):
-                print(chain, nxt.get_id(), res_id)
                 cap_residues.add(build_hydrogen(res, None, "N"))
 
         if ind < len(chain_list) - 1:
