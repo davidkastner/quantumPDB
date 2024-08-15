@@ -210,11 +210,13 @@ def get_center_residues(model, center_residues, merge_cutoff=0.0):
     found = set()
     center_atoms = []
     for res in model.get_residues():
-        if res.get_resname() in center_residues:
+        # We will assume the ligand is labeled as a heteroatom with res.id[0] != ' '
+        if res.get_resname() in center_residues and res.id[0] != ' ':
             found.add(res)
             center_atoms.extend([atom for atom in res.get_unpacked_list() if atom.element != "H"])
     if not len(center_atoms):
-        raise ValueError("No matching cluster centers found")
+        print("> WARNING: No matching cluster center found. Skipping cluster.")
+        return []
     
     search = NeighborSearch(center_atoms)
     seen = set()

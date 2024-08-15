@@ -48,7 +48,7 @@ def find_and_convert_ligands_to_oxo(atoms, iron_names, distance_cutoff=2.8):
                         ligand['resName'] = 'OXO'
                         ligand['name'] = 'O'
                         ligand['element'] = 'O'
-                        ligand['x'], ligand['y'], ligand['z'] = iron_coord + 1.6 * (ligand_coord - iron_coord) / distance
+                        ligand['x'], ligand['y'], ligand['z'] = iron_coord + 1.65 * (ligand_coord - iron_coord) / distance
                         for other_atom in atoms:
                             if other_atom['resSeq'] == ligand['resSeq'] and other_atom['chainID'] == ligand['chainID'] and other_atom['serial'] != ligand['serial']:
                                 other_atom['record'] = 'DELETE'
@@ -88,7 +88,7 @@ def calculate_dihedral(p1, p2, p3, p4):
 def place_oxo_manually(atoms, iron):
     histidines = find_histidines(atoms, iron)
     if len(histidines) != 2:
-        print(f"   > Error: Expected two His coordinating iron {iron['serial']}")
+        print(f"> Error: Expected two His coordinating iron {iron['serial']}")
         return False
 
     iron_coord = np.array([iron['x'], iron['y'], iron['z']])
@@ -96,28 +96,28 @@ def place_oxo_manually(atoms, iron):
 
     for ne2 in histidines:
         ne2_coord = np.array([ne2['x'], ne2['y'], ne2['z']])
-        oxo_coord = iron_coord + 1.6 * (iron_coord - ne2_coord) / np.linalg.norm(iron_coord - ne2_coord)
-        print(f"   > Checking potential oxo site opposite His {ne2['serial']}")
+        oxo_coord = iron_coord + 1.65 * (iron_coord - ne2_coord) / np.linalg.norm(iron_coord - ne2_coord)
+        print(f"> Checking potential oxo site opposite His {ne2['serial']}")
 
-        clash_threshold = 1.8
+        clash_threshold = 1.2
         clash = False
         for atom in atoms:
             if atom['serial'] != iron['serial'] and not (atom['resName'] == 'AKG' and atom['name'] in ['C1', 'O1', 'O2']):  # Exclude specific AKG atoms from clash detection
                 distance = np.linalg.norm(np.array([atom['x'], atom['y'], atom['z']]) - oxo_coord)
                 if distance < clash_threshold:
                     clash = True
-                    print(f"   > Clash found with atom {atom['serial']} ({atom['name']} {atom['resName']}) at distance {round(distance, 2)}")
+                    print(f"> Clash found with atom {atom['serial']} ({atom['name']} {atom['resName']}) at distance {round(distance, 2)}")
                     break
         if not clash:
             potential_oxos.append((oxo_coord, ne2['serial']))
-            print(f"   > Potential oxo site opposite His {ne2['serial']}.")
+            print(f"> Potential oxo site opposite His {ne2['serial']}.")
 
     # Find AKG coordinates for dihedral calculation
     try:
         akg_c2 = next(atom for atom in atoms if atom['resName'] == 'AKG' and atom['name'] == 'C2')
         akg_o5 = next(atom for atom in atoms if atom['resName'] == 'AKG' and atom['name'] == 'O5')
     except StopIteration:
-        print("   > Error: Could not find AKG atoms (C2 and O5) for dihedral calculation.")
+        print("> Error: Could not find AKG atoms (C2 and O5) for dihedral calculation.")
         return False
     
     c2_coord = np.array([akg_c2['x'], akg_c2['y'], akg_c2['z']])
@@ -129,20 +129,20 @@ def place_oxo_manually(atoms, iron):
     # Calculate dihedral for all potential sites, including clashing ones
     for ne2 in histidines:
         ne2_coord = np.array([ne2['x'], ne2['y'], ne2['z']])
-        oxo_coord = iron_coord + 1.6 * (iron_coord - ne2_coord) / np.linalg.norm(iron_coord - ne2_coord)
+        oxo_coord = iron_coord + 1.65 * (iron_coord - ne2_coord) / np.linalg.norm(iron_coord - ne2_coord)
         dihedral = abs(calculate_dihedral(c2_coord, o5_coord, iron_coord, oxo_coord))
-        print(f"   > Dihedral angle for potential OXO site opposite His {ne2['serial']}: {round(dihedral, 2)}")
+        print(f"> Dihedral angle for potential OXO site opposite His {ne2['serial']}: {round(dihedral, 2)}")
 
     # Select the best site among the non-clashing ones
     for oxo_coord, _ in potential_oxos:
         dihedral = abs(calculate_dihedral(c2_coord, o5_coord, iron_coord, oxo_coord))
-        print(f"   > Dihedral angle for non-clashing site: {round(dihedral, 2)}")
+        print(f"> Dihedral angle for non-clashing site: {round(dihedral, 2)}")
         if best_dihedral is None or abs(dihedral - 90) < abs(best_dihedral - 90):
             best_site = oxo_coord
             best_dihedral = dihedral
 
     if best_site is None:
-        print("   > Error: Could not determine the best site for OXO")
+        print("> Error: Could not determine the best site for OXO")
         return False
 
     oxo = {
@@ -164,7 +164,7 @@ def place_oxo_manually(atoms, iron):
     }
     atoms.append(oxo)
     rounded_best_site = [round(num, 2) for num in best_site]
-    print(f'   > OXO placed at {rounded_best_site} with dihedral {round(best_dihedral, 2)}\n')
+    print(f'> OXO placed at {rounded_best_site} with dihedral {round(best_dihedral, 2)}\n')
     return True
 
 def convert_akg_to_sin(atoms):
@@ -202,7 +202,7 @@ def add_oxo_and_sin(pdb_path):
                 oxo_placed.add(iron['serial'])
 
     if not oxo_placed:
-        print("   > Error: Could not place OXO")
+        print("> Error: Could not place OXO")
 
     convert_akg_to_sin(atoms)
     atoms = [atom for atom in atoms if atom['record'] != 'DELETE']

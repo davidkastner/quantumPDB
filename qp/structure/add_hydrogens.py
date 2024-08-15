@@ -77,10 +77,10 @@ def upload(path):
 
             return json.loads(r.text)["id"]  # Exit if successful
         except KeyError:
-            print(f"KeyError encountered. Retrying in {delay} seconds...")
+            print(f"> KeyError encountered. Retrying in {delay} seconds...")
             time.sleep(delay)
 
-    raise KeyError(f"Failed to upload the file and retrieve 'id' after {retries} attempts.")
+    raise KeyError(f"> Failed to upload the file and retrieve 'id' after {retries} attempts.")
 
 
 def submit(pid):
@@ -111,10 +111,10 @@ def submit(pid):
                 raise ValueError("Invalid PDB code")
             return json.loads(protoss.text)["location"]  # Exit if successful
         except KeyError:
-            print(f"KeyError encountered. Retrying in {delay} seconds...")
+            print(f"> KeyError encountered. Retrying in {delay} seconds...")
             time.sleep(delay)
 
-    raise KeyError(f"Failed to submit the PDB code and retrieve 'location' after {retries} attempts.")
+    raise KeyError(f"> Failed to submit the PDB code and retrieve 'location' after {retries} attempts.")
 
 
 
@@ -151,7 +151,7 @@ def download(job, out, key="protein"):
             time.sleep(delay)
             continue  # Retry on failure
 
-    raise KeyError(f"Failed to download the file with key '{key}' after {retries} attempts.")
+    raise KeyError(f"> Failed to download the file with key '{key}' after {retries} attempts.")
 
 
 def repair_ligands(path, orig):
@@ -223,7 +223,7 @@ def flip_coordinated_HIS(points, res):
         CB = res["CB"]
         CG = res["CG"]
     except IndexError:
-        print("Non standard atom names of HIS")
+        print("> Non standard atom names of HIS")
         return
 
     closest = sorted(points, key=lambda p: min(p - x for x in [CE1, NE2, CD2, ND1]))[0]
@@ -296,7 +296,7 @@ def add_hydrogen_CSO(res, structure):
         for atom_name in ["C", "N", "CA", "CB", "SG", "OD"]:
             coords[atom_name] = res[atom_name].get_coord()
     except IndexError:
-        print("Non standard atom names of CSO")
+        print("> Non standard atom names of CSO")
         return
     if "H_1" not in res and "HA" not in res:
         vec_CA_C = coords["C"] - coords["CA"]
@@ -324,10 +324,10 @@ def add_hydrogen_CSO(res, structure):
                 try:
                     C = res2["C"]
                 except:
-                    print("Non standard atom names of TAN")
+                    print("> Non standard atom names of TAN")
                 if C - res["OD"] < 1.6 and "H1" in res2:
                     # TAN reacting with CSO, ref. 3X20, 3X24, 3X25
-                    print("TAN reacting with CSO!")
+                    print("> TAN reacting with CSO!")
                     return
         vec_CB_SG = coords["SG"] - coords["CB"]
         vec_OD_HD = vec_CB_SG / np.linalg.norm(vec_CB_SG) # * 1.00
@@ -411,7 +411,7 @@ def partial_res_info(res, res_info):
     _, _, chain, code = res.get_full_id()
     _, resid, _ = code
     resname = res.get_resname()
-    return f'resname {resname}_{chain}{resid} with averaged occupancy {res_info[res]["avg_occupancy"]:.2f} and {res_info[res]["num_atom"]} atoms'
+    return f'residue {resname}_{chain}{resid} with avg. occupancy {res_info[res]["avg_occupancy"]:.2f} and {res_info[res]["num_atom"]} atoms'
 
 
 def clean_partial_occupancy(path, center_residues):
@@ -471,10 +471,10 @@ def clean_partial_occupancy(path, center_residues):
                 p2 = res_priority(clash_res, kept_partial_res, center_residues)
                 if p1 > p2:
                     kept_partial_res[clash_res]["kept"] = False
-                    print(f"{partial_res_info(clash_res, kept_partial_res)} is deleted in comparison with {partial_res_info(res, kept_partial_res)} in search radius {kept_partial_res[res]['search_radius']}")
+                    print(f"> Deleting {partial_res_info(clash_res, kept_partial_res)}, keeping {partial_res_info(res, kept_partial_res)} in search radius {kept_partial_res[res]['search_radius']}Å")
                 elif p1 < p2:
                     kept_partial_res[res]["kept"] = False
-                    print(f"{partial_res_info(res, kept_partial_res)} is deleted in comparison with {partial_res_info(clash_res, kept_partial_res)} in search radius {kept_partial_res[res]['search_radius']}")
+                    print(f"> Deleting {partial_res_info(res, kept_partial_res)}, keeping {partial_res_info(clash_res, kept_partial_res)} in search radius {kept_partial_res[res]['search_radius']}Å")
                     break
         for res in recheck_res:
             print("Recheck", res)
@@ -484,9 +484,10 @@ def clean_partial_occupancy(path, center_residues):
         def accept_residue(self, residue):
             return (residue not in kept_partial_res) or kept_partial_res[residue]["kept"]
     
-    shutil.copy(path, f"{path[:-4]}_old.pdb")
+    # Creating a backup copy is unnecessary although it could be useful so I'm commenting it
+    # shutil.copy(path, f"{path[:-4]}_old.pdb")
     io.save(path, ResSelect())
-    print("Partial occupancy cleaning finished")
+    print("> Partial occupancy cleaning finished")
     return True
 
 
