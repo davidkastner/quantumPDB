@@ -42,10 +42,9 @@ import os
 from modeller import log, Environ, Selection
 from modeller.automodel import AutoModel
 from modeller import alignment, model
-
+from Bio import PDB
 
 log.none()
-
 
 #: Amino acid 3 to 1 lookup table
 def define_residues():
@@ -408,3 +407,97 @@ def build_model(residues, pdb, path, ali, out, optimize=1):
 
     os.chdir(cwd)
 
+def get_chain_order(pdb_path):
+    """
+    Get the order of chains in a PDB file.
+
+    Parameters
+    ----------
+    pdb_path: str
+        Path to the PDB file.
+
+    Returns
+    -------
+    chain_order: dict
+        Dictionary mapping chain IDs to their indices.
+    """
+    chain_order = {}
+    with open(pdb_path, "r") as f:
+        for line in f:
+            if line.startswith("ATOM") or line.startswith("HETATM"):
+                chain_id = line[21]
+                if chain_id not in chain_order:
+                    chain_order[chain_id] = len(chain_order)
+    return chain_order
+
+def parse_protoss_log(log_path, pdb_path, AA):
+    """
+    Parse the Protoss log file to identify residues with clashes and their chain indices.
+
+    Parameters
+    ----------
+    log_path: str
+        Path to the Protoss log file.
+    pdb_path: str
+        Path to the PDB file.
+    AA: dict
+        Dictionary mapping three-letter codes to one-letter codes.
+
+    Returns
+    -------
+    residues_with_clashes: set of tuples
+        Set of residues with clashes in the format compatible with `residues`.
+        Each tuple contains ((res_id, ' '), one_letter_code, 'R') and the chain index.
+    """
+    chain_order = get_chain_order(pdb_path)
+    residues_with_clashes = set()
+    with open(log_path, "r") as f:
+        for line in f:
+            if line.startswith("PDB entry filter removed ATOM"):
+                parts = line.split()
+                res_name = parts[-9]
+                chain = parts[-8]
+                res_id = int(parts[-7])
+                one_letter_code = AA.get(res_name, 'X')  # Use 'X' for unknown residues
+                chain_index = chain_order.get(chain, -1)
+                residues_with_clashes.add((res_id, one_letter_code, chain_index, chain))
+
+    return residues_with_clashes
+
+def delete_residues_with_clashes(pdb_path, residues_with_clashes):
+    """
+    Delete residues with clashes from a PDB file and rewrite the PDB file.
+
+    Parameters
+    ----------
+    pdb_path: str
+        Path to the PDB file.
+    residues_with_clashes: set of tuples
+        Set of residues with clashes.
+        Each tuple contains (res_id, one_letter_code, chain_index, chain).
+
+    Returns
+    -------
+    output_pdb_path: str
+        Path to the new PDB file with residues removed.
+    """
+    
+    # Read the PDB file
+    with open(pdb_path, "r") as file:
+        lines = file.readlines()
+
+    # Create a set for quick lookup of residues to delete
+    residues_to_delete = {(chain, res_id) for res_id, _, _, chain in residues_with_clashes}
+
+    # Write the new PDB file, excluding the residues to delete
+    with open(pdb_path, "w") as file:
+        for line in lines:
+            if line.startswith("ATOM") or line.startswith("HETATM"):
+                chain_id = line[21]
+                res_id = int(line[22:26])
+                if (chain_id, res_id) not in residues_to_delete:
+                    file.write(line)
+            else:
+                file.write(line)
+
+    print(f"> Updated PDB {os.path.basename(pdb_path)} by removing residues with clashes")

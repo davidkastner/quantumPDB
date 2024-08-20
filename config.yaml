@@ -6,14 +6,15 @@ protoss: true                          # Assign protonation states
 coordination: true                     # Generate clusters
 skip: all                              # Skip 'modeller', 'protoss', or 'all' jobs if they already exist
 optimize_select_residues: 1            # Modeller to model no (0), missing (1), or all (2) residues
-convert_to_oxo: false                   # Used to convert A-KG NHIEs to Succinate-Oxo NHIEs, usually False
+convert_to_oxo: true                   # Used to convert A-KG NHIEs to Succinate-Oxo NHIEs, usually False
+max_clash_refinement_iter: 5           # The max number of times to iterate over the modeller protoss loop 
 
 # Cluster model parameters
 max_atom_count: 750            
 center_residues: [FE, FE2]             # Residue name to use as the cluster center
+additional_ligands: []                 # Residues beyond first sphere to include
 number_of_spheres: 3                   # Coordination spheres to generate
 radius_of_first_sphere: 4.0            # Distance based cut off to determine first sphere
-additional_ligands: []                 # Residues beyond first sphere to include
 include_ligands: 2                     # Only ligands and waters in first sphere (0), Only non-water ligands (1), Everything (2)
 capping_method: 1                      # Cap residues with None (0), hydrogens (1), ACE/NME (2)
 smoothing_method: 2                    # Smoothing method Box plot (0), DBSCAN (1), [Dummy Atom] (2), None (3)

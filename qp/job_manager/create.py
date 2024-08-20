@@ -79,7 +79,7 @@ def get_electronic(pdb_id, master_list):
         # Check if the row with the matching pdb_id exists
         row = df[df['pdb_id'] == pdb_id]
         if row.empty:
-            print(f"No data found for pdb_id: {pdb_id}")
+            print(f"> No data found for pdb_id: {pdb_id}")
             return None
 
         # Extract multiplicity and oxidation state directly
@@ -89,7 +89,7 @@ def get_electronic(pdb_id, master_list):
         return oxidation, multiplicity
 
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"> ERROR: {e}")
         sys.exit()
 
 
@@ -168,7 +168,7 @@ def create_jobs(pdb_list_path, output_dir, optimization, basis, method, guess, u
             
             xyz_files = glob.glob(os.path.join(structure, '*.xyz'))
             if len(xyz_files) != 1:
-                print(f"Error: Expected 1 xyz file in {structure}, found {len(xyz_files)}")
+                print(f"ERROR: Expected 1 xyz file in {structure}, found {len(xyz_files)}")
                 continue
             
             coord_file = os.path.join(qm_path, os.path.basename(xyz_files[0]))
@@ -204,7 +204,7 @@ def create_jobs(pdb_list_path, output_dir, optimization, basis, method, guess, u
             if use_charge_embedding:
                 charge_embedding.get_charge_embedding(charge_embedding_cutoff)
 
-            print(f"      > Created QM job files for {pdb}/{structure_name}/{method}/")
+            print(f"> Created QM job files for {pdb}/{structure_name}/{method}/")
             
             os.chdir(base_dir)
     

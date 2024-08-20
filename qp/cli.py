@@ -4,31 +4,32 @@
 """
 
 import os
+import sys
 import yaml
 import click
 
 def welcome():
     """Print first to welcome the user while it waits to load the modules"""
-    print("\n")
-    print("             ╔════════════════════════╗             ")
-    print("             ║       __________       ║             ")
-    print("             ║     / ____/\____ \     ║             ")
-    print("             ║    < <_|  ||  |_> >    ║             ")
-    print("             ║     \__   ||   __/     ║             ")
-    print("             ║        |__||__|        ║             ")
-    print("             ║                        ║             ")
-    print("             ║       QUANTUMPDB       ║             ")
-    print("             ║  [quantumpdb.rtfd.io]  ║             ")
-    print("             ╚═══════════╗╔═══════════╝             ")
-    print("                 ╔═══════╝╚═══════╗                 ")
-    print("                 ║ THE KULIK LAB  ║                 ")
-    print("                 ╚═══════╗╔═══════╝                 ")
-    print("  ╔══════════════════════╝╚══════════════════════╗  ")
-    print("  ║   Code: github.com/davidkastner/quantumpdb   ║  ")
-    print("  ║   Docs: quantumpdb.readthedocs.io            ║  ")
-    print("  ║      - Clusters: qp run -c config.yaml       ║  ")
-    print("  ║      - QM calcs: qp submit -c config.yaml    ║  ")
-    print("  ╚══════════════════════════════════════════════╝  \n")
+    click.secho("\n")
+    click.secho("             ╔════════════════════════╗             ", bold=True)
+    click.secho("             ║       __________       ║             ", bold=True)
+    click.secho("             ║     / ____/\____ \     ║             ", bold=True)
+    click.secho("             ║    < <_|  ||  |_> >    ║             ", bold=True)
+    click.secho("             ║     \__   ||   __/     ║             ", bold=True)
+    click.secho("             ║        |__||__|        ║             ", bold=True)
+    click.secho("             ║                        ║             ", bold=True)
+    click.secho("             ║       QUANTUMPDB       ║             ", bold=True)
+    click.secho("             ║  [quantumpdb.rtfd.io]  ║             ", bold=True)
+    click.secho("             ╚═══════════╗╔═══════════╝             ", bold=True)
+    click.secho("                 ╔═══════╝╚═══════╗                 ", bold=True)
+    click.secho("                 ║ THE KULIK LAB  ║                 ", bold=True)
+    click.secho("                 ╚═══════╗╔═══════╝                 ", bold=True)
+    click.secho("  ╔══════════════════════╝╚══════════════════════╗  ", bold=True)
+    click.secho("  ║   Code: github.com/davidkastner/quantumpdb   ║  ", bold=True)
+    click.secho("  ║   Docs: quantumpdb.readthedocs.io            ║  ", bold=True)
+    click.secho("  ║      - Clusters: qp run -c config.yaml       ║  ", bold=True)
+    click.secho("  ║      - QM calcs: qp submit -c config.yaml    ║  ", bold=True)
+    click.secho("  ╚══════════════════════════════════════════════╝\n", bold=True)
 
 # Welcome even if no flags
 welcome()
@@ -55,6 +56,7 @@ def run(config):
     protoss = config_data.get('protoss', False)
     coordination = config_data.get('coordination', False)
     skip = config_data.get('skip', 'all')
+    max_clash_refinement_iter = config_data.get('max_clash_refinement_iter', 5)
 
     import os
     from Bio.PDB.PDBExceptions import PDBIOException
@@ -63,11 +65,10 @@ def run(config):
     if modeller:
         from qp.structure import missing_loops
         optimize = config_data.get('optimize_select_residues', 1)
-        convert_to_oxo = config_data.get('convert_to_oxo', False)
+        convert_to_nhie_oxo = config_data.get('convert_to_nhie_oxo', False)
 
     if coordination:
         from qp.cluster import coordination_spheres
-        center_residues = config_data.get('center_residues', [])
         sphere_count = config_data.get('number_of_spheres', 2)
         first_sphere_radius = config_data.get('radius_of_first_sphere', 4.0)
         max_atom_count = config_data.get('max_atom_count', None)
@@ -95,8 +96,7 @@ def run(config):
         from qp.structure import add_hydrogens
 
     err = {
-        "PDB": [],
-        "Protoss": [],
+        "PDB": [],        "Protoss": [],
         "Coordination sphere": [],
         "Other": []
     }
@@ -107,10 +107,34 @@ def run(config):
         input = [input]
     output = config_data.get('output_dir', '')
     output = os.path.abspath(output)
-    pdb_all = fetch_pdb.parse_input(input, output)
+    pdb_all = fetch_pdb.get_pdbs(input, output)
+
+    # Determine how the user has decided to provide the center residues
+    center_csv_residues = fetch_pdb.get_centers(input)
+    center_yaml_residues = config_data.get('center_residues', [])
+
+    if center_csv_residues:
+        use_csv_centers = True
+        print("> Using residues from the input csv as centers\n")
+    elif center_yaml_residues:
+        use_csv_centers = False
+        print("> Using residues from the input yaml as centers.\n")
+    else:
+        print("> No center residues were provided in the input csv or the yaml.\n")
+        exit()
 
     for pdb, path in pdb_all:
-        click.secho(pdb, bold=True)
+        click.secho("╔══════╗", bold=True)
+        click.secho(f"║ {pdb.upper()} ║", bold=True)
+        click.secho("╚══════╝", bold=True)
+
+        # Determine the center residues for the current PDB
+        if use_csv_centers:
+            center_residues = [center_csv_residues.pop(0)]
+        else:
+            if not center_yaml_residues:
+                sys.exit("> No more center residues available.")
+            center_residues = center_yaml_residues
 
         # Skips fetching if PDB file exists
         if not os.path.isfile(path):
@@ -118,81 +142,123 @@ def run(config):
             try:
                 fetch_pdb.fetch_pdb(pdb, path)
             except ValueError:
-                click.secho("Error fetching PDB file\n", italic=True, fg="red")
+                click.secho("> Error: Could not fetch PDB file\n", italic=True, fg="red")
                 err["PDB"].append(pdb)
                 continue
-
-        mod_path = f"{output}/{pdb}/{pdb}_modeller.pdb"
-        if modeller:
-            if skip in ["modeller", "all"] and os.path.isfile(mod_path):
-                click.echo("> MODELLER file found")
-            else:
-                click.echo("> Building model")
-                AA = missing_loops.define_residues()
-                residues = missing_loops.get_residues(path, AA)
-                # Remove trailing missing residues from the ends of all chains
-                residues = missing_loops.clean_termini(residues)
-
-                ali_path = f"{output}/{pdb}/{pdb}.ali"
-                missing_loops.write_alignment(residues, pdb, path, ali_path)
-                missing_loops.build_model(residues, pdb, path, ali_path, mod_path, optimize)
-
-            if convert_to_oxo:
-                click.echo("> Converting AKG to reactive OXO and SUC state")
-                click.echo("> OXO conversion requires a fresh `qp run` to work!\n")
-                from qp.structure.convert_to_oxo import add_oxo_and_suc
-                add_oxo_and_suc(mod_path)
-
-        prot_path = f"{output}/{pdb}/Protoss"
-        if protoss:
-            if skip in ["protoss", "all"] and os.path.isfile(f"{prot_path}/{pdb}_protoss.pdb"):
-                click.echo("> Protoss file found")
-            else:
-                import qp
-                pdbl = pdb.lower()
-                prepared_flag = False
-                for qp_path in qp.__path__:
-                    prepared_prot_path = os.path.join(qp_path, f"prepared/{pdbl}/Protoss")
-                    if os.path.exists(prepared_prot_path):
-                        prepared_flag = True
-                if prepared_flag:
-                    os.makedirs(prot_path, exist_ok=True)
-                    from shutil import copy
-                    copy(os.path.join(prepared_prot_path, f"{pdbl}_protoss.pdb"), f"{prot_path}/{pdb}_protoss.pdb")
-                    copy(os.path.join(prepared_prot_path, f"{pdbl}_ligands.sdf"), f"{prot_path}/{pdb}_ligands.sdf")
-                    click.echo("> Using pre-prepared protoss file")
+        
+        residues_with_clashes = [] # Start by assuming no protoss clashes
+        for i in range(max_clash_refinement_iter):
+            mod_path = f"{output}/{pdb}/{pdb}_modeller.pdb"
+            if modeller:
+                if skip in ["modeller", "all"] and os.path.isfile(mod_path) and not residues_with_clashes:
+                    click.echo("> MODELLER file found")
                 else:
-                    from qp.structure.add_hydrogens import clean_partial_occupancy
-                    click.echo("> Running Protoss")
-                    if modeller:
-                        path = mod_path
-                    clean_partial_occupancy(path, center_residues)
+                    click.echo("> Building model")
+                    AA = missing_loops.define_residues()
+                    residues = missing_loops.get_residues(path, AA)
 
-                    try:
-                        pid = add_hydrogens.upload(path)
-                    except ValueError:
-                        click.secho("Error uploading PDB file\n", italic=True, fg="red")
-                        # Occurs when uploading a PDB file > 4MB
-                        # TODO retry with parsed PDB code? Will raise Bio.PDB error if
-                        #      number of atoms in output exceeds 99999
-                        err["Protoss"].append(pdb)
-                        continue
-                    
-                    protoss_pdb = f"{prot_path}/{pdb}_protoss.pdb"
-                    ligands_sdf = f"{prot_path}/{pdb}_ligands.sdf"
-                    job = add_hydrogens.submit(pid)
-                    add_hydrogens.download(job, protoss_pdb, "protein")
-                    add_hydrogens.download(job, ligands_sdf, "ligands")
-                    add_hydrogens.download(job, f"{prot_path}/{pdb}_log.txt", "log")
-                    add_hydrogens.repair_ligands(protoss_pdb, path)
+                    # Remove trailing missing residues from the ends of all chains
+                    residues = missing_loops.clean_termini(residues)
 
-            if convert_to_oxo:
-                click.echo("> Removing hydrogens from OXO's")
-                from qp.structure.convert_to_oxo import remove_oxo_hydrogens, update_ligands_sdf
-                remove_oxo_hydrogens(protoss_pdb)
-                click.echo("> Adding OXO to ligands.sdf")
-                update_ligands_sdf(protoss_pdb, ligands_sdf)
+                    # Update residues with clashes if any
+                    if residues_with_clashes:
+                        missing_loops.delete_residues_with_clashes(path, residues_with_clashes)
+                        for residue_with_clashes in residues_with_clashes:
+                            res_id = residue_with_clashes[0]
+                            one_letter_code = residue_with_clashes[1]
+                            chain_index = residue_with_clashes[2]
+                            for j, residue in enumerate(residues[chain_index]):
+                                    if residue[0][0] == res_id:
+                                        if residue[1] == one_letter_code:
+                                            residues[chain_index][j] = ((res_id, ' '), one_letter_code, 'R')
+                                        else:
+                                            print("> Residue index matched but residue name did not.")
+                                            exit()
 
+                    ali_path = f"{output}/{pdb}/{pdb}.ali"
+                    missing_loops.write_alignment(residues, pdb, path, ali_path)
+                    print("> Generated alignment file and starting Modeller run:\n")
+                    missing_loops.build_model(residues, pdb, path, ali_path, mod_path, optimize)
+
+            prot_path = f"{output}/{pdb}/Protoss"
+            protoss_log_file = f"{prot_path}/{pdb}_log.txt"
+            protoss_pdb = f"{prot_path}/{pdb}_protoss.pdb"
+            ligands_sdf = f"{prot_path}/{pdb}_ligands.sdf"
+
+            if protoss:
+                if skip in ["protoss", "all"] and os.path.isfile(protoss_pdb) and not residues_with_clashes:
+                    click.echo("> Protoss file found")
+                else:
+                    import qp
+                    pdbl = pdb.lower()
+                    prepared_flag = False
+                    for qp_path in qp.__path__:
+                        prepared_prot_path = os.path.join(qp_path, f"prepared/{pdbl}/Protoss")
+                        if os.path.exists(prepared_prot_path):
+                            prepared_flag = True
+                    if prepared_flag:
+                        os.makedirs(prot_path, exist_ok=True)
+                        from shutil import copy
+                        copy(os.path.join(prepared_prot_path, f"{pdbl}_protoss.pdb"), protoss_pdb)
+                        copy(os.path.join(prepared_prot_path, f"{pdbl}_ligands.sdf"), ligands_sdf)
+                        click.echo("> Using pre-prepared protoss file")
+                    else:
+                        from qp.structure.add_hydrogens import clean_partial_occupancy
+                        click.echo("> Running Protoss")
+                        if modeller:
+                            pdb_path = mod_path
+                        else:
+                            pdb_path = path
+                        clean_partial_occupancy(pdb_path, center_residues)
+
+                        try:
+                            pid = add_hydrogens.upload(pdb_path)
+                        except ValueError:
+                            click.secho("> Error: Could not upload PDB file\n", italic=True, fg="red")
+                            # Occurs when uploading a PDB file > 4MB
+                            # TODO retry with parsed PDB code? Will raise Bio.PDB error if
+                            #      number of atoms in output exceeds 99999
+                            err["Protoss"].append(pdb)
+                            continue
+                        
+                        job = add_hydrogens.submit(pid)
+                        add_hydrogens.download(job, protoss_pdb, "protein")
+                        add_hydrogens.download(job, ligands_sdf, "ligands")
+                        add_hydrogens.download(job, protoss_log_file, "log")
+                        add_hydrogens.repair_ligands(protoss_pdb, pdb_path)
+
+            # Get any residues identified by Protoss as problematic
+            from qp.structure.missing_loops import parse_protoss_log
+            AA = missing_loops.define_residues()
+            residues_with_clashes = parse_protoss_log(protoss_log_file, protoss_pdb, AA)
+            if residues_with_clashes:
+                print(f"> WARNING: Protoss has deleted {len(residues_with_clashes)} residues due to clashes, trying to fix them with Modeller")
+            else:
+                break # Don't loop again as no clashes were detected
+
+        if protoss and convert_to_nhie_oxo:
+            click.echo("> Converting AKG to reactive OXO and SIN state")
+            from qp.structure.convert_to_oxo import add_oxo_and_sin
+            add_oxo_and_sin(protoss_pdb)
+            click.echo("> Removing hydrogens from OXO's")
+            
+            from qp.structure.convert_to_oxo import remove_oxo_hydrogens, update_oxo_sdf, update_sin_sdf
+            remove_oxo_hydrogens(protoss_pdb)
+            
+            click.echo("> Adding OXO to ligands.sdf")
+            update_oxo_sdf(protoss_pdb, ligands_sdf)
+            
+            click.echo("> Updating SIN in ligands.sdf")
+            sin_ligands_sdf = f"{prot_path}/{pdb}_ligands_sin.sdf"
+            click.echo("> Uploading new succinate structure to Protoss")
+            pid = add_hydrogens.upload(protoss_pdb)
+            job = add_hydrogens.submit(pid) # Send Protoss the new SIN ligands
+            add_hydrogens.download(job, sin_ligands_sdf, "ligands") # Get the .sdf file for the SIN ligands
+            update_sin_sdf(ligands_sdf, sin_ligands_sdf)
+
+        # Check if any atoms changed from HETATM to ATOM or vice versa for future troubleshooting purposes
+        from qp.checks.protoss_atom_renaming import protoss_atom_renaming
+        changed_residues = protoss_atom_renaming(mod_path, protoss_pdb)
 
         if coordination:
             click.echo("> Extracting clusters")
@@ -278,16 +344,16 @@ def submit(config, failure_checkup):
             raise FileNotFoundError(f"Could not find input file named {input}.")
         input = os.path.abspath(input)
 
-        click.echo("   > Creating job files for QM calculations")
+        click.echo("> Creating job files for QM calculations")
         create.create_jobs(input, output, optimization, basis, method, guess, charge_embedding, charge_embedding_cutoff, gpus, memory, scheduler, pcm_radii_file, dielectric)
         if submit_jobs:
-            click.echo("\n   > Submitting QM calculations")
+            click.echo("\n> Submitting QM calculations")
             submit.manage_jobs(output, job_count, method, scheduler)
 
 
     if failure_checkup:
         from qp.job_manager import failure_checkup
-        qm_job_dir = input("What is the name of your QM job directory? ")
+        qm_job_dir = input("> What is the name of your QM job directory? ")
         failure_counts = failure_checkup.check_all_jobs(qm_job_dir)
         failure_checkup.plot_failures(failure_counts)
 

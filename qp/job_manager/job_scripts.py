@@ -47,6 +47,7 @@ def write_slurm_jobscript(job_name, gpus, memory):
 
     jobscript_content = f"""#! /bin/bash
 #SBATCH --job-name={job_name}
+#SBATCH --partition=xeon-g6-volta
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:volta:{gpus}
 #SBATCH --ntasks-per-node={gpus * 20}

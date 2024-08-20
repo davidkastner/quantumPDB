@@ -50,7 +50,7 @@ def prepare_submission(job_count, method, scheduler):
             
             xyz_files = glob.glob(os.path.join(structure, '*.xyz'))
             if len(xyz_files) != 1:
-                print(f"Error: Expected 1 xyz file in {structure}, found {len(xyz_files)}")
+                print(f"ERROR: Expected 1 xyz file in {structure}, found {len(xyz_files)}")
                 continue
             
             os.chdir(qm_path)
@@ -79,7 +79,7 @@ def prepare_submission(job_count, method, scheduler):
             
             # Existing condition to break early if job_count is reached
             if submitted_jobs == job_count:
-                print(f"   > Submitted {job_count} jobs")
+                print(f"> Submitted {job_count} jobs")
                 return submitted_jobs
             
     return 0
@@ -108,11 +108,11 @@ def manage_jobs(output, target_job_count, method, scheduler):
     while True:
         current_job_count = count_running_jobs(scheduler)
         sleep_time_seconds = 300 # seconds
-        print(f"   > Currently, there are {current_job_count} jobs running or queued.")
+        print(f"> Currently, there are {current_job_count} jobs running or queued.")
 
         if current_job_count < target_job_count:
             jobs_needed = target_job_count - current_job_count
-            print(f"   > Attempting to submit {jobs_needed} jobs to reach the target of {target_job_count}.")
+            print(f"> Attempting to submit {jobs_needed} jobs to reach the target of {target_job_count}.")
             submitted_jobs = prepare_submission(jobs_needed, method, scheduler)
             
             # Check if any new jobs were submitted
@@ -121,11 +121,11 @@ def manage_jobs(output, target_job_count, method, scheduler):
                 sys.exit(0)
 
             # Wait a moment to let the system update
-            print(f"   > Sleeping for {int(sleep_time_seconds / 60)} minutes before checking queue")
+            print(f"> Sleeping for {int(sleep_time_seconds / 60)} minutes before checking queue")
             time.sleep(sleep_time_seconds)
         
         else:
             # Max requested jobs are already running
-            print(f"   > Sleeping for {int(sleep_time_seconds / 60)} minutes before checking queue")
+            print(f"> Sleeping for {int(sleep_time_seconds / 60)} minutes before checking queue")
             time.sleep(sleep_time_seconds)
 
