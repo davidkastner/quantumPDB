@@ -34,6 +34,7 @@ import requests
 import json
 import time
 import shutil
+from typing import List
 from queue import Queue
 from warnings import warn
 import numpy as np
@@ -414,59 +415,79 @@ def partial_res_info(res, res_info):
     return f'resname {resname}_{chain}{resid} with averaged occupancy {res_info[res]["avg_occupancy"]:.2f} and {res_info[res]["num_atom"]} atoms'
 
 
-def clean_partial_occupancy(path, center_residues):
+def clean_partial_occupancy(path: str, center_residues: List[str]) -> bool:
     parser = PDBParser(QUIET=True)
     io = PDBIO()
     structure = parser.get_structure("PDB", path)
     io.set_structure(structure)
     kept_partial_res = dict()
     partial_atom_list = []
+
     for res in structure[0].get_residues():
+        partial_in_res = False
+        total_occupancy = 0
+
+        # Check if there are partial occupied atoms in res
         for atom in res:
             atom_occupancy = atom.get_occupancy()
+            total_occupancy += atom_occupancy
             if atom_occupancy < 1.0:
+                partial_in_res = True
                 partial_atom_list.append(atom)
-                if res not in kept_partial_res:
-                    kept_partial_res[res] = {
-                        "avg_occupancy": atom_occupancy,
-                        "num_atom": len(res),
-                        "kept": True,
-                        "search_radius": 1.0 if res.get_resname() in center_residues else 2.5 # allow for bonding to center, otherwise vdw
-                    }
-                else:
-                    kept_partial_res[res]["avg_occupancy"] += atom_occupancy
+        
+        # If so, add res to the partial res dict
+        if partial_in_res:
+            num_atom = len(res)
+            kept_partial_res[res] = {
+                "avg_occupancy": total_occupancy / num_atom,
+                "num_atom": num_atom,
+                "kept": True,
+                "search_radius": 1.0 if res.get_resname() in center_residues else 2.5 # allow for bonding to center, otherwise vdw
+            }
+    
+    # no partial occupancy detected
     if not partial_atom_list:
         return False
-    search = NeighborSearch(partial_atom_list)
-    for res in kept_partial_res:
-        kept_partial_res[res]["avg_occupancy"] /= kept_partial_res[res]["num_atom"]
+    
     check_queue = Queue()
     for res in kept_partial_res:
         check_queue.put(res)
+
+    search = NeighborSearch(partial_atom_list)
     while not check_queue.empty():
         res = check_queue.get()
-        if not kept_partial_res[res]["kept"]: # deleted res
+
+        # don't check deleted res
+        if not kept_partial_res[res]["kept"]:
             continue
+
         recheck_res = set()
         for atom in res:
             for clash_res in search.search(center=atom.get_coord(), radius=kept_partial_res[res]["search_radius"], level="R"):
+                # don't delete self and deleted res
                 if (
                     clash_res == res or # self
                     not kept_partial_res[clash_res]["kept"] # deleted res
                 ):
                     continue
-                # if search center is not center res, reconsider res-clash_res pair from center res's point of view
+
+                # if center is in clash with current atom
+                # reconsider this clash from the center's point of view with tighter search radius
                 if clash_res.get_resname() in center_residues:
+                    # if center doesn't contain partial occupancy, put it into the queue for rechecking,
                     if clash_res not in kept_partial_res:
-                        # put center res in partial res list
                         kept_partial_res[clash_res] = {
                             "avg_occupancy": 1.0,
-                            "num_atom": len(res),
+                            "num_atom": len(clash_res),
                             "kept": True,
                             "search_radius": 1.0
                         }
-                    recheck_res.add(clash_res)
+                        recheck_res.add(clash_res)
+
+                    # otherwise the center would have been checked
                     continue
+
+                # compare priority and delete the lower one
                 p1 = res_priority(res, kept_partial_res, center_residues)
                 p2 = res_priority(clash_res, kept_partial_res, center_residues)
                 if p1 > p2:
@@ -476,6 +497,7 @@ def clean_partial_occupancy(path, center_residues):
                     kept_partial_res[res]["kept"] = False
                     print(f"{partial_res_info(res, kept_partial_res)} is deleted in comparison with {partial_res_info(clash_res, kept_partial_res)} in search radius {kept_partial_res[res]['search_radius']}")
                     break
+        
         for res in recheck_res:
             print("Recheck", res)
             check_queue.put(res)
