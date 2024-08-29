@@ -635,7 +635,7 @@ def cap_chains(model: Model, residues: Set[Residue], capping: int) -> Set[Residu
     cap_residues = set()
 
     for res in list(sorted(residues)):
-        if not Polypeptide.is_aa(res):
+        if not Polypeptide.is_aa(res) or res.get_id()[0] != " ":
             continue
 
         res_id = res.get_full_id()
