@@ -635,7 +635,7 @@ def cap_chains(model: Model, residues: Set[Residue], capping: int) -> Set[Residu
     cap_residues = set()
 
     for res in list(sorted(residues)):
-        if not Polypeptide.is_aa(res):
+        if not Polypeptide.is_aa(res) or res.get_id()[0] != " ":
             continue
 
         res_id = res.get_full_id()
@@ -671,7 +671,7 @@ def cap_chains(model: Model, residues: Set[Residue], capping: int) -> Set[Residu
                     cap_residues.add(build_hydrogen(res, nxt, "C"))
                 else:
                     cap_residues.add(build_heavy(res, nxt, "C"))
-            elif not check_atom_valence(res, chain_tree, "N", 3):
+            elif not check_atom_valence(res, chain_tree, "C", 3):
                 cap_residues.add(build_hydrogen(res, None, "C"))
 
     return cap_residues
