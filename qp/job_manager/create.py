@@ -50,21 +50,19 @@ def residue_exists(sphere_path, res_name, chain, res_id):
     return False
 
 
-def get_electronic(pdb_id, master_list):
+def get_electronic(pdb_id, pdb_list_path):
     """Query the local pdb master list CSV file."""
 
     try:
-        df = pd.read_csv(master_list)
+        df = pd.read_csv(pdb_list_path)
         # Check if the row with the matching pdb_id exists
         row = df[df['pdb_id'] == pdb_id]
         if row.empty:
             print(f"> No data found for pdb_id: {pdb_id}")
             return None
-
         # Extract multiplicity and oxidation state directly
-        multiplicity = int(row['multiplicity'].iloc[0])
-        oxidation = int(row['oxidation'].iloc[0])
-
+        multiplicity = int(row['multiplicity'].fillna(1).iloc[0])
+        oxidation = int(row['oxidation'].fillna(0).iloc[0])
         return oxidation, multiplicity
 
     except Exception as e:

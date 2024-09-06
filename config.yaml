@@ -37,6 +37,7 @@ scheduler: slurm                       # What scheduler do you use (e.g., slurm,
 pcm_radii_file: /path/to/pcm_radii     # The path to the pcm_radii file if using terachem
 
 # Submit QM jobs
-submit_jobs: true                      # Submit the created jobs
+create_jobs: false                     # Create QM job input files
+submit_jobs: false                     # Submit the created jobs
 job_count: 10                          # The number of jobs to maintain on the scheduler
 checkup: false                         # Check how status of qm jobs
