@@ -311,49 +311,57 @@ def run(config):
 
 @cli.command()
 @click.option("--config", "-c", required=True, type=click.Path(exists=True), help="Path to the configuration YAML file")
-@click.option("--failure_checkup", "-f", is_flag=True, help="Find failed structures")
 def submit(config, failure_checkup):
     """Handles the submission of jobs for the quantumPDB."""
 
     from qp.job_manager import create
     from qp.job_manager import submit
     
-    if config:
-        # Parse configuration parameters
-        config_data = read_config(config)
-        optimization = config_data.get('optimization', False)
-        method = config_data.get('method', 'wpbeh')
-        basis = config_data.get('basis', 'lacvps_ecp')
-        guess = config_data.get('guess', 'generate')
-        gpus = config_data.get('gpus', 1)
-        memory = config_data.get('memory', '8G')
-        scheduler = config_data.get('scheduler', 'slurm')
-        pcm_radii_file = config_data.get('pcm_radii_file', 'pcm_radii')
-        job_count = config_data.get('job_count', 80)
-        charge_embedding = config_data.get('charge_embedding', False)
-        charge_embedding_cutoff = config_data.get('charge_embedding_cutoff', 20)
-        dielectric = config_data.get('dielectric', 10)
-        create_jobs = config_data.get('create_jobs', False)
-        submit_jobs = config_data.get('submit_jobs', False)
-        input = config_data.get('input', [])
-        output = config_data.get('output_dir', '')
-        
-        if not os.path.exists(input):
-            raise FileNotFoundError(f"Could not find input file named {input}.")
-        input = os.path.abspath(input)
+    # Parse configuration parameters
+    config_data = read_config(config)
+    optimization = config_data.get('optimization', False)
+    method = config_data.get('method', 'wpbeh')
+    basis = config_data.get('basis', 'lacvps_ecp')
+    guess = config_data.get('guess', 'generate')
+    gpus = config_data.get('gpus', 1)
+    memory = config_data.get('memory', '8G')
+    scheduler = config_data.get('scheduler', 'slurm')
+    pcm_radii_file = config_data.get('pcm_radii_file', 'pcm_radii')
+    job_count = config_data.get('job_count', 80)
+    charge_embedding = config_data.get('charge_embedding', False)
+    charge_embedding_cutoff = config_data.get('charge_embedding_cutoff', 20)
+    dielectric = config_data.get('dielectric', 10)
+    create_jobs = config_data.get('create_jobs', False)
+    submit_jobs = config_data.get('submit_jobs', False)
+    input = config_data.get('input', [])
+    output = config_data.get('output_dir', '')
+    
+    if not os.path.exists(input):
+        raise FileNotFoundError(f"Could not find input file named {input}.")
+    input = os.path.abspath(input)
 
-        if create_jobs:
-            click.echo("> Creating job files for QM calculations")
-            create.create_jobs(input, output, optimization, basis, method, guess, charge_embedding, charge_embedding_cutoff, gpus, memory, scheduler, pcm_radii_file, dielectric)
-        if submit_jobs:
-            click.echo("\n> Submitting QM calculations")
-            submit.manage_jobs(output, job_count, method, scheduler)
+    if create_jobs:
+        click.echo("> Creating job files for QM calculations")
+        create.create_jobs(input, output, optimization, basis, method, guess, charge_embedding, charge_embedding_cutoff, gpus, memory, scheduler, pcm_radii_file, dielectric)
+    if submit_jobs:
+        click.echo("\n> Submitting QM calculations")
+        submit.manage_jobs(output, job_count, method, scheduler)
 
 
-    if failure_checkup:
-        from qp.job_manager import failure_checkup
-        qm_job_dir = input("> What is the name of your QM job directory? ")
-        failure_counts = failure_checkup.check_all_jobs(qm_job_dir)
+@cli.command()
+@click.option("--config", "-c", required=True, type=click.Path(exists=True), help="Path to the configuration YAML file")
+def analyze(config):
+    """Functionality for analyzing complete jobs."""
+
+    from qp.job_manager import failure_checkup
+
+    config_data = read_config(config)
+    method = config_data.get('method', 'wpbeh')
+    job_checkup = config_data.get('job_checkup', True)
+    output = config_data.get('output_dir', 'dataset/v1')
+    
+    if job_checkup:
+        failure_counts = failure_checkup.check_all_jobs(method, output)
         failure_checkup.plot_failures(failure_counts)
 
 
