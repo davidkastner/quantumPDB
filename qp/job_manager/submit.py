@@ -14,7 +14,7 @@ def create_submission_marker(submission_marker_path, job_name, submission_comman
     with open(submission_marker_path, 'w') as marker:
         marker.write(f"Jobname: {job_name}\n")
         marker.write(f"Author: {getpass.getuser()}\n")
-        marker.write(f"Time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        marker.write(f"Queue Time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         marker.write(f"Command: {submission_command}\n")
         marker.write(f"Output: {submission_output}\n")
 
@@ -59,7 +59,7 @@ def prepare_submission(job_count, method, scheduler):
             structure_name = os.path.basename(structure)
             job_name = f"{pdb_name}{structure_name}"
             
-            time.sleep(.25) # Gives user time to abort with ctrl + C
+            time.sleep(.2) # Gives user time to abort with ctrl + C
             
             # Execute the job submission command and capture its output
             if scheduler == "sge":
@@ -71,12 +71,9 @@ def prepare_submission(job_count, method, scheduler):
             submission_output = result.stdout.strip() if result.returncode == 0 else result.stderr.strip()
             print(f"      > {submission_output}")
             create_submission_marker(submission_marker_path, job_name, submission_command, submission_output)
-
             os.chdir(base_dir)
-
             submitted_jobs += 1
 
-            
             # Existing condition to break early if job_count is reached
             if submitted_jobs == job_count:
                 print(f"> Submitted {job_count} jobs")
@@ -85,47 +82,20 @@ def prepare_submission(job_count, method, scheduler):
     return 0
 
 
-def count_running_jobs(scheduler):
-    """Counts jobs submitted by the user that are currently running or in the queue."""
-    try:
-        user_name = getpass.getuser()
-        if scheduler == "slurm":
-            cmd = f"squeue -u {user_name} | grep {user_name} | wc -l"
-        if scheduler == "sge":
-            cmd = f"qstat -u {user_name} | grep {user_name} | wc -l"
-        result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
-        job_count = int(result.stdout.strip())
-    except subprocess.CalledProcessError:
-        job_count = 0
-    return job_count
-
-
-def manage_jobs(output, target_job_count, method, scheduler):
+def manage_jobs(output, job_count, method, scheduler):
     """Main function for managing QM jobs."""
     # Change into the directory of the generated cluster models
     os.chdir(output)
+    print(f"> Attempting to submit {job_count} jobs.")
     
-    while True:
-        current_job_count = count_running_jobs(scheduler)
-        sleep_time_seconds = 300 # seconds
-        print(f"> Currently, there are {current_job_count} jobs running or queued.")
-
-        if current_job_count < target_job_count:
-            jobs_needed = target_job_count - current_job_count
-            print(f"> Attempting to submit {jobs_needed} jobs to reach the target of {target_job_count}.")
-            submitted_jobs = prepare_submission(jobs_needed, method, scheduler)
-            
-            # Check if any new jobs were submitted
-            if submitted_jobs == 0:
-                print("Done.")
-                sys.exit(0)
-
-            # Wait a moment to let the system update
-            print(f"> Sleeping for {int(sleep_time_seconds / 60)} minutes before checking queue")
-            time.sleep(sleep_time_seconds)
-        
-        else:
-            # Max requested jobs are already running
-            print(f"> Sleeping for {int(sleep_time_seconds / 60)} minutes before checking queue")
-            time.sleep(sleep_time_seconds)
+    # Submit the required number of jobs directly
+    submitted_jobs = prepare_submission(job_count, method, scheduler)
+    if submitted_jobs > 0:
+        print(f"> Successfully submitted {submitted_jobs} jobs.")
+    else:
+        print("> No jobs were submitted.")
+    
+    # Done, exit the script
+    print("Done.\n")
+    sys.exit(0)
 

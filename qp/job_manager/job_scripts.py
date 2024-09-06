@@ -59,7 +59,9 @@ module load terachem/1.9-2023.11-dev
 LD_LIBRARY_PATH=/usr/local/pkg/cuda/cuda-11.8/lib64/stubs:${{LD_LIBRARY_PATH}}
 
 # your command to run terachem
+echo "Run Start Time: $(date '+%Y-%m-%d %H:%M:%S')" >> .submit_record
 terachem qmscript.in > qmscript.out
+echo "Run End Time: $(date '+%Y-%m-%d %H:%M:%S')" >> .submit_record
 """
 
     return jobscript_content
@@ -88,12 +90,15 @@ export OMP_NUM_THREADS={gpus}
 # Start time
 SECONDS=0
 
+echo "Run Start Time: $(date '+%Y-%m-%d %H:%M:%S')" >> .submit_record
 terachem qmscript.in > $SGE_O_WORKDIR/qmscript.out
+echo "Run End Time: $(date '+%Y-%m-%d %H:%M:%S')" >> .submit_record
 
 # Calculate elapsed time in seconds
 ELAPSED_TIME=$SECONDS
 
 # If elapsed time is less than 600 seconds (10 minutes), sleep for the remainder
+# This is just for Gibraltar which can't handle short jobs
 if [ $ELAPSED_TIME -lt 600 ]; then
     SLEEP_TIME=$((600 - ELAPSED_TIME))
     sleep $SLEEP_TIME

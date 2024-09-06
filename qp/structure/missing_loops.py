@@ -451,13 +451,17 @@ def parse_protoss_log(log_path, pdb_path, AA):
     """
     chain_order = get_chain_order(pdb_path)
     residues_with_clashes = set()
+
     with open(log_path, "r") as f:
         for line in f:
-            if line.startswith("PDB entry filter removed ATOM"):
-                parts = line.split()
-                res_name = parts[-9]
-                chain = parts[-8]
-                res_id = int(parts[-7])
+            if "ATOM" in line:
+                # Remove everything before "ATOM"
+                atom_line = line[line.index("ATOM"):]
+
+                # Extract information based on PDB format columns
+                res_name = atom_line[17:20].strip()
+                chain = atom_line[21].strip()
+                res_id = int(atom_line[22:26].strip())
                 one_letter_code = AA.get(res_name, 'X')  # Use 'X' for unknown residues
                 chain_index = chain_order.get(chain, -1)
                 residues_with_clashes.add((res_id, one_letter_code, chain_index, chain))
