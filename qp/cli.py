@@ -5,6 +5,7 @@
 
 import os
 import sys
+import time
 import yaml
 import click
 import traceback
@@ -122,6 +123,7 @@ def run(config):
 
     for pdb, path in pdb_all:
         try:
+            time.sleep(0.5) # Give the user a chance to escape with CTRL-C
             click.secho("╔══════╗", bold=True)
             click.secho(f"║ {pdb.upper()} ║", bold=True)
             click.secho("╚══════╝", bold=True)
@@ -311,7 +313,7 @@ def run(config):
 
 @cli.command()
 @click.option("--config", "-c", required=True, type=click.Path(exists=True), help="Path to the configuration YAML file")
-def submit(config, failure_checkup):
+def submit(config):
     """Handles the submission of jobs for the quantumPDB."""
 
     from qp.job_manager import create
