@@ -95,7 +95,13 @@ def get_centers(input_path):
                 input_csv = pdb_id
                 with open(input_csv, "r") as csvfile:
                     reader = csv.DictReader(csvfile)
+                    # Check if 'center' column exists
+                    if 'center' not in reader.fieldnames:
+                        print(f"> WARNING: The 'center' option is not being used in {input_csv}. Returning empty list.")
+                        return []
+                    # If the 'center' column exists, proceed to collect centers
                     for row in reader:
-                        center = row['center']
-                        centers.append(center)
+                        center = row.get('center', None)
+                        if center:
+                            centers.append(center)
     return centers
