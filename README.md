@@ -17,7 +17,8 @@ QuantumPDB
     * Examples
 5. **Developer Guide**
     * GitHub refresher
-6. **Areas of Active Development**    
+6. **Areas of Active Development**
+7. **QuantumPDB File Structure**  
 
 
 ## 1. Overview
@@ -53,7 +54,7 @@ After performing the developer install, the CLI can be called from anywhere usin
 
 
 ## 3. What is included?
-### File structure
+### Package architecture
 ```
 .
 ├── docs                           # Readthedocs documentation site
@@ -129,6 +130,49 @@ git pull
 ```
 ## 6. Areas of active development
 Currently working on handling all edge cases, including non-canonical amino acids. Additionally, support for mmCIFs will eventually needed to be added to work with newer and larger PDBs. Documentation is present for all functions in the code, but should be added with external examples for use. 
+
+## 7. QuantumPDB generated file structure
+An example file structure from a `qp` run given the parameters in `config.yaml` `input: qp_input.csv` and `output_dir: dataset/`.
+If we run `qp run -c ./config.yaml`, then the file structure will be generated in `dataset` if `qp_input.csv` specfies `1a9s`.
+```
+.
+├── config.yaml                           # The input yaml containing all `qp` job parameters 
+├── qp_input.csv                          # List of PDB ID's to run `qp`
+└── dataset                               # Specified with "output_dir: dataset/" in config.yaml
+    └── 1a9s                              # One of these is generated for each entry in qp_input.csv
+        ├── 1a9s_modeller.pdb             # Modeller optimized structure with added missing atoms and loops
+        ├── 1a9s.ali                      # Alignment file needed by Modeller
+        ├── 1a9s.pdb                      # Original 1a9s PDB downloaded directly from the Protein Data Bank
+        ├── charge.csv                    # Generated file used to calculate the charge of the system
+        ├── count.csv                     # Generated file that keeps track of the residue counts
+        ├── Protoss                       # Directory storing all Protoss files
+        │   ├── 1a9s_ligands.sdf          # Ligand structural files
+        │   ├── 1a9s_log.txt              # Error log from Protoss server
+        │   └── 1a9s_protoss.pdb          # Protonated result returned from the Protoss server
+        └── A290                          # Generated for each cluster, named by chain (A) and the res number of center (290)
+            ├── 0.pdb                     # Structure of the center residue
+            ├── 1.pdb                     # Structure of the first sphere around the center
+            ├── 2.pdb                     # Structure of the second sphere around the first
+            ├── A290.pdb                  # Structure of the entire cluster in PDB format
+            ├── A290.xyz                  # Structure of the entire cluster in XYZ format
+            └── wpbeh                     # QM job file specified with "method: wpbeh" in "config.yaml"
+                ├── A290.xyz              # Structure of the entire cluster in XYZ format
+                ├── jobscript.sh          # SLURM/SGE submit script
+                ├── ptchrges.xyz          # MM embedded point charges specified with "charge_embedding: true"
+                ├── qmscript.in           # QM job input using TeraChem
+                ├── qmscript.out          # QM job output details
+                └── wpbeh                 # Results from the TeraChem QM calculation
+                    ├── A290.basis
+                    ├── A290.geometry
+                    ├── A290.molden
+                    ├── bond_order.list
+                    ├── c0
+                    ├── charge_mull.xls
+                    ├── grad.xyz
+                    ├── mullpop
+                    ├── results.dat
+                    └── xyz.xyz
+```
 
 ### Copyright
 

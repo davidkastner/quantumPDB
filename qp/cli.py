@@ -48,7 +48,7 @@ def read_config(config_file):
 
 def parse_input(input, output, center_yaml_residues):
     """Returns system information from the provided input"""
-    from qp.checks import fetch_pdb
+    from qp.structure import fetch_pdb
 
     # If the input was a path or a single PDB, convert it to a list
     if isinstance(input, str):
@@ -67,7 +67,16 @@ def parse_input(input, output, center_yaml_residues):
     else:
         print("> No center residues were provided in the input csv or the yaml.\n")
         exit()
-    return pdb_all, center_csv_residues, use_csv_centers
+
+    # Determine the center residues for the current PDB
+    if use_csv_centers:
+        center_residues = center_csv_residues
+    else:
+        if not center_yaml_residues:
+            sys.exit("> No more center residues available.")
+        center_residues = center_yaml_residues
+
+    return pdb_all, center_residues
 
 
 @cli.command()
@@ -76,7 +85,7 @@ def run(config):
     """Generates quantumPDB structures and files."""
     import os
     from Bio.PDB.PDBExceptions import PDBIOException
-    from qp.checks import fetch_pdb
+    from qp.structure import fetch_pdb
 
     config_data = read_config(config)
     err = {"PDB": [], "Protoss": [], "Coordination sphere": [], "Other": []}
@@ -87,18 +96,18 @@ def run(config):
     coordination = config_data.get('coordination', False)
     skip = config_data.get('skip', 'all')
     max_clash_refinement_iter = config_data.get('max_clash_refinement_iter', 5)
+    
     input = config_data.get('input', [])
     output = config_data.get('output_dir', '')
     center_yaml_residues = config_data.get('center_residues', [])
-
-    pdb_all, center_csv_residues, use_csv_centers = parse_input(input, output, center_yaml_residues)
+    pdb_all, center_residues = parse_input(input, output, center_yaml_residues)
 
     if modeller:
         from qp.structure import missing_loops
         optimize = config_data.get('optimize_select_residues', 1)
         convert_to_nhie_oxo = config_data.get('convert_to_nhie_oxo', False)
     if protoss:
-        from qp.structure import add_hydrogens
+        from qp.protonate import add_hydrogens
     if coordination:
         from qp.cluster import coordination_spheres
         sphere_count = config_data.get('number_of_spheres', 2)
@@ -128,14 +137,6 @@ def run(config):
             click.secho(f"║ {pdb.upper()} ║", bold=True)
             click.secho("╚══════╝", bold=True)
 
-            # Determine the center residues for the current PDB
-            if use_csv_centers:
-                center_residues = [center_csv_residues.pop(0)]
-            else:
-                if not center_yaml_residues:
-                    sys.exit("> No more center residues available.")
-                center_residues = center_yaml_residues
-
             # Skips fetching if PDB file exists
             if not os.path.isfile(path):
                 click.echo(f"> Fetching PDB file")
@@ -145,6 +146,10 @@ def run(config):
                     click.secho("> Error: Could not fetch PDB file\n", italic=True, fg="red")
                     err["PDB"].append(pdb)
                     continue
+            
+            # Extract the current center residue from the list of all residues
+            center_residue = [center_residues.pop(0)]
+            click.echo(f"> Using center residue: {center_residue[0]}")
             
             residues_with_clashes = [] # Start by assuming no protoss clashes
             for i in range(max_clash_refinement_iter):
@@ -193,7 +198,7 @@ def run(config):
                         pdbl = pdb.lower()
                         prepared_flag = False
                         for qp_path in qp.__path__:
-                            prepared_prot_path = os.path.join(qp_path, f"prepared/{pdbl}/Protoss")
+                            prepared_prot_path = os.path.join(qp_path, f"resources/prepared/{pdbl}/Protoss")
                             if os.path.exists(prepared_prot_path):
                                 prepared_flag = True
                         if prepared_flag:
@@ -203,13 +208,13 @@ def run(config):
                             copy(os.path.join(prepared_prot_path, f"{pdbl}_ligands.sdf"), ligands_sdf)
                             click.echo("> Using pre-prepared protoss file")
                         else:
-                            from qp.structure.add_hydrogens import clean_partial_occupancy
+                            from qp.protonate.add_hydrogens import clean_partial_occupancy
                             click.echo("> Running Protoss")
                             if modeller:
                                 pdb_path = mod_path
                             else:
                                 pdb_path = path
-                            clean_partial_occupancy(pdb_path, center_residues)
+                            clean_partial_occupancy(pdb_path, center_residue)
 
                             try:
                                 pid = add_hydrogens.upload(pdb_path)
@@ -257,7 +262,7 @@ def run(config):
                 update_sin_sdf(ligands_sdf, sin_ligands_sdf)
 
             # Check if any atoms changed from HETATM to ATOM or vice versa for future troubleshooting purposes
-            from qp.checks.protoss_atom_renaming import protoss_atom_renaming
+            from qp.protonate.protoss_atom_renaming import protoss_atom_renaming
             changed_residues = protoss_atom_renaming(mod_path, protoss_pdb)
 
             if coordination:
@@ -270,7 +275,7 @@ def run(config):
                     if not os.path.exists(old_path):
                         from shutil import copy
                         copy(path, old_path)
-                    add_hydrogens.adjust_activesites(path, center_residues)
+                    add_hydrogens.adjust_activesites(path, center_residue)
                 if charge:
                     ligand_charge = add_hydrogens.compute_charge(f"{prot_path}/{pdb}_ligands.sdf", path)
                     ligand_spin = add_hydrogens.compute_spin(f"{prot_path}/{pdb}_ligands.sdf")
@@ -278,7 +283,7 @@ def run(config):
                     ligand_charge = dict()
 
                 cluster_paths = coordination_spheres.extract_clusters(
-                    path, f"{output}/{pdb}", center_residues, sphere_count, 
+                    path, f"{output}/{pdb}", center_residue, sphere_count, 
                     first_sphere_radius, max_atom_count, merge_cutoff, smooth_method,
                     ligands, capping, charge, ligand_charge, count, xyz, hetero_pdb, include_ligands,
                     **smooth_params
@@ -296,7 +301,7 @@ def run(config):
                             for k, v in sorted(ligand_spin.items()):
                                 f.write(f"{k},{v}\n")
                     
-                    from qp.checks.charge_count import check_charge
+                    from qp.cluster.charge_count import check_charge
                     for cluster_path in cluster_paths:
                         check_charge(cluster_path)               
             click.echo("")
@@ -316,8 +321,8 @@ def run(config):
 def submit(config):
     """Handles the submission of jobs for the quantumPDB."""
 
-    from qp.job_manager import create
-    from qp.job_manager import submit
+    from qp.manager import create
+    from qp.manager import submit
     
     # Parse configuration parameters
     config_data = read_config(config)
@@ -355,17 +360,41 @@ def submit(config):
 def analyze(config):
     """Functionality for analyzing complete jobs."""
 
-    from qp.job_manager import failure_checkup
-
     config_data = read_config(config)
     method = config_data.get('method', 'wpbeh')
-    job_checkup = config_data.get('job_checkup', True)
-    output = config_data.get('output_dir', 'dataset/v1')
+    method = config_data.get('method', 'wpbeh')
+    job_checkup = config_data.get('job_checkup', False)
+    delete_queued = config_data.get('delete_queued', False)
+    calc_charge_schemes = config_data.get('calc_charge_schemes', False)
+    calc_dipole = config_data.get('calc_dipole', False)
+    multiwfn_path = config_data.get('multiwfn_path', 'Multiwfn')
+    input = config_data.get('input', [])
+    output = config_data.get('output_dir', '')
+    center_yaml_residues = config_data.get('center_residues', [])
+    pdb_all, __ = parse_input(input, output, center_yaml_residues)
     
     if job_checkup:
-        failure_counts = failure_checkup.check_all_jobs(method, output)
+        from qp.analyze import failure_checkup
+        click.echo("> Checking to see the status of the jobs...")
+        failure_counts, author_counts = failure_checkup.check_all_jobs(method, output, delete_queued)
         failure_checkup.plot_failures(failure_counts)
+        failure_checkup.plot_authors(author_counts)
 
+    if calc_charge_schemes:
+        from qp.analyze import multiwfn
+        click.echo("> Calculating charge schemes...")
+        click.echo("> Activate Multiwfn (e.g., module load multiwfn/noGUI_3.7)")
+        settings_ini_path = multiwfn.get_settings_ini_path()
+        atmrad_path = multiwfn.get_atmrad_path()
+        multiwfn.iterate_qm_output(pdb_all, method, output, multiwfn_path, settings_ini_path, atmrad_path, multiwfn.calc_charge_scheme)
+
+    if calc_dipole:
+        from qp.analyze import multiwfn
+        click.echo("> Calculating dipoles...")
+        click.echo("> Activate Multiwfn (e.g., module load multiwfn/noGUI_3.7)")
+        settings_ini_path = multiwfn.get_settings_ini_path()
+        atmrad_path = multiwfn.get_atmrad_path()
+        multiwfn.iterate_qm_output(pdb_all, method, output, multiwfn_path, settings_ini_path, atmrad_path, multiwfn.calc_dipole)
 
 if __name__ == "__main__":
     # Run the command-line interface when this script is executed
