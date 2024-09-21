@@ -1,3 +1,6 @@
+#######
+# RUN #
+#######
 # Initialization parameters
 input: akg_nhie.csv                    # Path to protein csv, single PDB, or list of PDBs [PDB1, PDB2, PDB3]
 output_dir: dataset/v1                 # Path to save the generated clusters
@@ -8,7 +11,6 @@ skip: all                              # Skip 'modeller', 'protoss', or 'all' jo
 optimize_select_residues: 1            # Modeller to model no (0), missing (1), or all (2) residues
 convert_to_oxo: true                   # Used to convert A-KG NHIEs to Succinate-Oxo NHIEs, usually False
 max_clash_refinement_iter: 5           # The max number of times to iterate over the modeller protoss loop 
-
 # Cluster model parameters
 max_atom_count: 750            
 center_residues: [FE, FE2]             # Residue name to use as the cluster center
@@ -18,12 +20,14 @@ radius_of_first_sphere: 4.0            # Distance based cut off to determine fir
 include_ligands: 2                     # Only ligands and waters in first sphere (0), Only non-water ligands (1), Everything (2)
 capping_method: 1                      # Cap residues with None (0), hydrogens (1), ACE/NME (2)
 smoothing_method: 2                    # Smoothing method Box plot (0), DBSCAN (1), [Dummy Atom] (2), None (3)
-
 # Output parameters                               
 compute_charges: true                  # Calculate charges using Protoss output
 count_residues: true                   # Count the number of residues
 write_xyz: true                        # Write out xyz files
 
+##########
+# SUBMIT #
+##########
 # Create QM job files
 optimization: false                    # Optimization (true) or single point (false)
 method: ub3lyp                         # Functional to use
@@ -35,9 +39,15 @@ dielectric : 10                        # The dieletric to use if using implicit 
 charge_embedding: true                 # Prepare QM with charge embedding
 scheduler: slurm                       # What scheduler do you use (e.g., slurm, sge)
 pcm_radii_file: /path/to/pcm_radii     # The path to the pcm_radii file if using terachem
-
 # Submit QM jobs
 create_jobs: false                     # Create QM job input files
 submit_jobs: false                     # Submit the created jobs
 job_count: 10                          # The number of jobs to maintain on the scheduler
+
+###########
+# ANALYZE #
+###########
 job_checkup: false                     # Check how status of qm jobs
+delete_queued: False                   # Clean up jobs by deleting .submit_records for unfinished jobs
+calc_charge_schemes: true              # Calculate charge schemes with Multiwfn
+atmrad_path: /data1/groups/HJKgroup/src/multiwfn/Multiwfn_3.7_bin_Linux_noGUI/examples/atmrad

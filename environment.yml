@@ -7,10 +7,12 @@ dependencies:
   - python=3.8
   - biopython
   - click
+  - importlib
   - matplotlib
   - modeller
   - numpy
   - pandas
+  - periodictable
   - pyyaml
   - requests
   - scikit-learn
