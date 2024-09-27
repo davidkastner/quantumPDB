@@ -1,7 +1,7 @@
 import pytest
 import os
 
-from qp.checks import fetch_pdb
+from qp.structure import fetch_pdb
 
 
 def test_fetch_pdb(tmpdir):
