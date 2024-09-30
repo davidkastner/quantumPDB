@@ -67,6 +67,19 @@ def compute_charge(path_ligand, path_pdb):
                 if line[17:20].strip() == res_name and line[21] == chain_id and line[22:26].strip() == res_id and line[0:3] != "TER":
                     cnt += 1
         charge[name] -= (n_atom - cnt)
+
+    # check Na+, K+, Mg2+, Ca2+
+    for line in pdb_lines:
+        if len(line) > 26 and line[0:3] != "TER":
+            res_name = line[17:20].strip()
+            chain_id = line[21]
+            res_id = line[22:26].strip()
+            if res_name in {"NA", "K"}:
+                print(f"Find {res_name} in protein, charge + 1")
+                charge[f"{res_name}_{chain_id}{res_id}"] = 1
+            elif res_name in {"MG", "CA"}:
+                print(f"Find {res_name} in protein, charge + 2")
+                charge[f"{res_name}_{chain_id}{res_id}"] = 2
     return charge
 
 
