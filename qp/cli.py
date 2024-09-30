@@ -322,7 +322,9 @@ def submit(config):
 def analyze(config):
     """Functionality for analyzing complete jobs."""
 
-    config_data = read_config(config)
+    from qp.structure import setup
+
+    config_data = setup.read_config(config)
     method = config_data.get('method', 'wpbeh')
     method = config_data.get('method', 'wpbeh')
     job_checkup = config_data.get('job_checkup', False)
@@ -333,7 +335,7 @@ def analyze(config):
     input = config_data.get('input', [])
     output = config_data.get('output_dir', '')
     center_yaml_residues = config_data.get('center_residues', [])
-    pdb_all, __ = parse_input(input, output, center_yaml_residues)
+    pdb_all, center_residues = setup.parse_input(input, output, center_yaml_residues)
     
     if job_checkup:
         from qp.analyze import checkup

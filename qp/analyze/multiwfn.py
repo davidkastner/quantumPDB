@@ -7,6 +7,7 @@ from pathlib import Path
 from Bio.PDB import PDBParser
 from importlib import resources
 from periodictable import elements
+from qp.analyze import molden
 
 
 def get_settings_ini_path():
@@ -127,7 +128,7 @@ def iterate_qm_output(pdb_all, method, base_output_dir, multiwfn_path, settings_
                 shutil.copy(settings_ini_path, settings_ini_dest_path)
 
                 if os.path.exists(scr_dir_path):
-                    molden_files = glob.glob(os.path.join(scr_dir_path, '*.molden'))
+                    molden_files = glob.glob(os.path.join(scr_dir_path, f'{chain_dir}.molden'))
                     if molden_files:
                         # Call the task function with the directory and molden file
                         molden_file = os.path.basename(molden_files[0])
@@ -226,17 +227,17 @@ def calc_dipole(scr_dir_path, molden_file, multiwfn_path):
     raw_out_file = f"{molden_base_name}_dipole.out"
     dipole_results_file = f"{molden_base_name}_dipole.csv"
 
-    dipole_command = f"{multiwfn_path} {molden_file} > {raw_out_file}"
     fragment_atom_range = get_atom_range()
     center_of_mass_list = get_com()
-    center_of_mass_str = ",".join(map(str, center_of_mass_list))
+    output_molden_file = molden.center_molden(molden_file, center_of_mass_list)
+    dipole_command = f"{multiwfn_path} {output_molden_file} > {raw_out_file}"
     
     if not is_valid_dipole_file(raw_out_file):
         proc = subprocess.Popen(dipole_command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-        commands = ["15", "-10", center_of_mass_str, "2", "-5", fragment_atom_range, "-1", "3", "2", "0", "q"]
+        commands = ["15", "-5", fragment_atom_range, "-1", "3", "2", "0", "q"]
         output, _ = proc.communicate("\n".join(commands).encode())  # Send the commands to Multiwfn
-    
-    if not is_valid_dipole_file(raw_out_file) and not os.path.exists(dipole_results_file):
+
+    if is_valid_dipole_file(raw_out_file) and not os.path.exists(dipole_results_file):
         # Parse raw_out_file and generate dipole_results_file
         dipole_a_u = None
         magnitude_a_u = None
