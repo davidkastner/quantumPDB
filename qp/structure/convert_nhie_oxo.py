@@ -186,7 +186,7 @@ def convert_akg_to_sin(atoms):
             else:
                 atom['resName'] = 'SIN'
 
-def add_oxo_and_sin(pdb_path):
+def add_oxo_sin(pdb_path):
     # Start by making a copy of the file
     shutil.copy(pdb_path, f'{pdb_path[:-4]}_akg.pdb')
     atoms = read_pdb(pdb_path)

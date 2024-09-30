@@ -183,7 +183,7 @@ def parse_pdb_to_xyz(pdb_file_path, output_file_path, qm_centroid, cutoff_distan
             z_coord = float(line[46:54])
             output_file.write(f"{charges} {x_coord} {y_coord} {z_coord}\n")
 
-def get_charge_embedding(charge_embedding_cutoff):
+def get_charges(charge_embedding_cutoff):
     # Setup a temporary directory to store files
     temporary_files_dir = "ptchrges_temp"
     # Check if the directory exists
@@ -221,4 +221,4 @@ def get_charge_embedding(charge_embedding_cutoff):
     shutil.rmtree(temporary_files_dir)
 
 if __name__ == "__main__":
-    get_charge_embedding()
+    get_charges()

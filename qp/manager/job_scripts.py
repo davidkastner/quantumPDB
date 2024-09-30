@@ -1,6 +1,6 @@
 """Stored job submission scripts"""
 
-def write_qmscript(optimization, coord_file, basis, method, total_charge, multiplicity, guess, pcm_radii_file, constraint_freeze, dielectric, use_charge_embedding):
+def write_qm(optimization, coord_file, basis, method, total_charge, multiplicity, guess, pcm_radii_file, constraint_freeze, dielectric, use_charge_embedding):
     """Generate TeraChem job submission scripts."""
     
     minimization_keywords = """new_minimizer yes\nrun minimize\n""" if optimization else ""
@@ -42,7 +42,7 @@ end
 
 
 
-def write_slurm_jobscript(job_name, gpus, memory):
+def write_slurm_job(job_name, gpus, memory):
     """Generate bash submission scripts with conditional sleep time."""
 
     jobscript_content = f"""#! /bin/bash
@@ -66,7 +66,7 @@ echo "Run End Time: $(date '+%Y-%m-%d %H:%M:%S')" >> .submit_record
 
     return jobscript_content
 
-def write_sge_jobscript(job_name, gpus, memory):
+def write_sge_job(job_name, gpus, memory):
     """Generate bash submission scripts with conditional sleep time."""
 
     jobscript_content = f"""#!/bin/bash

@@ -23,7 +23,7 @@ def get_atmrad_path():
 
     return atmrad_path
 
-def get_center_of_mass():
+def get_com():
     """
     Gets the center of mass of the atoms in the PDB file (0.pdb)
     
@@ -57,7 +57,7 @@ def get_center_of_mass():
     return center_of_mass
 
 
-def get_fragment_atom_range():
+def get_atom_range():
     """
     Gets the range of atoms in the file 0.pdb, which is the substrate.
     Returns the atoms as a range e.g., "1-32".
@@ -143,7 +143,7 @@ def iterate_qm_output(pdb_all, method, base_output_dir, multiwfn_path, settings_
             continue
 
 
-def calc_charge_scheme(scr_dir_path, molden_file,  multiwfn_path):
+def charge_scheme(scr_dir_path, molden_file,  multiwfn_path):
     """
     Calculate a variety of charge schemes with Multiwfn for a given .molden file and
     process the output to extract relevant information, saving it in a readable format.
@@ -166,7 +166,7 @@ def calc_charge_scheme(scr_dir_path, molden_file,  multiwfn_path):
     # charge_schemes = {"Hirshfeld": "1", "Voronoi": "2", "Mulliken": "5", "ADCH": "11", "Hirshfeld-I": "15", "CM5": "16"}
     charge_schemes = {"Hirshfeld-I": "15"}
     charge_command = f"{multiwfn_path} {molden_file}"
-    fragment_atom_range = get_fragment_atom_range() # Get the atoms to define a Multiwfn fragment
+    fragment_atom_range = get_atom_range() # Get the atoms to define a Multiwfn fragment
 
     for scheme_name, scheme_code in charge_schemes.items():
         new_charge_file = f"{molden_base_name}_{scheme_name}.txt"
@@ -227,8 +227,8 @@ def calc_dipole(scr_dir_path, molden_file, multiwfn_path):
     dipole_results_file = f"{molden_base_name}_dipole.csv"
 
     dipole_command = f"{multiwfn_path} {molden_file} > {raw_out_file}"
-    fragment_atom_range = get_fragment_atom_range()
-    center_of_mass_list = get_center_of_mass()
+    fragment_atom_range = get_atom_range()
+    center_of_mass_list = get_com()
     center_of_mass_str = ",".join(map(str, center_of_mass_list))
     
     if not is_valid_dipole_file(raw_out_file):
