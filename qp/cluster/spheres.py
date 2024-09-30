@@ -2,9 +2,9 @@
 
 **Usage**::
 
-    >>> from qp.cluster import coordination_spheres
+    >>> from qp.cluster import spheres
 
-    >>> coordination_spheres.extract_clusters(
+    >>> spheres.extract_clusters(
     ...     "path/to/PDB.pdb", 
     ...     "path/to/out/dir/", 
     ...     center_residues=["FE", "FE2"], # List of resnames of the residues to use as the cluster center
@@ -13,7 +13,7 @@
     ... )
 
 Extracting clusters leaves open valences in the outermost sphere. Capping may be
-performed by specifying ``capping`` in ``coordination_spheres.extract_clusters``:
+performed by specifying ``capping`` in ``spheres.extract_clusters``:
 
 * 0. No capping. (Default)
 * 1. Cap with hydrogens.
@@ -30,7 +30,7 @@ from Bio.PDB.Chain import Chain
 from Bio.PDB.Model import Model
 from Bio.PDB.NeighborSearch import NeighborSearch
 from scipy.spatial import Voronoi
-from qp.structure import struct_to_file
+from qp.cluster import struct_to_file
 from sklearn.cluster import DBSCAN
 
 
@@ -83,7 +83,7 @@ def get_grid(coords, mean_distance):
     return coord_min, coord_max, coord_min + np.linspace(0, npoints - 1, npoints) * mean_distance
 
 
-def _visualize_dummy(dummy, path):
+def visualize_dummy(dummy, path):
     # debug function
     with open(path + "/dummy.xyz", "w") as f:
         f.write(f"{len(dummy)}\n\n")
@@ -150,7 +150,7 @@ def calc_dist(point_a, point_b):
     return np.linalg.norm(point_a - point_b)
 
 
-def voronoi(model, center_residues, ligands, smooth_method, **smooth_params):
+def voronoi(model, center_residues, ligands, smooth_method, output_path, **smooth_params):
     """
     Computes the Voronoi tessellation of a protein structure.
 
@@ -177,9 +177,14 @@ def voronoi(model, center_residues, ligands, smooth_method, **smooth_params):
     points_count = len(points)
     if smooth_method == "dummy_atom":
         new_points = fill_dummy(points, **smooth_params)
+        visualize_dummy(new_points, output_path)
         vor = Voronoi(new_points)
+        # vor = Voronoi(points)
     else:
         vor = Voronoi(points)
+
+    # Plot Voronoi diagrams (2D and 3D)
+    # plot_voronoi_2d(new_points, points_count, output_path)  # Plot 2D Voronoi excluding dummy atoms
 
     neighbors = {}
     for a, b in vor.ridge_points:
@@ -677,7 +682,7 @@ def cap_chains(model: Model, residues: Set[Residue], capping: int) -> Set[Residu
     return cap_residues
 
 
-def write_pdb(io, sphere, out):
+def write_pdbs(io, sphere, out):
     """
     Write coordination sphere to PDB file.
 
@@ -862,7 +867,7 @@ def extract_clusters(
     io.set_structure(structure)
 
     model = structure[0]
-    neighbors = voronoi(model, center_residues, ligands, smooth_method, **smooth_params)
+    neighbors = voronoi(model, center_residues, ligands, smooth_method, out,**smooth_params)
 
     centers = get_center_residues(model, center_residues, merge_cutoff)
 
@@ -892,7 +897,7 @@ def extract_clusters(
         for i, s in enumerate(spheres):
             sphere_path = f"{cluster_path}/{i}.pdb"
             sphere_paths.append(sphere_path)
-            write_pdb(io, s, sphere_path)
+            write_pdbs(io, s, sphere_path)
         if capping:
             for cap in cap_residues:
                 cap.get_parent().detach_child(cap.get_id())
@@ -920,3 +925,96 @@ def extract_clusters(
                 f.write("\n")
 
     return cluster_paths
+
+
+
+
+
+
+import numpy as np
+from scipy.spatial import Voronoi
+import matplotlib.pyplot as plt
+
+def format_plot() -> None:
+    """General plotting parameters for the Kulik Lab."""
+    font = {"family": "sans-serif", "weight": "bold", "size": 10}
+    plt.rc("font", **font)
+    plt.rcParams["xtick.major.pad"] = 5
+    plt.rcParams["ytick.major.pad"] = 5
+    plt.rcParams["axes.linewidth"] = 2
+    plt.rcParams["xtick.major.size"] = 7
+    plt.rcParams["xtick.major.width"] = 2
+    plt.rcParams["ytick.major.size"] = 7
+    plt.rcParams["ytick.major.width"] = 2
+    plt.rcParams["xtick.direction"] = "in"
+    plt.rcParams["ytick.direction"] = "in"
+    plt.rcParams["xtick.top"] = True
+    plt.rcParams["ytick.right"] = True
+    plt.rcParams["svg.fonttype"] = "none"
+
+def plot_voronoi_2d(points, points_count, output_path, x_threshold=(22, 32), y_threshold=(15, 25)):
+    """
+    Plot a 2D Voronoi diagram from the atomic coordinates, excluding unbounded vertices and filtering by x and y thresholds.
+    
+    Parameters
+    ----------
+    points: list or numpy.array
+        The 3D coordinates of the points (atoms) to be tessellated.
+        Only the xy-plane projection will be plotted.
+    points_count: int
+        The number of real atoms (excluding dummy atoms).
+    output_path: str
+        The directory where the plot will be saved.
+    x_threshold: tuple of floats
+        The min and max thresholds for the x-coordinate filtering.
+    y_threshold: tuple of floats
+        The min and max thresholds for the y-coordinate filtering.
+
+    Notes
+    -----
+    Zoom-Out ->  x_threshold=(-22, 83), y_threshold=(-20, 62)
+    Zoom-In  ->  x_threshold=(22, 32), y_threshold=(15, 25)
+
+    """
+    # Ensure points is a NumPy array
+    points = np.array(points)
+    
+    # Compute the Voronoi tessellation using only xy coordinates
+    vor = Voronoi(points[:, :2])
+    
+    # Plot the Voronoi diagram
+    format_plot()
+    fig, ax = plt.subplots()
+
+    # Filter vertices to exclude extreme values for both x and y coordinates
+    x_min, x_max = x_threshold
+    y_min, y_max = y_threshold
+
+    valid_vertices = vor.vertices[
+        (vor.vertices[:, 0] >= x_min) & (vor.vertices[:, 0] <= x_max) & 
+        (vor.vertices[:, 1] >= y_min) & (vor.vertices[:, 1] <= y_max)
+    ]
+    
+    ax.plot(valid_vertices[:, 0], valid_vertices[:, 1], 'o', markersize=3, color='red', zorder=1)
+
+    # Plot ridges (edges) of the Voronoi cells, but only for real atoms
+    for ridge in vor.ridge_vertices:
+        if all(v >= 0 for v in ridge):  # Ignore unbounded vertices
+            ridge_vertices = vor.vertices[ridge]
+            # Filter the ridge by the x and y thresholds
+            if (np.all(ridge_vertices[:, 0] >= x_min) and np.all(ridge_vertices[:, 0] <= x_max) and 
+                np.all(ridge_vertices[:, 1] >= y_min) and np.all(ridge_vertices[:, 1] <= y_max)):
+                ax.plot(ridge_vertices[:, 0], ridge_vertices[:, 1], 'k-')
+
+    # Plot the original points (real atoms)
+    # ax.plot(points[:points_count, 0], points[:points_count, 1], 'o', markersize=3, color='red', label='Atoms')
+
+    ax.set_xlabel('X Coordinate (Å)', fontsize=10, fontweight='bold')
+    ax.set_ylabel('Y Coordinate (Å)', fontsize=10, fontweight='bold')
+    ax.set_aspect('equal')
+
+    # Save the plot to the output path
+    output_file = os.path.join(output_path, '2D_filtered_voronoi.png')
+    plt.savefig(output_file, bbox_inches="tight", dpi=600)
+    plt.close()
+

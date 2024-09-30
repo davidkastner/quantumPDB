@@ -4,7 +4,7 @@ import os
 import glob
 import filecmp
 
-from qp.cluster import coordination_spheres
+from qp.cluster import spheres
 
 
 def check_clusters(path, out, metal_ids):
@@ -37,7 +37,7 @@ def check_clusters(path, out, metal_ids):
 def test_extract_clusters(tmpdir, sample_cluster):
     pdb, metal_ids, path = sample_cluster
     pdb_path = os.path.join(path, "Protoss", f"{pdb}_protoss.pdb")
-    coordination_spheres.extract_clusters(
+    spheres.extract_clusters(
         pdb_path, tmpdir, ["FE", "FE2"],
         smooth_method="dummy_atom", mean_distance=3
     )
@@ -48,7 +48,7 @@ def test_extract_clusters(tmpdir, sample_cluster):
 def test_cap_heavy(tmpdir, sample_cluster):
     pdb, metal_ids, path = sample_cluster
     pdb_path = os.path.join(path, "Protoss", f"{pdb}_protoss.pdb")
-    coordination_spheres.extract_clusters(
+    spheres.extract_clusters(
         pdb_path, tmpdir, ["FE", "FE2"], capping=2, 
         smooth_method="dummy_atom", mean_distance=3
     )
@@ -59,7 +59,7 @@ def test_cap_heavy(tmpdir, sample_cluster):
 def test_box_plot(tmpdir, sample_cluster):
     pdb, metal_ids, path = sample_cluster
     pdb_path = os.path.join(path, "Protoss", f"{pdb}_protoss.pdb")
-    coordination_spheres.extract_clusters(
+    spheres.extract_clusters(
         pdb_path, tmpdir, ["FE", "FE2"],
         smooth_method="box_plot"
     )
@@ -70,7 +70,7 @@ def test_box_plot(tmpdir, sample_cluster):
 def test_dbscan(tmpdir, sample_cluster):
     pdb, metal_ids, path = sample_cluster
     pdb_path = os.path.join(path, "Protoss", f"{pdb}_protoss.pdb")
-    coordination_spheres.extract_clusters(
+    spheres.extract_clusters(
         pdb_path, tmpdir, ["FE", "FE2"], 
         smooth_method="dbscan", eps=6, min_samples=3
     )
@@ -90,7 +90,7 @@ def test_dbscan(tmpdir, sample_cluster):
 def test_merge_centers(tmpdir, sample_cluster):
     pdb, metal_ids, path = sample_cluster
     pdb_path = os.path.join(path, "Protoss", f"{pdb}_protoss.pdb")
-    coordination_spheres.extract_clusters(
+    spheres.extract_clusters(
         pdb_path, tmpdir, ["BGC", "GAL", "NGA", "SIA", "NI"],
         merge_cutoff=4.0,
         smooth_method="dummy_atom", mean_distance=3
@@ -102,7 +102,7 @@ def test_merge_centers(tmpdir, sample_cluster):
 def test_prune_atoms(tmpdir, sample_cluster):
     pdb, metal_ids, path = sample_cluster
     pdb_path = os.path.join(path, "Protoss", f"{pdb}_protoss.pdb")
-    coordination_spheres.extract_clusters(
+    spheres.extract_clusters(
         pdb_path, tmpdir, ["DT", "MA7"],
         max_atom_count=102, merge_cutoff=2.0,
         smooth_method="dummy_atom", mean_distance=3
