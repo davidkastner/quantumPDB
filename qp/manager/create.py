@@ -44,7 +44,7 @@ def residue_exists(sphere_path, res_name, chain, res_id):
     """Returns True if ligand_name exists in the pdb file."""
     with open(sphere_path, 'r') as f:
         for line in f:
-            if line.startswith("HETATM") and res_name == line[17:20].strip() \
+            if res_name == line[17:20].strip() \
                 and chain == line[21] and res_id == int(line[22:26]):
                 return True
     return False
