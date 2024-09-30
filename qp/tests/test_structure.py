@@ -4,7 +4,7 @@ import glob
 import shutil
 import filecmp
 
-from qp.structure import add_hydrogens
+from qp.protonate import get_protoss, fix
 from qp.structure import struct_to_file
 
 # Skip MODELLER tests if in Github actions
@@ -18,7 +18,7 @@ if not MISSING_LICENSE:
     from qp.structure import missing_loops
 
 
-# ========== add_hydrogens ==========
+# ========== protonate ==========
 
 @pytest.mark.parametrize("sample_pdb", ["1lm6"], indirect=True)
 def test_protoss(tmpdir, sample_pdb):
@@ -26,9 +26,9 @@ def test_protoss(tmpdir, sample_pdb):
     pdb_path = os.path.join(path, f"{pdb}.pdb")
     out = os.path.join(tmpdir, f"{pdb}_protoss.pdb")
 
-    pid = add_hydrogens.upload(pdb_path)
-    job = add_hydrogens.submit(pid)
-    add_hydrogens.download(job, out)
+    pid = get_protoss.upload(pdb_path)
+    job = get_protoss.submit(pid)
+    get_protoss.download(job, out)
     assert os.path.getsize(out) > 0, "Found empty PDB file"
 
 
@@ -41,7 +41,7 @@ def test_repair_ligands(tmpdir, sample_pdb):
     output_prot = os.path.join(tmpdir, f"{pdb}_protoss.pdb")
 
     shutil.copy(input_prot, output_prot)
-    add_hydrogens.repair_ligands(output_prot, pdb_path)
+    get_protoss.repair_ligands(output_prot, pdb_path)
     assert filecmp.cmp(expected_prot, output_prot), "Repaired Protoss PDB does not match expected"
 
 
@@ -53,7 +53,7 @@ def test_adjust_activesites(tmpdir, sample_pdb):
     output_prot = os.path.join(tmpdir, f"{pdb}_protoss.pdb")
 
     shutil.copy(input_prot, output_prot)
-    add_hydrogens.adjust_activesites(output_prot, ["FE", "FE2"])
+    fix.adjust_activesites(output_prot, ["FE", "FE2"])
     assert filecmp.cmp(expected_prot, output_prot), "Adjusted Protoss PDB does not match expected"
 
 
@@ -70,7 +70,7 @@ def test_compute_charge(tmpdir, sample_pdb):
                 break
             ligand, charge = l.split(",")
             expected_charge[ligand] = int(charge)
-    output_charge = add_hydrogens.compute_charge(sdf_path, prot_path)
+    output_charge = get_protoss.compute_charge(sdf_path, prot_path)
     assert expected_charge == output_charge, "Ligand charge does not match expected"
 
 

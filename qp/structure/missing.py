@@ -2,14 +2,14 @@
 
 **Usage**::
 
-    >>> from qp.structure import missing_loops
+    >>> from qp.structure import missing
     >>> pdb = "1lnh"
 
     # Parse PDB file, filling in missing residues
-    >>> residues = missing_loops.get_residues("path/to/PDB.pdb")
+    >>> residues = missing.get_residues("path/to/PDB.pdb")
 
     # Write alignment file
-    >>> missing_loops.write_alignment(
+    >>> missing.write_alignment(
     ...     residues, 
     ...     pdb, 
     ...     "path/to/PDB.pdb", 
@@ -23,7 +23,7 @@
     MLGGLLHRGHKIKGTVVLMRKNVLDVNSVTSVGGIIGQGLDLVGSTLDTLTAFLGRSVSLQLISAT...
 
     # Run MODELLER with the given alignment file
-    >>> missing_loops.build_model(
+    >>> missing.build_model(
     ...     residues, 
     ...     pdb, 
     ...     "path/to/PDB.pdb", 
@@ -31,7 +31,7 @@
     ...     "path/to/OUT.pdb"
     ... )
 
-Optimization level (``optimize`` argument in ``missing_loops.build_model``): 
+Optimization level (``optimize`` argument in ``missing.build_model``): 
 
 * 0. No optimization. Missing coordinates filled in using MODELLER's topology library.
 * 1. Optimize missing residues and residues with missing atoms only. (Default)
@@ -103,7 +103,7 @@ def get_residues(path, AA):
     with open(path, "r") as f:
         p = f.read().splitlines()
 
-    missing = {}
+    missing_residues = {}
     ind = {}
     seen = {}
     residues = []
@@ -119,7 +119,7 @@ def get_residues(path, AA):
                 chain = line[19]
                 rid = int(line[21:26])
                 ic = line[26]
-                missing.setdefault(chain, set()).add(((rid, ic), AA[res], "R"))
+                missing_residues.setdefault(chain, set()).add(((rid, ic), AA[res], "R"))
 
         elif line.startswith("REMARK 470   "):  # missing atoms
             res = line[15:18]
@@ -127,7 +127,7 @@ def get_residues(path, AA):
                 chain = line[19]
                 rid = int(line[20:24])
                 ic = line[24]
-                missing.setdefault(chain, set()).add(((rid, ic), AA[res], "A"))
+                missing_residues.setdefault(chain, set()).add(((rid, ic), AA[res], "A"))
 
         elif line.startswith("ATOM") or line.startswith("HETATM"):
             res = line[17:20]
@@ -137,19 +137,19 @@ def get_residues(path, AA):
 
             if chain != cur:
                 residues.append([])
-                if chain in missing and chain not in ind:
-                    missing[chain] = sorted(missing[chain])
+                if chain in missing_residues and chain not in ind:
+                    missing_residues[chain] = sorted(missing_residues[chain])
                     ind[chain] = 0
                 if chain not in seen:
                     seen[chain] = set()
                 cur = chain
 
-            if chain in missing:
+            if chain in missing_residues:
                 while (
-                    ind[chain] < len(missing[chain])
-                    and (rid, ic) >= missing[chain][ind[chain]][0]
+                    ind[chain] < len(missing_residues[chain])
+                    and (rid, ic) >= missing_residues[chain][ind[chain]][0]
                 ):
-                    residues[-1].append(missing[chain][ind[chain]])
+                    residues[-1].append(missing_residues[chain][ind[chain]])
                     ind[chain] += 1
                     seen[chain].add(residues[-1][-1][:2])
 
@@ -163,9 +163,9 @@ def get_residues(path, AA):
 
         elif line.startswith("TER"):
             chain = line[21]
-            if chain in missing:
-                while ind[chain] < len(missing[chain]):
-                    residues[-1].append(missing[chain][ind[chain]])
+            if chain in missing_residues:
+                while ind[chain] < len(missing_residues[chain]):
+                    residues[-1].append(missing_residues[chain][ind[chain]])
                     ind[chain] += 1
 
     return residues
@@ -245,7 +245,7 @@ def transfer_numbering(e, ali, path, out):
 
     See Also
     --------
-    qp.structure.missing_loops.fix_numbering()
+    qp.structure.missing.fix_numbering()
 
     """
     # Read the alignment for the transfer
@@ -370,7 +370,7 @@ def build_model(residues, pdb, path, ali, out, optimize=1):
             n = len(residues)
             self.rename_segments(chain_ids[:n], [1] * n)
 
-    missing = []
+    missing_residues = []
     for i, c in enumerate(residues):
         chain = chr(ord("A") + i)
         ind = None
@@ -378,14 +378,14 @@ def build_model(residues, pdb, path, ali, out, optimize=1):
             if res[2] and ind is None:
                 ind = j + 1
             elif not res[2] and ind is not None:
-                missing.append((f"{ind}:{chain}", f"{j}:{chain}"))
+                missing_residues.append((f"{ind}:{chain}", f"{j}:{chain}"))
                 ind = None
         if ind is not None:
-            missing.append((f"{ind}:{chain}", f"{len(c)}:{chain}"))
+            missing_residues.append((f"{ind}:{chain}", f"{len(c)}:{chain}"))
 
-    if optimize == 1 and missing:
+    if optimize == 1 and missing_residues:
         CustomModel.select_atoms = lambda self: Selection(
-            *[self.residue_range(x, y) for x, y in missing]
+            *[self.residue_range(x, y) for x, y in missing_residues]
         )
 
     e = Environ()
@@ -395,7 +395,7 @@ def build_model(residues, pdb, path, ali, out, optimize=1):
     a.starting_model = 1
     a.ending_model = 1
 
-    if not optimize or (optimize == 1 and not missing):
+    if not optimize or (optimize == 1 and not missing_residues):
         a.make(exit_stage=2)
         os.rename(f"{pdb}_fill.ini", os.path.basename(out))
         transfer_numbering(e, ali, pdb, out)
@@ -430,45 +430,8 @@ def get_chain_order(pdb_path):
                     chain_order[chain_id] = len(chain_order)
     return chain_order
 
-def parse_protoss_log(log_path, pdb_path, AA):
-    """
-    Parse the Protoss log file to identify residues with clashes and their chain indices.
 
-    Parameters
-    ----------
-    log_path: str
-        Path to the Protoss log file.
-    pdb_path: str
-        Path to the PDB file.
-    AA: dict
-        Dictionary mapping three-letter codes to one-letter codes.
-
-    Returns
-    -------
-    residues_with_clashes: set of tuples
-        Set of residues with clashes in the format compatible with `residues`.
-        Each tuple contains ((res_id, ' '), one_letter_code, 'R') and the chain index.
-    """
-    chain_order = get_chain_order(pdb_path)
-    residues_with_clashes = set()
-
-    with open(log_path, "r") as f:
-        for line in f:
-            if "ATOM" in line:
-                # Remove everything before "ATOM"
-                atom_line = line[line.index("ATOM"):]
-
-                # Extract information based on PDB format columns
-                res_name = atom_line[17:20].strip()
-                chain = atom_line[21].strip()
-                res_id = int(atom_line[22:26].strip())
-                one_letter_code = AA.get(res_name, 'X')  # Use 'X' for unknown residues
-                chain_index = chain_order.get(chain, -1)
-                residues_with_clashes.add((res_id, one_letter_code, chain_index, chain))
-
-    return residues_with_clashes
-
-def delete_residues_with_clashes(pdb_path, residues_with_clashes):
+def delete_clashes(pdb_path, residues_with_clashes):
     """
     Delete residues with clashes from a PDB file and rewrite the PDB file.
 

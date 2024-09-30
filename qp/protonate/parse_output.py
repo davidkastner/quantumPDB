@@ -1,8 +1,47 @@
-'''Checks if protoss changed HETATM or ATOM classifications.'''
-
 from Bio.PDB import PDBParser
+from qp.structure.missing import get_chain_order
 
-def protoss_atom_renaming(modeller_pdb_path, protoss_pdb_path):
+def parse_log(log_path, pdb_path, AA):
+    """
+    Parse the Protoss log file to identify residues with clashes and their chain indices.
+
+    Parameters
+    ----------
+    log_path: str
+        Path to the Protoss log file.
+    pdb_path: str
+        Path to the PDB file.
+    AA: dict
+        Dictionary mapping three-letter codes to one-letter codes.
+
+    Returns
+    -------
+    residues_with_clashes: set of tuples
+        Set of residues with clashes in the format compatible with `residues`.
+        Each tuple contains ((res_id, ' '), one_letter_code, 'R') and the chain index.
+    """
+    chain_order = get_chain_order(pdb_path)
+    residues_with_clashes = set()
+
+    with open(log_path, "r") as f:
+        for line in f:
+            if "ATOM" in line:
+                # Remove everything before "ATOM"
+                atom_line = line[line.index("ATOM"):]
+
+                # Extract information based on PDB format columns
+                res_name = atom_line[17:20].strip()
+                chain = atom_line[21].strip()
+                res_id = int(atom_line[22:26].strip())
+                one_letter_code = AA.get(res_name, 'X')  # Use 'X' for unknown residues
+                chain_index = chain_order.get(chain, -1)
+                residues_with_clashes.add((res_id, one_letter_code, chain_index, chain))
+
+    return residues_with_clashes
+
+
+
+def record_type(modeller_pdb_path, protoss_pdb_path):
     '''
     Checks if protoss changed HETATM or ATOM classifications.
 

@@ -1,5 +1,3 @@
-"""Manager for submitting DFT single point calcultions."""
-
 import os
 import sys
 import glob
@@ -8,9 +6,9 @@ import getpass
 import datetime
 import subprocess
 
-def create_submission_marker(submission_marker_path, job_name, submission_command, submission_output):
-    """Creates a comprehensive summary of submission information that doubles as a tracker."""
 
+def create_marker(submission_marker_path, job_name, submission_command, submission_output):
+    """Creates a comprehensive summary of submission information that doubles as a tracker."""
     with open(submission_marker_path, 'w') as marker:
         marker.write(f"Jobname: {job_name}\n")
         marker.write(f"Author: {getpass.getuser()}\n")
@@ -19,10 +17,10 @@ def create_submission_marker(submission_marker_path, job_name, submission_comman
         marker.write(f"Output: {submission_output}\n")
 
 
-def prepare_submission(job_count, method, scheduler):
-    """Generate and submit jobs to queueing system, returning True if any jobs were submitted."""
+def prepare_jobs(job_count, method):
+    """Prepare the jobs but do not submit them yet."""
     base_dir = os.getcwd()
-    submitted_jobs = 0
+    prepared_jobs = []
     
     pdb_dirs = sorted([d for d in os.listdir() if os.path.isdir(d) and not d == 'Protoss'])
     for pdb in pdb_dirs:
@@ -53,34 +51,46 @@ def prepare_submission(job_count, method, scheduler):
                 print(f"ERROR: Expected 1 xyz file in {structure}, found {len(xyz_files)}")
                 continue
             
-            os.chdir(qm_path)
-            
-            pdb_name = os.path.basename(pdb)
-            structure_name = os.path.basename(structure)
-            job_name = f"{pdb_name}{structure_name}"
-            
-            time.sleep(.2) # Gives user time to abort with ctrl + C
-            
-            # Execute the job submission command and capture its output
-            if scheduler == "sge":
-                submission_command = 'qsub jobscript.sh'
-            if scheduler == "slurm":
-                submission_command = 'sbatch jobscript.sh'
+            prepared_jobs.append((qm_path, pdb, structure))
 
-            result = subprocess.run(submission_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            submission_output = result.stdout.strip() if result.returncode == 0 else result.stderr.strip()
-            print(f"      > {submission_output}")
-            create_submission_marker(submission_marker_path, job_name, submission_command, submission_output)
-            os.chdir(base_dir)
-            submitted_jobs += 1
-
-            # Existing condition to break early if job_count is reached
-            if submitted_jobs == job_count:
-                print(f"> Submitted {job_count} jobs")
-                return submitted_jobs
+            # Break early if job_count is reached
+            if len(prepared_jobs) == job_count:
+                return prepared_jobs
             
-    return 0
+    return prepared_jobs
 
+
+def submit_jobs(prepared_jobs, scheduler):
+    """Submit the prepared jobs to the scheduler."""
+    base_dir = os.getcwd()
+    submitted_jobs = 0
+
+    for qm_path, pdb, structure in prepared_jobs:
+        os.chdir(qm_path)
+        
+        pdb_name = os.path.basename(pdb)
+        structure_name = os.path.basename(structure)
+        job_name = f"{pdb_name}{structure_name}"
+        
+        time.sleep(.2)  # Gives user time to abort with ctrl + C
+
+        # Execute the job submission command and capture its output
+        if scheduler == "sge":
+            submission_command = 'qsub jobscript.sh'
+        elif scheduler == "slurm":
+            submission_command = 'sbatch jobscript.sh'
+
+        result = subprocess.run(submission_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        submission_output = result.stdout.strip() if result.returncode == 0 else result.stderr.strip()
+        print(f"      > {submission_output}")
+
+        submission_marker_path = os.path.join(qm_path, '.submit_record')
+        create_marker(submission_marker_path, job_name, submission_command, submission_output)
+        
+        os.chdir(base_dir)
+        submitted_jobs += 1
+        
+    return submitted_jobs
 
 def manage_jobs(output, job_count, method, scheduler):
     """Main function for managing QM jobs."""
@@ -88,12 +98,15 @@ def manage_jobs(output, job_count, method, scheduler):
     os.chdir(output)
     print(f"> Attempting to submit {job_count} jobs.")
     
-    # Submit the required number of jobs directly
-    submitted_jobs = prepare_submission(job_count, method, scheduler)
-    if submitted_jobs > 0:
+    # Prepare the jobs
+    prepared_jobs = prepare_jobs(job_count, method)
+    
+    # Submit the jobs
+    if prepared_jobs:
+        submitted_jobs = submit_jobs(prepared_jobs, scheduler)
         print(f"> Successfully submitted {submitted_jobs} jobs.")
     else:
-        print("> No jobs were submitted.")
+        print("> No jobs were prepared.")
     
     # Done, exit the script
     print("Done.\n")

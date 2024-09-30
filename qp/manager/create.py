@@ -177,11 +177,11 @@ def create_jobs(pdb_list_path, output_dir, optimization, basis, method, guess, u
             job_name = f"{pdb_name}{structure_name}"
             
             if scheduler == "slurm":
-                qmscript = job_scripts.write_qmscript(optimization, coord_file, basis, method, total_charge, multiplicity, guess, pcm_radii_file, constraint_freeze, dielectric, use_charge_embedding)
-                jobscript = job_scripts.write_slurm_jobscript(job_name, gpus, memory)
+                qmscript = job_scripts.write_qm(optimization, coord_file, basis, method, total_charge, multiplicity, guess, pcm_radii_file, constraint_freeze, dielectric, use_charge_embedding)
+                jobscript = job_scripts.write_slurm_job(job_name, gpus, memory)
             if scheduler == "sge":
-                qmscript = job_scripts.write_qmscript(optimization, coord_file, basis, method, total_charge, multiplicity, guess, pcm_radii_file, constraint_freeze, dielectric, use_charge_embedding)
-                jobscript = job_scripts.write_sge_jobscript(job_name, gpus, memory)
+                qmscript = job_scripts.write_qm(optimization, coord_file, basis, method, total_charge, multiplicity, guess, pcm_radii_file, constraint_freeze, dielectric, use_charge_embedding)
+                jobscript = job_scripts.write_sge_job(job_name, gpus, memory)
             
             with open('qmscript.in', 'w') as f:
                 f.write(qmscript)
@@ -189,7 +189,7 @@ def create_jobs(pdb_list_path, output_dir, optimization, basis, method, guess, u
                 f.write(jobscript)
 
             if use_charge_embedding:
-                charge_embedding.get_charge_embedding(charge_embedding_cutoff)
+                charge_embedding.get_mm_charges(charge_embedding_cutoff)
 
             print(f"> Created QM job files for {pdb}/{structure_name}/{method}/")
             
