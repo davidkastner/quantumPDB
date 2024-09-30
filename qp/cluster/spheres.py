@@ -497,7 +497,7 @@ def get_normalized_vector(atom1: Atom, atom2: Atom) -> np.array:
     return v / np.linalg.norm(v)
 
 
-def build_hydrogen(parent: Residue, template: Optional[Residue], atom: Literal["N", "C"]):
+def build_hydrogen(parent: Residue, template: Optional[Residue], atom: Literal["N", "C", "CG"]):
     """
     Cap with hydrogen, building based on the upstream or downstream residue
 
@@ -510,7 +510,7 @@ def build_hydrogen(parent: Residue, template: Optional[Residue], atom: Literal["
     template: Bio.PDB.Residue
         Upstream or downstream residue
     atom: str
-        Flag for adding to the 'N' or 'C' side of the residue
+        Flag for adding to the 'N' or 'C' or 'CG' (IAS) side of the residue
 
     Returns
     -------
@@ -520,22 +520,32 @@ def build_hydrogen(parent: Residue, template: Optional[Residue], atom: Literal["
     if template is not None:
         if atom == "N":
             pos = scale_hydrogen(parent["N"], template["C"], 1 / 1.32)
-        else:
+        elif atom == "C":
             pos = scale_hydrogen(parent["C"], template["N"], 1.09 / 1.32)
+        elif atom == "CG":
+            pos = scale_hydrogen(parent["CG"], template["N"], 1.09 / 1.32)
     else:
-        CA = parent["CA"]
         if atom == "N":
+            CA = parent["CA"]
             N = parent["N"]
             H = parent["H"]
             bis = get_normalized_vector(N, CA) + get_normalized_vector(N, H)
             bis /= np.linalg.norm(bis)
             pos = N.get_coord() - bis
-        else:
+        elif atom == "C":
+            CA = parent["CA"]
             C = parent["C"]
             O = parent["O"]
             bis = get_normalized_vector(C, CA) + get_normalized_vector(C, O)
             bis /= np.linalg.norm(bis)
             pos = C.get_coord() - bis * 1.09
+        elif atom == "CG":
+            CB = parent["CB"]
+            CG = parent["CG"]
+            OD1 = parent["OD1"]
+            bis = get_normalized_vector(CG, CB) + get_normalized_vector(CG, OD1)
+            bis /= np.linalg.norm(bis)
+            pos = CG.get_coord() - bis * 1.09
 
     for name in ["H1", "H2", "H3"]:
         if name not in parent:
@@ -602,15 +612,15 @@ def build_heavy(chain, parent, template, atom):
     return res
 
 
-def check_atom_valence(res: Residue, tree: NeighborSearch, atom: Literal["N", "C"], cn: int) -> bool:
+def check_atom_valence(res: Residue, tree: NeighborSearch, atom: Literal["N", "C", "CG"], cn: int) -> bool:
     neighbors = tree.search(res[atom].get_coord(), radius=1.8)
     if len(neighbors) > cn:
         return True
     else:
         for neighbor in neighbors:
-            if neighbor.get_name() == "C" and atom == "N":
+            if neighbor.get_name() in ["C", "CG"] and atom == "N":
                 return True
-            elif neighbor.get_name() == "N" and atom == "C":
+            elif neighbor.get_name() == "N" and atom in ["C", "CG"]:
                 return True
     return False 
 
@@ -639,16 +649,24 @@ def cap_chains(model: Model, residues: Set[Residue], capping: int) -> Set[Residu
 
     cap_residues = set()
 
+    cluster_atom_list = []
+    for res in residues:
+        cluster_atom_list += list(res.get_atoms())
+    cluster_tree = NeighborSearch(cluster_atom_list)
+
     for res in list(sorted(residues)):
-        if not Polypeptide.is_aa(res) or res.get_id()[0] != " ":
+        if not (
+            (Polypeptide.is_aa(res) and res.get_id()[0] == " ") # normal amino acid
+            or res.get_resname() == "IAS"                       # IAS
+        ):
             continue
 
         res_id = res.get_full_id()
         chain = model[res_id[2]]
-        chain_tree = NeighborSearch(list(chain.get_atoms()))
         chain_list = orig_chains[chain.get_id()]
         ind = chain_list.index(res)
 
+        N_capped_flag = False
         if ind > 0:
             pre = chain_list[ind - 1]
             if (
@@ -661,9 +679,16 @@ def cap_chains(model: Model, residues: Set[Residue], capping: int) -> Set[Residu
                     cap_residues.add(build_hydrogen(res, pre, "N"))
                 else:
                     cap_residues.add(build_heavy(res, pre, "N"))
-            elif not check_atom_valence(res, chain_tree, "N", 3):
+                N_capped_flag = True
+        if not N_capped_flag:
+            if not check_atom_valence(res, cluster_tree, "N", 3):
                 cap_residues.add(build_hydrogen(res, None, "N"))
 
+        C_capped_flag = False
+        if res.get_resname() == "IAS":
+            C_name = "CG"
+        else:
+            C_name = "C"
         if ind < len(chain_list) - 1:
             nxt = chain_list[ind + 1]
             if (
@@ -673,11 +698,13 @@ def cap_chains(model: Model, residues: Set[Residue], capping: int) -> Set[Residu
                 and Polypeptide.is_aa(nxt)
             ):
                 if capping == 1:
-                    cap_residues.add(build_hydrogen(res, nxt, "C"))
+                    cap_residues.add(build_hydrogen(res, nxt, C_name))
                 else:
-                    cap_residues.add(build_heavy(res, nxt, "C"))
-            elif not check_atom_valence(res, chain_tree, "C", 3):
-                cap_residues.add(build_hydrogen(res, None, "C"))
+                    cap_residues.add(build_heavy(res, nxt, C_name))
+                C_capped_flag = True
+        if not C_capped_flag:
+            if not check_atom_valence(res, cluster_tree, C_name, 3):
+                cap_residues.add(build_hydrogen(res, None, C_name))
 
     return cap_residues
 
