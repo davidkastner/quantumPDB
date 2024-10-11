@@ -2,6 +2,7 @@ import os
 import glob
 import matplotlib.pyplot as plt
 from collections import defaultdict
+import csv  # Import csv module
 
 def format_plot() -> None:
     """General plotting parameters for the Kulik Lab."""
@@ -122,12 +123,15 @@ def check_all_jobs(method, output, delete_queued):
     """Loop over all jobs and check if they failed or are still queued."""
     
     print(f"> Checking for failed QM jobs in the {output} directory.")
-    output_name = "failure_modes.txt"
+    output_name = "failure_modes.csv"  # Changed to CSV file
     failure_counts = {"done": 0, "backlog": 0, "queue": 0, "running": 0, 
                       "charge": 0, "memory": 0, "unknown": 0}
     author_counts = defaultdict(int)  # Track job counts per author
 
-    with open(output_name, "w") as output_file:
+    with open(output_name, "w", newline='') as output_file:
+        writer = csv.writer(output_file)
+        writer.writerow(['pdb', 'chain', 'error'])  # Write CSV header
+
         base_dir = os.getcwd()
         os.chdir(output)
 
@@ -153,7 +157,7 @@ def check_all_jobs(method, output, delete_queued):
                         author_counts[author] += 1  # Increment author count
                         
                         if job_status not in ["done", "running", "queue"]:
-                            output_file.write(f"{chain_dir_path} - {job_status}\n")
+                            writer.writerow([pdb_dir, chain_dir, job_status])  # Write CSV row
                     else:
                         # If no .submit_record, count it as backlog for job_status
                         failure_counts["backlog"] += 1
@@ -162,5 +166,3 @@ def check_all_jobs(method, output, delete_queued):
     print(f"> Saving checkup results in {output_name}\n")
 
     return failure_counts, author_counts
-
-

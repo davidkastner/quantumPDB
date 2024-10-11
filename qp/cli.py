@@ -283,11 +283,12 @@ def run(config):
 def submit(config):
     """Handles the submission of jobs for the quantumPDB."""
 
+    from qp.structure import setup
     from qp.manager import create
     from qp.manager import submit
     
     # Parse configuration parameters
-    config_data = read_config(config)
+    config_data = setup.read_config(config)
     optimization = config_data.get('optimization', False)
     method = config_data.get('method', 'wpbeh')
     basis = config_data.get('basis', 'lacvps_ecp')
@@ -326,12 +327,12 @@ def analyze(config):
 
     config_data = setup.read_config(config)
     method = config_data.get('method', 'wpbeh')
-    method = config_data.get('method', 'wpbeh')
     job_checkup = config_data.get('job_checkup', False)
     delete_queued = config_data.get('delete_queued', False)
     calc_charge_schemes = config_data.get('calc_charge_schemes', False)
     calc_dipole = config_data.get('calc_dipole', False)
     multiwfn_path = config_data.get('multiwfn_path', 'Multiwfn')
+    charge_scheme = config_data.get('charge_scheme', 'Hirshfeld-I')
     input = config_data.get('input', [])
     output = config_data.get('output_dir', '')
     center_yaml_residues = config_data.get('center_residues', [])
@@ -344,21 +345,18 @@ def analyze(config):
         checkup.plot_failures(failure_counts)
         checkup.plot_authors(author_counts)
 
-    if calc_charge_schemes:
+    if calc_charge_schemes or calc_dipole:
         from qp.analyze import multiwfn
-        click.echo("> Calculating charge schemes...")
-        click.echo("> Activate Multiwfn (e.g., module load multiwfn/noGUI_3.7)")
+        click.echo("> Activate Multiwfn module (e.g., module load multiwfn/noGUI_3.7)")
         settings_ini_path = multiwfn.get_settings_ini_path()
         atmrad_path = multiwfn.get_atmrad_path()
-        multiwfn.iterate_qm_output(pdb_all, method, output, multiwfn_path, settings_ini_path, atmrad_path, multiwfn.charge_scheme)
+        if calc_charge_schemes:
+            click.echo("> Calculating charge schemes...")
+            multiwfn.iterate_qm_output(pdb_all, method, output, multiwfn_path, settings_ini_path, atmrad_path, charge_scheme, multiwfn.charge_scheme)
+        if calc_dipole:
+            click.echo("> Calculating dipoles using center of mass as the reference...")
+            multiwfn.iterate_qm_output(pdb_all, method, output, multiwfn_path, settings_ini_path, atmrad_path, charge_scheme, multiwfn.calc_dipole)
 
-    if calc_dipole:
-        from qp.analyze import multiwfn
-        click.echo("> Calculating dipoles...")
-        click.echo("> Activate Multiwfn (e.g., module load multiwfn/noGUI_3.7)")
-        settings_ini_path = multiwfn.get_settings_ini_path()
-        atmrad_path = multiwfn.get_atmrad_path()
-        multiwfn.iterate_qm_output(pdb_all, method, output, multiwfn_path, settings_ini_path, atmrad_path, multiwfn.calc_dipole)
 
 if __name__ == "__main__":
     # Run the command-line interface when this script is executed
