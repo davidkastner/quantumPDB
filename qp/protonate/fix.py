@@ -4,6 +4,7 @@ from queue import Queue
 from Bio.PDB.Atom import Atom
 from Bio.PDB.Polypeptide import is_aa
 from Bio.PDB.NeighborSearch import NeighborSearch
+from Bio.PDB.Residue import Residue
 from Bio.PDB import PDBParser, PDBIO, Select, Polypeptide
 
 
@@ -33,27 +34,29 @@ def clean_occupancy(path: str, center_residues: List[str]) -> bool:
     kept_partial_res = dict()
     partial_atom_list = []
 
-    for res in structure[0].get_residues():
-        partial_in_res = False
-        total_occupancy = 0
+    for model in structure:
+        for chain in model:
+            for res in chain.get_residues():
+                partial_in_res = False
+                total_occupancy = 0
 
-        # Check if there are partial occupied atoms in res
-        for atom in res:
-            atom_occupancy = atom.get_occupancy()
-            total_occupancy += atom_occupancy
-            if atom_occupancy < 1.0:
-                partial_in_res = True
-                partial_atom_list.append(atom)
-        
-        # If so, add res to the partial res dict
-        if partial_in_res:
-            num_atom = len(res)
-            kept_partial_res[res] = {
-                "avg_occupancy": total_occupancy / num_atom,
-                "num_atom": num_atom,
-                "kept": True,
-                "search_radius": 1.0 if res.get_resname() in center_residues else 2.5 # allow for bonding to center, otherwise vdw
-            }
+                # Check if there are partial occupied atoms in res
+                for atom in res:
+                    atom_occupancy = atom.get_occupancy()
+                    total_occupancy += atom_occupancy
+                    if atom_occupancy < 1.0:
+                        partial_in_res = True
+                        partial_atom_list.append(atom)
+                
+                # If so, add res to the partial res dict
+                if partial_in_res:
+                    num_atom = len(res)
+                    kept_partial_res[res] = {
+                        "avg_occupancy": total_occupancy / num_atom,
+                        "num_atom": num_atom,
+                        "kept": True,
+                        "search_radius": 1.0 if res.get_resname() in center_residues else 2.5 # allow for bonding to center, otherwise vdw
+                    }
     
     # no partial occupancy detected
     if not partial_atom_list:
@@ -260,6 +263,38 @@ def add_hydrogen_CSO(res, structure):
         coord_HD = coords["OD"] + vec_OD_HD
         res.add(Atom("HD", coord_HD, 0, 1, " ", "HD", None, "H"))
 
+
+def fix_OXT(path: str) -> None:
+    parser = PDBParser(QUIET=True)
+    io = PDBIO()
+    structure = parser.get_structure("PDB", path)
+    io.set_structure(structure)
+    for model in structure:
+        for chain in model:
+            for res in chain.get_residues():
+                res: Residue
+                OXT_flag = True
+                for name in {"OXT", "O", "CA", "C"}:
+                    if name not in res:
+                        OXT_flag = False
+                        break
+                if not OXT_flag:
+                    continue
+                OXT: Atom = res["OXT"]
+                O: Atom = res["O"]
+                CA: Atom = res["CA"]
+                C: Atom = res["C"]
+                if OXT - O > 1.8:
+                    break
+                print("> Fixing corrupted C terminus")
+                vec_C_CA = CA.get_coord() - C.get_coord()
+                vec_C_OXT = OXT.get_coord() - C.get_coord()
+                proj_vec_C_OXT = np.dot(vec_C_CA, vec_C_OXT) / np.dot(vec_C_CA, vec_C_CA) * vec_C_CA
+                dist_vec_C_OXT = proj_vec_C_OXT - vec_C_OXT
+                reflect_vec_C_OXT = vec_C_OXT + 2 * dist_vec_C_OXT
+                O.set_coord(C.get_coord() + reflect_vec_C_OXT)
+    
+    io.save(path, Select())
 
 
 def adjust_activesites(path, metals):
