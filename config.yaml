@@ -48,6 +48,9 @@ job_count: 10                          # The number of jobs to maintain on the s
 # ANALYZE #
 ###########
 job_checkup: false                     # Check how status of qm jobs
-delete_queued: False                   # Clean up jobs by deleting .submit_records for unfinished jobs
-calc_charge_schemes: true              # Calculate charge schemes with Multiwfn
+delete_queued: false                   # Clean up jobs by deleting .submit_records for unfinished jobs
 atmrad_path: /data1/groups/HJKgroup/src/multiwfn/Multiwfn_3.7_bin_Linux_noGUI/examples/atmrad
+charge_scheme: Hirshfeld,CM5           # Choose from the following: Hirshfeld, Voronoi, Mulliken, ADCH, Hirshfeld-I, CM5
+calc_charge_schemes: false             # Calculate charge schemes with Multiwfn
+calc_dipole_com: true                  # Calculate dipole with Multiwfn using the center of mass as the reference
+calc_dipole_coc: false                 # Calculate dipole with Multiwfn using the center of charge as the reference
