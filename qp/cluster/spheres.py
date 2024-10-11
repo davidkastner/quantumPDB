@@ -528,7 +528,11 @@ def build_hydrogen(parent: Residue, template: Optional[Residue], atom: Literal["
         if atom == "N":
             CA = parent["CA"]
             N = parent["N"]
-            H = parent["H"]
+            if parent.get_resname() == "PRO":
+                # Proline does not have an H atom on N-terminus
+                H = parent["CD"]
+            else:
+                H = parent["H"]
             bis = get_normalized_vector(N, CA) + get_normalized_vector(N, H)
             bis /= np.linalg.norm(bis)
             pos = N.get_coord() - bis
