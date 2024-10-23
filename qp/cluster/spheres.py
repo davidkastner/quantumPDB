@@ -293,7 +293,7 @@ def check_NC(atom, metal):
 
 def get_next_neighbors(
     start, neighbors, sphere_count, ligands,
-    first_sphere_radius=3,
+    first_sphere_radius=4,
     smooth_method="boxplot", 
     include_ligands=2,
     **smooth_params):
@@ -328,21 +328,22 @@ def get_next_neighbors(
     """
     seen = start.copy()
     spheres = [start]
+    lig_frontiers = [set()]
     lig_adds = [set()]
+    start_atoms = []
+    for res in start:
+        start_atoms.extend(res.get_unpacked_list())
+    is_metal_like = (len(start_atoms) == len(start))
+    search = NeighborSearch([atom for atom in start_atoms[0].get_parent().get_parent().get_parent().get_parent().get_atoms() if atom.element != "H" and atom not in start_atoms])
     for i in range(0, sphere_count):
         # get candidate atoms in the new sphere
         nxt = set()
         lig_add = set()
+        lig_frontier_atoms = set()
         if i == 0 and first_sphere_radius > 0:
-            start_atoms = []
-            for res in start:
-                start_atoms.extend(res.get_unpacked_list())
-
-            is_metal_like = (len(start_atoms) == len(start))
-            search = NeighborSearch([atom for atom in start_atoms[0].get_parent().get_parent().get_parent().get_atoms() if atom.element != "H" and atom not in start_atoms])
-            first_sphere = []
+            first_sphere = set()
             for center in start_atoms:
-                first_sphere += search.search(center=center.get_coord(), radius=first_sphere_radius, level="A")
+                first_sphere |= set(search.search(center=center.get_coord(), radius=5, level="A"))
             for atom in first_sphere:
                 if atom.get_parent() not in seen:
                     element = atom.element
@@ -360,39 +361,45 @@ def get_next_neighbors(
                                 include_ligands != 1 or
                                 res.get_resname() != "HOH" # mode 1: exclude all waters
                             ):
+                                lig_frontier_atoms.add(atom)
                                 lig_add.add(res)
-        else:
+        else:   
             candidates = []
-            frontiers = spheres[-1] if spheres[-1] else spheres[0]
-            for res in frontiers:
-                for atom in res.get_unpacked_list():
-                    for n, dist in neighbors[atom]:
-                        par = n.get_parent()
-                        candidates.append((n, dist, par))
+            frontiers = spheres[-1] if spheres[-1] else spheres[0] # if no previous sphere, use the starting atoms
+            frontier_atoms = [atom for res in frontiers for atom in res.get_unpacked_list()]
+            for atom in frontier_atoms:
+                for nb_atom, dist in neighbors[atom]:
+                    par = nb_atom.get_parent()
+                    candidates.append((nb_atom, dist, par))
 
             # screen candidates
             if smooth_method == "box_plot":
-                dist_data = [dist for n, dist, par in candidates]
-                lb, ub = box_outlier_thres(dist_data, **smooth_params)
-                screened_candidates = [(dist, par) for n, dist, par in candidates if dist < ub]
+                dist_data = [dist for _, dist, _ in candidates]
+                _, ub = box_outlier_thres(dist_data, **smooth_params)
+                screened_candidates = [(atom, dist, par) for atom, dist, par in candidates if dist < ub]
             elif smooth_method == "dbscan":
                 optics = DBSCAN(**smooth_params)
-                X = [n.get_coord() for n, dist, par in candidates]
+                X = [atom.get_coord() for atom, _, _ in candidates]
                 for res in spheres[-1]:
                     for atom in res.get_unpacked_list():
                         X.append(atom.get_coord())
                 cluster_idx = optics.fit_predict(X) + 1
                 largest_idx = np.bincount(cluster_idx).argmax()
-                screened_candidates = [(dist, par) for i, (n, dist, par) in enumerate(candidates) if cluster_idx[i] == largest_idx]
+                screened_candidates = [(atom, dist, par) for i, (atom, dist, par) in enumerate(candidates) if cluster_idx[i] == largest_idx]
             else:
-                screened_candidates = [(dist, par) for n, dist, par in candidates]
+                screened_candidates = [(atom, dist, par) for atom, dist, par in candidates]
 
-            screened_candidates = [par for dist, par in screened_candidates if i != 0 or dist < 2.7]
+            new_ball = set()
+            for atom in lig_frontiers[i]:
+                new_ball |= set(search.search(center=atom.get_coord(), radius=first_sphere_radius, level="A"))
+            for atom in new_ball:
+                screened_candidates.append((atom, 0, atom.get_parent()))
 
             # build the new sphere
-            for par in screened_candidates:
+            new_seen = set()
+            for atom, _, par in screened_candidates:
                 if par not in seen:
-                    seen.add(par)
+                    new_seen.add(par)
                 ## Added to include ligands in the first coordination sphere
                 ## Produced unweildy clusters as some ligands are large
                 ## Potentially useful in the future
@@ -405,10 +412,13 @@ def get_next_neighbors(
                             (include_ligands == 1 and par.get_resname() != "HOH") or # mode 1: exclude all waters
                             include_ligands == 2 # mode 2: include everything
                         ):
+                            lig_frontier_atoms.add(atom)
                             lig_add.add(par)
+            seen |= new_seen
 
         spheres.append(nxt)
         lig_adds.append(lig_add)
+        lig_frontiers.append(lig_frontier_atoms)
 
     metal_id = []
     for res in start:
@@ -497,7 +507,7 @@ def get_normalized_vector(atom1: Atom, atom2: Atom) -> np.array:
     return v / np.linalg.norm(v)
 
 
-def build_hydrogen(parent: Residue, template: Optional[Residue], atom: Literal["N", "C"]):
+def build_hydrogen(parent: Residue, template: Optional[Residue], atom: Literal["N", "C", "CG"]):
     """
     Cap with hydrogen, building based on the upstream or downstream residue
 
@@ -510,7 +520,7 @@ def build_hydrogen(parent: Residue, template: Optional[Residue], atom: Literal["
     template: Bio.PDB.Residue
         Upstream or downstream residue
     atom: str
-        Flag for adding to the 'N' or 'C' side of the residue
+        Flag for adding to the 'N' or 'C' or 'CG' (IAS) side of the residue
 
     Returns
     -------
@@ -520,22 +530,36 @@ def build_hydrogen(parent: Residue, template: Optional[Residue], atom: Literal["
     if template is not None:
         if atom == "N":
             pos = scale_hydrogen(parent["N"], template["C"], 1 / 1.32)
-        else:
+        elif atom == "C":
             pos = scale_hydrogen(parent["C"], template["N"], 1.09 / 1.32)
+        elif atom == "CG":
+            pos = scale_hydrogen(parent["CG"], template["N"], 1.09 / 1.32)
     else:
-        CA = parent["CA"]
         if atom == "N":
+            CA = parent["CA"]
             N = parent["N"]
-            H = parent["H"]
+            if parent.get_resname() == "PRO":
+                # Proline does not have an H atom on N-terminus
+                H = parent["CD"]
+            else:
+                H = parent["H"]
             bis = get_normalized_vector(N, CA) + get_normalized_vector(N, H)
             bis /= np.linalg.norm(bis)
             pos = N.get_coord() - bis
-        else:
+        elif atom == "C":
+            CA = parent["CA"]
             C = parent["C"]
             O = parent["O"]
             bis = get_normalized_vector(C, CA) + get_normalized_vector(C, O)
             bis /= np.linalg.norm(bis)
             pos = C.get_coord() - bis * 1.09
+        elif atom == "CG":
+            CB = parent["CB"]
+            CG = parent["CG"]
+            OD1 = parent["OD1"]
+            bis = get_normalized_vector(CG, CB) + get_normalized_vector(CG, OD1)
+            bis /= np.linalg.norm(bis)
+            pos = CG.get_coord() - bis * 1.09
 
     for name in ["H1", "H2", "H3"]:
         if name not in parent:
@@ -602,15 +626,15 @@ def build_heavy(chain, parent, template, atom):
     return res
 
 
-def check_atom_valence(res: Residue, tree: NeighborSearch, atom: Literal["N", "C"], cn: int) -> bool:
+def check_atom_valence(res: Residue, tree: NeighborSearch, atom: Literal["N", "C", "CG"], cn: int) -> bool:
     neighbors = tree.search(res[atom].get_coord(), radius=1.8)
     if len(neighbors) > cn:
         return True
     else:
         for neighbor in neighbors:
-            if neighbor.get_name() == "C" and atom == "N":
+            if neighbor.get_name() in ["C", "CG"] and atom == "N":
                 return True
-            elif neighbor.get_name() == "N" and atom == "C":
+            elif neighbor.get_name() == "N" and atom in ["C", "CG"]:
                 return True
     return False 
 
@@ -639,16 +663,24 @@ def cap_chains(model: Model, residues: Set[Residue], capping: int) -> Set[Residu
 
     cap_residues = set()
 
+    cluster_atom_list = []
+    for res in residues:
+        cluster_atom_list += list(res.get_atoms())
+    cluster_tree = NeighborSearch(cluster_atom_list)
+
     for res in list(sorted(residues)):
-        if not Polypeptide.is_aa(res) or res.get_id()[0] != " ":
+        if not (
+            (Polypeptide.is_aa(res) and res.get_id()[0] == " ") # normal amino acid
+            or res.get_resname() == "IAS"                       # IAS
+        ):
             continue
 
         res_id = res.get_full_id()
         chain = model[res_id[2]]
-        chain_tree = NeighborSearch(list(chain.get_atoms()))
         chain_list = orig_chains[chain.get_id()]
         ind = chain_list.index(res)
 
+        N_capped_flag = False
         if ind > 0:
             pre = chain_list[ind - 1]
             if (
@@ -661,9 +693,16 @@ def cap_chains(model: Model, residues: Set[Residue], capping: int) -> Set[Residu
                     cap_residues.add(build_hydrogen(res, pre, "N"))
                 else:
                     cap_residues.add(build_heavy(res, pre, "N"))
-            elif not check_atom_valence(res, chain_tree, "N", 3):
+                N_capped_flag = True
+        if not N_capped_flag:
+            if not check_atom_valence(res, cluster_tree, "N", 3):
                 cap_residues.add(build_hydrogen(res, None, "N"))
 
+        C_capped_flag = False
+        if res.get_resname() == "IAS":
+            C_name = "CG"
+        else:
+            C_name = "C"
         if ind < len(chain_list) - 1:
             nxt = chain_list[ind + 1]
             if (
@@ -673,11 +712,13 @@ def cap_chains(model: Model, residues: Set[Residue], capping: int) -> Set[Residu
                 and Polypeptide.is_aa(nxt)
             ):
                 if capping == 1:
-                    cap_residues.add(build_hydrogen(res, nxt, "C"))
+                    cap_residues.add(build_hydrogen(res, nxt, C_name))
                 else:
-                    cap_residues.add(build_heavy(res, nxt, "C"))
-            elif not check_atom_valence(res, chain_tree, "C", 3):
-                cap_residues.add(build_hydrogen(res, None, "C"))
+                    cap_residues.add(build_heavy(res, nxt, C_name))
+                C_capped_flag = True
+        if not C_capped_flag:
+            if not check_atom_valence(res, cluster_tree, C_name, 3):
+                cap_residues.add(build_hydrogen(res, None, C_name))
 
     return cap_residues
 
@@ -701,6 +742,18 @@ def write_pdbs(io, sphere, out):
             return residue in sphere
 
     io.save(out, ResSelect())
+
+
+def residue_in_ligands(resname, resid, res_is_aa, ligand_keys):
+    res_key = f"{resname}_{resid[2]}{resid[3][1]}"
+    if res_is_aa:
+        return res_key in ligand_keys
+    else:
+        for ligand_key in ligand_keys:
+            ligand_res_keys = ligand_key.split()
+            if res_key in ligand_res_keys:
+                return True
+        return False
 
 
 def compute_charge(spheres, structure, ligand_charge):
@@ -755,13 +808,13 @@ def compute_charge(spheres, structure, ligand_charge):
         for res in s:
             res_id = res.get_full_id()
             resname = res.get_resname()
-            ligand_key = f"{resname}_{res_id[2]}{res_id[3][1]}"
-            if ligand_key not in ligand_charge:
+            res_is_aa = Polypeptide.is_aa(res)
+            if not residue_in_ligands(resname, res_id, res_is_aa, ligand_charge.keys()):
                 if resname in pos and all(res.has_id(h) for h in pos[resname]):
                     c += 1
                 elif resname in neg and all(not res.has_id(h) for h in neg[resname]):
                     c -= 1
-                if Polypeptide.is_aa(res) and resname != "PRO" and all(not res.has_id(h) for h in ["H", "H2"]):
+                if res_is_aa and resname != "PRO" and all(not res.has_id(h) for h in ["H", "H2"]):
                     # TODO: termini
                     c -= 1
 
@@ -799,6 +852,56 @@ def count_residues(spheres):
             c[res.get_resname()] = c.get(res.get_resname(), 0) + 1
         count.append(c)
     return count
+
+
+def make_res_key(res):
+    resname = res.get_resname()
+    resid = res.get_id()[1]
+    chainid = res.get_parent().get_id()
+    return f"{resname}_{chainid}{resid}"    
+
+
+def complete_oligomer(ligand_keys, model, residues, spheres, include_ligands):
+    ligand_res_found = dict()
+    oligomer_found = dict()
+    for ligand_key in ligand_keys:
+        ligand_res_keys = ligand_key.split()
+        if len(ligand_res_keys) == 1:
+            continue
+        oligomer_found[ligand_key] = dict()
+        for ligand_res_key in ligand_res_keys:
+            ligand_res_found[ligand_res_key] = {
+                "sphere": -1,
+                "oligomer": ligand_key
+            }
+            oligomer_found[ligand_key][ligand_res_key] = False
+    if not oligomer_found:
+        return
+    for i, sphere in enumerate(spheres):
+        if include_ligands == 0 and i > 0:
+            break
+        for res in sphere:
+            res_key = make_res_key(res)
+            if res_key in ligand_res_found and not Polypeptide.is_aa(res):
+                ligand_res_found[res_key]["sphere"] = i
+                oligomer = ligand_res_found[res_key]["oligomer"]
+                oligomer_found[oligomer][res_key] = True
+    for chain in model:
+        for res in chain.get_unpacked_list():
+            res_key = make_res_key(res)
+            if (
+                res_key in ligand_res_found and 
+                not Polypeptide.is_aa(res)
+            ):
+                oligomer = ligand_res_found[res_key]["oligomer"]
+                found_sphere = ligand_res_found[res_key]["sphere"]
+                if found_sphere < 0 and any(oligomer_found[oligomer].values()):
+                    if include_ligands == 0:
+                        spheres[0].add(res)
+                    else:
+                        spheres[-1].add(res)
+                    residues.add(res)
+                    print(f"To avoid unpredictable charge error, {res_key} in {oligomer} is added to spheres")
 
 
 def extract_clusters(
@@ -878,6 +981,7 @@ def extract_clusters(
         metal_id, residues, spheres = get_next_neighbors(
             c, neighbors, sphere_count, ligands, first_sphere_radius, smooth_method, include_ligands, **smooth_params
         )
+        complete_oligomer(ligand_charge, model, residues, spheres, include_ligands)
         cluster_path = f"{out}/{metal_id}"
         cluster_paths.append(cluster_path)
         os.makedirs(cluster_path, exist_ok=True)

@@ -54,7 +54,6 @@ def compute_charge(path_ligand, path_pdb):
                 n_atom -= int(line.split()[2])
             if line.startswith("M  CHG"):
                 c += sum([int(x) for x in line.split()[4::2]])
-                break
         charge[name] = c
         cnt = 0
         for res_name, chain_id, res_id in name_id:
@@ -67,6 +66,20 @@ def compute_charge(path_ligand, path_pdb):
                 if line[17:20].strip() == res_name and line[21] == chain_id and line[22:26].strip() == res_id and line[0:3] != "TER":
                     cnt += 1
         charge[name] -= (n_atom - cnt)
+
+    # check Na+, K+, Mg2+, Ca2+
+    for line in pdb_lines:
+        if len(line) > 26 and line[0:3] != "TER":
+            res_name = line[17:20].strip()
+            chain_id = line[21]
+            res_id = line[22:26].strip()
+            name = f"{res_name}_{chain_id}{res_id}"
+            if res_name in {"NA", "K"} and name not in charge:
+                print(f"Find extra {res_name} in protein, charge + 1")
+                charge[name] = 1
+            elif res_name in {"MG", "CA"} and name not in charge:
+                print(f"Find extra {res_name} in protein, charge + 2")
+                charge[name] = 2
     return charge
 
 

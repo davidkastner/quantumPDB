@@ -167,12 +167,14 @@ def run(config):
                             copy(os.path.join(prepared_prot_path, f"{pdbl}_ligands.sdf"), ligands_sdf)
                             click.echo("> Using pre-prepared protoss file")
                         else:
-                            from qp.protonate.fix import clean_occupancy
+                            from qp.protonate.fix import clean_occupancy, fix_OXT
                             click.echo("> Running Protoss")
                             if modeller:
                                 pdb_path = mod_path
                             else:
                                 pdb_path = path
+                              
+                            fix_OXT(pdb_path)
                             clean_occupancy(pdb_path, center_residue)
 
                             try:

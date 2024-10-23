@@ -5,16 +5,22 @@ from qp.manager.create import get_charge
 
 ATOM_ELECTRON_MAP = {
     "H": 1,
+    "B": 5,
     "C": 6,
     "N": 7,
     "O": 8,
+    "F": 9,
+    "Na": 11,
+    "Mg": 12,
+    "P": 15,
     "S": 16,
     "Cl": 17,
-    "Br": 35,
-    "P": 15,
+    "K": 19,
+    "Ca": 20,
+    "Zn": 30,
     "Se": 34,
+    "Br": 35,
     "I": 53,
-    "F": 9
 }
 
 
