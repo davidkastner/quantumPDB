@@ -293,7 +293,7 @@ def check_NC(atom, metal):
 
 def get_next_neighbors(
     start, neighbors, sphere_count, ligands,
-    first_sphere_radius=3,
+    first_sphere_radius=4,
     smooth_method="boxplot", 
     include_ligands=2,
     **smooth_params):
@@ -328,21 +328,22 @@ def get_next_neighbors(
     """
     seen = start.copy()
     spheres = [start]
+    lig_frontiers = [set()]
     lig_adds = [set()]
+    start_atoms = []
+    for res in start:
+        start_atoms.extend(res.get_unpacked_list())
+    is_metal_like = (len(start_atoms) == len(start))
+    search = NeighborSearch([atom for atom in start_atoms[0].get_parent().get_parent().get_parent().get_parent().get_atoms() if atom.element != "H" and atom not in start_atoms])
     for i in range(0, sphere_count):
         # get candidate atoms in the new sphere
         nxt = set()
         lig_add = set()
+        lig_frontier_atoms = set()
         if i == 0 and first_sphere_radius > 0:
-            start_atoms = []
-            for res in start:
-                start_atoms.extend(res.get_unpacked_list())
-
-            is_metal_like = (len(start_atoms) == len(start))
-            search = NeighborSearch([atom for atom in start_atoms[0].get_parent().get_parent().get_parent().get_atoms() if atom.element != "H" and atom not in start_atoms])
-            first_sphere = []
+            first_sphere = set()
             for center in start_atoms:
-                first_sphere += search.search(center=center.get_coord(), radius=first_sphere_radius, level="A")
+                first_sphere |= set(search.search(center=center.get_coord(), radius=first_sphere_radius, level="A"))
             for atom in first_sphere:
                 if atom.get_parent() not in seen:
                     element = atom.element
@@ -360,39 +361,45 @@ def get_next_neighbors(
                                 include_ligands != 1 or
                                 res.get_resname() != "HOH" # mode 1: exclude all waters
                             ):
+                                lig_frontier_atoms.add(atom)
                                 lig_add.add(res)
-        else:
+        else:   
             candidates = []
-            frontiers = spheres[-1] if spheres[-1] else spheres[0]
-            for res in frontiers:
-                for atom in res.get_unpacked_list():
-                    for n, dist in neighbors[atom]:
-                        par = n.get_parent()
-                        candidates.append((n, dist, par))
+            frontiers = spheres[-1] if spheres[-1] else spheres[0] # if no previous sphere, use the starting atoms
+            frontier_atoms = [atom for res in frontiers for atom in res.get_unpacked_list()]
+            for atom in frontier_atoms:
+                for nb_atom, dist in neighbors[atom]:
+                    par = nb_atom.get_parent()
+                    candidates.append((nb_atom, dist, par))
 
             # screen candidates
             if smooth_method == "box_plot":
-                dist_data = [dist for n, dist, par in candidates]
-                lb, ub = box_outlier_thres(dist_data, **smooth_params)
-                screened_candidates = [(dist, par) for n, dist, par in candidates if dist < ub]
+                dist_data = [dist for _, dist, _ in candidates]
+                _, ub = box_outlier_thres(dist_data, **smooth_params)
+                screened_candidates = [(atom, dist, par) for atom, dist, par in candidates if dist < ub]
             elif smooth_method == "dbscan":
                 optics = DBSCAN(**smooth_params)
-                X = [n.get_coord() for n, dist, par in candidates]
+                X = [atom.get_coord() for atom, _, _ in candidates]
                 for res in spheres[-1]:
                     for atom in res.get_unpacked_list():
                         X.append(atom.get_coord())
                 cluster_idx = optics.fit_predict(X) + 1
                 largest_idx = np.bincount(cluster_idx).argmax()
-                screened_candidates = [(dist, par) for i, (n, dist, par) in enumerate(candidates) if cluster_idx[i] == largest_idx]
+                screened_candidates = [(atom, dist, par) for i, (atom, dist, par) in enumerate(candidates) if cluster_idx[i] == largest_idx]
             else:
-                screened_candidates = [(dist, par) for n, dist, par in candidates]
+                screened_candidates = [(atom, dist, par) for atom, dist, par in candidates]
 
-            screened_candidates = [par for dist, par in screened_candidates if i != 0 or dist < 2.7]
+            new_ball = set()
+            for atom in lig_frontiers[i]:
+                new_ball |= set(search.search(center=atom.get_coord(), radius=first_sphere_radius, level="A"))
+            for atom in new_ball:
+                screened_candidates.append((atom, 0, atom.get_parent()))
 
             # build the new sphere
-            for par in screened_candidates:
+            new_seen = set()
+            for atom, _, par in screened_candidates:
                 if par not in seen:
-                    seen.add(par)
+                    new_seen.add(par)
                 ## Added to include ligands in the first coordination sphere
                 ## Produced unweildy clusters as some ligands are large
                 ## Potentially useful in the future
@@ -405,10 +412,13 @@ def get_next_neighbors(
                             (include_ligands == 1 and par.get_resname() != "HOH") or # mode 1: exclude all waters
                             include_ligands == 2 # mode 2: include everything
                         ):
+                            lig_frontier_atoms.add(atom)
                             lig_add.add(par)
+            seen |= new_seen
 
         spheres.append(nxt)
         lig_adds.append(lig_add)
+        lig_frontiers.append(lig_frontier_atoms)
 
     metal_id = []
     for res in start:
