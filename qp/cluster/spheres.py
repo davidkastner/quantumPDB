@@ -343,7 +343,7 @@ def get_next_neighbors(
         if i == 0 and first_sphere_radius > 0:
             first_sphere = set()
             for center in start_atoms:
-                first_sphere |= set(search.search(center=center.get_coord(), radius=first_sphere_radius, level="A"))
+                first_sphere |= set(search.search(center=center.get_coord(), radius=5, level="A"))
             for atom in first_sphere:
                 if atom.get_parent() not in seen:
                     element = atom.element
