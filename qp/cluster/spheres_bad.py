@@ -702,6 +702,18 @@ def write_pdbs(io, sphere, out):
     io.save(out, ResSelect())
 
 
+def residue_in_ligands(resname, resid, res_is_aa, ligand_keys):
+    res_key = f"{resname}_{resid[2]}{resid[3][1]}"
+    if res_is_aa:
+        return res_key in ligand_keys
+    else:
+        for ligand_key in ligand_keys:
+            ligand_res_keys = ligand_key.split()
+            if res_key in ligand_res_keys:
+                return True
+        return False
+
+
 def compute_charge(spheres, structure, ligand_charge):
     """
     Computes the total charge of coordinating AAs
@@ -754,13 +766,13 @@ def compute_charge(spheres, structure, ligand_charge):
         for res in s:
             res_id = res.get_full_id()
             resname = res.get_resname()
-            ligand_key = f"{resname}_{res_id[2]}{res_id[3][1]}"
-            if ligand_key not in ligand_charge:
+            res_is_aa = Polypeptide.is_aa(res)
+            if not residue_in_ligands(resname, res_id, res_is_aa, ligand_charge.keys()):
                 if resname in pos and all(res.has_id(h) for h in pos[resname]):
                     c += 1
                 elif resname in neg and all(not res.has_id(h) for h in neg[resname]):
                     c -= 1
-                if Polypeptide.is_aa(res) and resname != "PRO" and all(not res.has_id(h) for h in ["H", "H2"]):
+                if res_is_aa and resname != "PRO" and all(not res.has_id(h) for h in ["H", "H2"]):
                     # TODO: termini
                     c -= 1
 
@@ -798,6 +810,56 @@ def count_residues(spheres):
             c[res.get_resname()] = c.get(res.get_resname(), 0) + 1
         count.append(c)
     return count
+
+
+def make_res_key(res):
+    resname = res.get_resname()
+    resid = res.get_id()[1]
+    chainid = res.get_parent().get_id()
+    return f"{resname}_{chainid}{resid}"    
+
+
+def complete_oligomer(ligand_keys, model, residues, spheres, include_ligands):
+    ligand_res_found = dict()
+    oligomer_found = dict()
+    for ligand_key in ligand_keys:
+        ligand_res_keys = ligand_key.split()
+        if len(ligand_res_keys) == 1:
+            continue
+        oligomer_found[ligand_key] = dict()
+        for ligand_res_key in ligand_res_keys:
+            ligand_res_found[ligand_res_key] = {
+                "sphere": -1,
+                "oligomer": ligand_key
+            }
+            oligomer_found[ligand_key][ligand_res_key] = False
+    if not oligomer_found:
+        return
+    for i, sphere in enumerate(spheres):
+        if include_ligands == 0 and i > 0:
+            break
+        for res in sphere:
+            res_key = make_res_key(res)
+            if res_key in ligand_res_found and not Polypeptide.is_aa(res):
+                ligand_res_found[res_key]["sphere"] = i
+                oligomer = ligand_res_found[res_key]["oligomer"]
+                oligomer_found[oligomer][res_key] = True
+    for chain in model:
+        for res in chain.get_unpacked_list():
+            res_key = make_res_key(res)
+            if (
+                res_key in ligand_res_found and 
+                not Polypeptide.is_aa(res)
+            ):
+                oligomer = ligand_res_found[res_key]["oligomer"]
+                found_sphere = ligand_res_found[res_key]["sphere"]
+                if found_sphere < 0 and any(oligomer_found[oligomer].values()):
+                    if include_ligands == 0:
+                        spheres[0].add(res)
+                    else:
+                        spheres[-1].add(res)
+                    residues.add(res)
+                    print(f"To avoid unpredictable charge error, {res_key} in {oligomer} is added to spheres")
 
 
 def extract_clusters(
@@ -877,6 +939,7 @@ def extract_clusters(
         metal_id, residues, spheres = get_next_neighbors(
             c, neighbors, sphere_count, ligands, first_sphere_radius, smooth_method, include_ligands, **smooth_params
         )
+        complete_oligomer(ligand_charge, model, residues, spheres, include_ligands)
         cluster_path = f"{out}/{metal_id}"
         cluster_paths.append(cluster_path)
         os.makedirs(cluster_path, exist_ok=True)
