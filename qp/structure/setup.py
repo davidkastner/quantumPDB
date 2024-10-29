@@ -13,15 +13,15 @@ def read_config(config_file):
         return yaml.safe_load(file)
 
 
-def parse_input(input, output, center_yaml_residues):
+def parse_input(input_path, output, center_yaml_residues):
     """Returns system information from the provided input"""
 
     # If the input was a path or a single PDB, convert it to a list
-    if isinstance(input, str):
-        input = [input]
+    if isinstance(input_path, str):
+        input_path = [input_path]
     output = os.path.abspath(output)
-    center_csv_residues = get_centers(input)
-    pdb_all = get_pdbs(input, output)
+    center_csv_residues = get_centers(input_path)
+    pdb_all = get_pdbs(input_path, output)
 
     # Determine how the user has decided to provide the center residues
     if center_csv_residues:

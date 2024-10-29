@@ -21,12 +21,13 @@ performed by specifying ``capping`` in ``spheres.extract_clusters``:
 """
 
 import os
-from typing import Set, Literal, Optional
+from typing import Set, Literal, Optional, List, Dict, Any
 import numpy as np
 from Bio.PDB import PDBParser, Polypeptide, PDBIO, Select
 from Bio.PDB.Atom import Atom
 from Bio.PDB.Residue import Residue
 from Bio.PDB.Chain import Chain
+from Bio.PDB.Structure import Structure
 from Bio.PDB.Model import Model
 from Bio.PDB.NeighborSearch import NeighborSearch
 from scipy.spatial import Voronoi
@@ -720,6 +721,9 @@ def cap_chains(model: Model, residues: Set[Residue], capping: int) -> Set[Residu
             if not check_atom_valence(res, cluster_tree, C_name, 3):
                 cap_residues.add(build_hydrogen(res, None, C_name))
 
+    # capping covalent ligands
+    
+
     return cap_residues
 
 
@@ -756,7 +760,12 @@ def residue_in_ligands(resname, resid, res_is_aa, ligand_keys):
         return False
 
 
-def compute_charge(spheres, structure, ligand_charge):
+def compute_charge(
+    spheres: List[Set], 
+    structure: Structure,
+    ligand_charge: Dict[str, int],
+    RGP_atoms: Dict[str, Dict[int, Dict[str, Any]]]
+):
     """
     Computes the total charge of coordinating AAs
 
@@ -813,20 +822,27 @@ def compute_charge(spheres, structure, ligand_charge):
                 if resname in pos and all(res.has_id(h) for h in pos[resname]):
                     c += 1
                 elif resname in neg and all(not res.has_id(h) for h in neg[resname]):
-                    c -= 1
+                    RGP_flag = False
+                    if resname == "CYS":
+                        for RGP_atom_list in RGP_atoms.values():
+                            for RGP_atom_info in RGP_atom_list.values():
+                                if "SG" in res and res["SG"] == RGP_atom_info["atom"]:
+                                    RGP_flag = True
+                                    break
+                    if not RGP_flag:
+                        c -= 1
                 if res_is_aa and resname != "PRO" and all(not res.has_id(h) for h in ["H", "H2"]):
                     # TODO: termini
                     c -= 1
-
                 # Check for charged N-terminus
                 if res_id in n_terminals \
                     and res.has_id("N"): # exclude sugar chain terminus
-                    c += 1
-
+                    if resname != "PRO" or res.has_id("H"):
+                        # sometimes PRO has no H atom on N-terminus (Protoss's fault)
+                        c += 1
                 # Check for charged C-terminus
                 if res.has_id("OXT"):
                     c -= 1
-
         charge.append(c)
     return charge
 
@@ -904,6 +920,15 @@ def complete_oligomer(ligand_keys, model, residues, spheres, include_ligands):
                     print(f"To avoid unpredictable charge error, {res_key} in {oligomer} is added to spheres")
 
 
+def find_RGP_atoms(structure: Structure, RGP_atoms: Dict[str, Dict[int, Dict[str, Any]]]) -> None:
+    for atom in structure.get_atoms():
+        atom_coord = atom.get_coord()
+        for RGP_atom_list in RGP_atoms.values():
+            for RGP_atom_info in RGP_atom_list.values():
+                if np.allclose(atom_coord, RGP_atom_info["coord"], atol=1e-3):
+                    RGP_atom_info["atom"] = atom
+
+
 def extract_clusters(
     path,
     out,
@@ -921,6 +946,7 @@ def extract_clusters(
     xyz=True,
     hetero_pdb=False,
     include_ligands=2,
+    RGP_atoms=[],
     **smooth_params
 ):
     """
@@ -986,14 +1012,15 @@ def extract_clusters(
         cluster_paths.append(cluster_path)
         os.makedirs(cluster_path, exist_ok=True)
 
+        find_RGP_atoms(structure, RGP_atoms)
         if max_atom_count is not None:
             prune_atoms(c, residues, spheres, max_atom_count, ligands)
         if charge:
-            aa_charge[metal_id] = compute_charge(spheres, structure, ligand_charge)
+            aa_charge[metal_id] = compute_charge(spheres, structure, ligand_charge, RGP_atoms)
         if count:
             res_count[metal_id] = count_residues(spheres)
         if capping:
-            cap_residues = cap_chains(model, residues, capping)
+            cap_residues = cap_chains(model, residues, capping, RGP_atoms)
             if capping == 2:
                 spheres[-1] |= cap_residues
 
@@ -1029,9 +1056,6 @@ def extract_clusters(
                 f.write("\n")
 
     return cluster_paths
-
-
-
 
 
 

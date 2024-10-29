@@ -9,7 +9,32 @@
 
 """
 
-def compute_charge(path_ligand, path_pdb):
+import numpy as np
+from collections import defaultdict
+from typing import List, Tuple, Dict, Any
+
+
+def read_ligands(path_ligand: str) -> List[List[str]]:
+    with open(path_ligand, "r") as f:
+        sdf = f.read()
+    return [
+        [t for t in s.splitlines() if t != ""]
+        for s in sdf.split("$$$$")
+    ]
+
+
+def parse_ligand_name(ligand_block: List[str]) -> Tuple[List[Tuple[str, str, str]], str]:
+    title = ligand_block[0].split("_")
+    name_id = [
+        (res_name, chain_id, res_id) 
+        for res_name, chain_id, res_id 
+        in zip(title[::3], title[1::3], title[2::3])
+    ]
+    name = " ".join([f"{res_name}_{chain_id}{res_id}" for res_name, chain_id, res_id in name_id])
+    return name_id, name
+
+
+def compute_charge(path_ligand: str, path_pdb: str) -> Dict[str, int]:
     """
     Computes the total charge of each ligand
 
@@ -23,25 +48,13 @@ def compute_charge(path_ligand, path_pdb):
     charge: dict
         Keyed by ligand ID
     """
-    with open(path_ligand, "r") as f:
-        sdf = f.read()
     with open(path_pdb, "r") as f:
         pdb_lines = f.readlines()
-    ligands = [
-        [t for t in s.splitlines() if t != ""]
-        for s in sdf.split("$$$$")
-        if s != "\n" and s != ""
-    ]
+    ligands = read_ligands(path_ligand)
 
     charge = {}
     for l in ligands:
-        title = l[0].split("_")
-        name_id = [
-            (res_name, chain_id, res_id) 
-            for res_name, chain_id, res_id 
-            in zip(title[::3], title[1::3], title[2::3])
-        ]
-        name = " ".join([f"{res_name}_{chain_id}{res_id}" for res_name, chain_id, res_id in name_id])
+        name_id, name = parse_ligand_name(l)
 
         c = 0
         n_atom = 0
@@ -84,26 +97,43 @@ def compute_charge(path_ligand, path_pdb):
 
 
 def compute_spin(path_ligand):
-    with open(path_ligand, "r") as f:
-        sdf = f.read()
-
-    ligands = [
-        [t for t in s.splitlines() if t != ""]
-        for s in sdf.split("$$$$")
-        if s != "\n" and s != ""
-    ]
+    ligands = read_ligands(path_ligand)
     spin = {}
     for l in ligands:
-        title = l[0].split("_")
-        name_id = [
-            (res_name, chain_id, res_id) 
-            for res_name, chain_id, res_id 
-            in zip(title[::3], title[1::3], title[2::3])
-        ]
-        name = " ".join([f"{res_name}_{chain_id}{res_id}" for res_name, chain_id, res_id in name_id])
-        for res_name, chain_id, res_id in name_id:
+        name_id, name = parse_ligand_name(l)
+        for res_name, _, _ in name_id:
             if res_name == "NO":
                 spin[name] = 1
             elif res_name == "OXY":
                 spin[name] = 2
     return spin
+
+
+def get_coord(line_segments: List[str]) -> np.ndarray:
+    return np.array([float(x) for x in line_segments[:3]])
+
+
+def collect_RGP_atoms(path_ligand: str) -> Dict[str, Dict[int, Dict[str, Any]]]:
+    ligands = read_ligands(path_ligand)
+    RGP_atoms = defaultdict(dict())
+    for l in ligands:
+        _, name = parse_ligand_name(l)
+        for i, line in enumerate(l):
+            RGP_indices = set()
+            line_segments = line.split()
+            if i == 3:
+                n_atom = int(line_segments[0])
+                n_bond = int(line_segments[1])
+            if len(line_segments) > 3 and line_segments[3] == "R#":
+                RGP_atoms[name][i - 3] = {
+                    "coord": get_coord(line_segments),
+                }
+                RGP_indices.add(i - 3)
+            if i >= n_atom + 4 and i < n_atom + 4 + n_bond:
+                begin_atom_idx = int(line_segments[0])
+                end_atom_idx = int(line_segments[1])
+                if begin_atom_idx in RGP_indices:
+                    RGP_atoms[name][begin_atom_idx]["linking_atom_coord"] = get_coord(ligands[end_atom_idx + 3].split())
+                elif end_atom_idx in RGP_indices:
+                    RGP_atoms[name][end_atom_idx]["linking_atom_coord"] = get_coord(ligands[begin_atom_idx + 3].split())
+    return RGP_atoms

@@ -57,10 +57,10 @@ def run(config):
     skip = config_data.get('skip', 'all')
     max_clash_refinement_iter = config_data.get('max_clash_refinement_iter', 5)
     
-    input = config_data.get('input', [])
+    input_path = config_data.get('input', [])
     output = config_data.get('output_dir', '')
     center_yaml_residues = config_data.get('center_residues', [])
-    pdb_all, center_residues = setup.parse_input(input, output, center_yaml_residues)
+    pdb_all, center_residues = setup.parse_input(input_path, output, center_yaml_residues)
 
     if modeller:
         from qp.structure import missing
@@ -107,8 +107,8 @@ def run(config):
                     continue
             
             # Extract the current center residue from the list of all residues
-            center_residue = [center_residues.pop(0)]
-            click.echo(f"> Using center residue: {center_residue[0]}")
+            center_residue = center_residues.pop(0).split("_")
+            click.echo(f"> Using center residue: {center_residue}")
             
             residues_with_clashes = [] # Start by assuming no protoss clashes
             for i in range(max_clash_refinement_iter):
@@ -238,18 +238,20 @@ def run(config):
                 fix.adjust_activesites(path, center_residue)
 
             if coordination:
-                from qp.protonate.ligand_prop import compute_charge, compute_spin
+                from qp.protonate.ligand_prop import compute_charge, compute_spin, collect_RGP_atoms
                 click.echo("> Extracting clusters")
                 if charge:
                     ligand_charge = compute_charge(f"{prot_path}/{pdb}_ligands.sdf", path)
                     ligand_spin = compute_spin(f"{prot_path}/{pdb}_ligands.sdf")
+                    RGP_atoms = collect_RGP_atoms(f"{prot_path}/{pdb}_ligands.sdf")
                 else:
                     ligand_charge = dict()
+                    RGP_atoms = dict()
 
                 cluster_paths = spheres.extract_clusters(
                     path, f"{output}/{pdb}", center_residue, sphere_count, 
                     first_sphere_radius, max_atom_count, merge_cutoff, smooth_method,
-                    ligands, capping, charge, ligand_charge, count, xyz, hetero_pdb, include_ligands,
+                    ligands, capping, charge, ligand_charge, count, xyz, hetero_pdb, include_ligands, RGP_atoms,
                     **smooth_params
                 )
 
