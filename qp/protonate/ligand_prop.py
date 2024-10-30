@@ -74,12 +74,15 @@ def compute_charge(path_ligand, path_pdb):
             chain_id = line[21]
             res_id = line[22:26].strip()
             name = f"{res_name}_{chain_id}{res_id}"
-            if res_name in {"NA", "K"} and name not in charge:
-                print(f"Find extra {res_name} in protein, charge + 1")
+            if res_name in {"NA", "K", "RB"} and name not in charge:
+                print(f"> Find extra {res_name} in protein, charge + 1")
                 charge[name] = 1
-            elif res_name in {"MG", "CA"} and name not in charge:
-                print(f"Find extra {res_name} in protein, charge + 2")
+            elif res_name in {"MG", "CA", "ZN", "PB"} and name not in charge:
+                print(f"> Find extra {res_name} in protein, charge + 2")
                 charge[name] = 2
+            elif res_name in {"AL"} and name not in charge:
+                print(f"> Find extra {res_name} in protein, charge + 3")
+                charge[name] = 3
     return charge
 
 
