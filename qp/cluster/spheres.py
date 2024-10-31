@@ -36,6 +36,12 @@ from sklearn.cluster import DBSCAN
 
 
 RANDOM_SEED = 66265
+HX_BOND_LENGTH = {
+    "C": 1.09,
+    "N": 1.00,
+    "O": 0.98,
+    "S": 1.35
+}
 
 
 def get_grid_coord_idx(coord, coord_min, mean_distance):
@@ -640,7 +646,7 @@ def check_atom_valence(res: Residue, tree: NeighborSearch, atom: Literal["N", "C
     return False 
 
 
-def cap_chains(model: Model, residues: Set[Residue], capping: int) -> Set[Residue]:
+def cap_chains(model: Model, residues: Set[Residue], capping: int, RGP_atoms: Dict[str, Dict[int, Dict[str, Any]]]) -> Set[Residue]:
     """
     Cap chain breaks for a set of extracted residues
 
@@ -652,6 +658,8 @@ def cap_chains(model: Model, residues: Set[Residue], capping: int) -> Set[Residu
         Set of residues
     capping: int
         Flag for capping group, H (1) or ACE/NME (2)
+    RGP_atoms: dict
+        Dictionary of RGP atom information
 
     Returns
     -------
@@ -670,6 +678,20 @@ def cap_chains(model: Model, residues: Set[Residue], capping: int) -> Set[Residu
     cluster_tree = NeighborSearch(cluster_atom_list)
 
     for res in list(sorted(residues)):
+        res_key = make_res_key(res)
+
+        if res_key in RGP_atoms:
+            for RGP_atom_info in RGP_atoms[res_key].values():
+                if RGP_atom_info["atom"] not in cluster_atom_list:
+                    bond_vector = RGP_atom_info["atom"].get_coord() - RGP_atom_info["linking_atom_coord"]
+                    norm_bond_vector = bond_vector / np.linalg.norm(bond_vector)
+                    pos = RGP_atom_info["linking_atom_coord"] + norm_bond_vector * HX_BOND_LENGTH[RGP_atom_info["atom"].element]
+                    name = "H0"
+                    for i in range(100):
+                        if f"H{i}" not in res:
+                            name = f"H{i}"
+                            break
+                    res.add(Atom(name, pos, 0, 1, " ", name, None, "H"))
         if not (
             (Polypeptide.is_aa(res) and res.get_id()[0] == " ") # normal amino acid
             or res.get_resname() == "IAS"                       # IAS

@@ -54,6 +54,8 @@ def compute_charge(path_ligand: str, path_pdb: str) -> Dict[str, int]:
 
     charge = {}
     for l in ligands:
+        if not l:
+            break
         name_id, name = parse_ligand_name(l)
 
         c = 0
@@ -100,6 +102,8 @@ def compute_spin(path_ligand):
     ligands = read_ligands(path_ligand)
     spin = {}
     for l in ligands:
+        if not l:
+            break
         name_id, name = parse_ligand_name(l)
         for res_name, _, _ in name_id:
             if res_name == "NO":
@@ -115,12 +119,16 @@ def get_coord(line_segments: List[str]) -> np.ndarray:
 
 def collect_RGP_atoms(path_ligand: str) -> Dict[str, Dict[int, Dict[str, Any]]]:
     ligands = read_ligands(path_ligand)
-    RGP_atoms = defaultdict(dict())
+    RGP_atoms = defaultdict(dict)
     for l in ligands:
+        if not l:
+            break
         _, name = parse_ligand_name(l)
+        n_atom = 0 # initialize n_atom
+        RGP_indices = set()
         for i, line in enumerate(l):
-            RGP_indices = set()
             line_segments = line.split()
+            
             if i == 3:
                 n_atom = int(line_segments[0])
                 n_bond = int(line_segments[1])
@@ -133,7 +141,7 @@ def collect_RGP_atoms(path_ligand: str) -> Dict[str, Dict[int, Dict[str, Any]]]:
                 begin_atom_idx = int(line_segments[0])
                 end_atom_idx = int(line_segments[1])
                 if begin_atom_idx in RGP_indices:
-                    RGP_atoms[name][begin_atom_idx]["linking_atom_coord"] = get_coord(ligands[end_atom_idx + 3].split())
+                    RGP_atoms[name][begin_atom_idx]["linking_atom_coord"] = get_coord(l[end_atom_idx + 3].split())
                 elif end_atom_idx in RGP_indices:
-                    RGP_atoms[name][end_atom_idx]["linking_atom_coord"] = get_coord(ligands[begin_atom_idx + 3].split())
+                    RGP_atoms[name][end_atom_idx]["linking_atom_coord"] = get_coord(l[begin_atom_idx + 3].split())
     return RGP_atoms
