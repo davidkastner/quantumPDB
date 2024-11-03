@@ -633,11 +633,11 @@ def build_heavy(chain, parent, template, atom):
     return res
 
 
-def check_atom_valence(res: Residue, tree: NeighborSearch, atom: Literal["N", "C", "CG"], cn: int) -> bool:
+def check_atom_valence(res: Residue, tree: NeighborSearch, atom: Literal["N", "C", "CG"], cn: int, backbone: bool=True) -> bool:
     neighbors = tree.search(res[atom].get_coord(), radius=1.8)
     if len(neighbors) > cn:
         return True
-    else:
+    elif backbone:
         for neighbor in neighbors:
             if neighbor.get_name() in ["C", "CG"] and atom == "N":
                 return True
@@ -834,7 +834,24 @@ def compute_charge(
     }
 
     charge = []
+
+    s = spheres[0]
+    sphere_tree = NeighborSearch([atom for res in s for atom in res.get_atoms()])
+    for res in s:
+        c = 0
+        res_id = res.get_full_id()
+        resname = res.get_resname()
+        res_is_aa = Polypeptide.is_aa(res)
+        if not residue_in_ligands(resname, res_id, res_is_aa, ligand_charge.keys()):
+            if res.has_id("N") and res_id in n_terminals and (resname != "PRO" or res.has_id("H")):
+                # sometimes PRO has no H atom on N-terminus (Protoss's fault)
+                c += 1
+            elif check_atom_valence(res, sphere_tree, "N", 4, backbone=False):
+                c += 1
+            ligand_charge[make_res_key(res)] = c
+
     for s in spheres[1:]:
+        sphere_tree = NeighborSearch([atom for res in s for atom in res.get_atoms()])
         c = 0
         for res in s:
             res_id = res.get_full_id()
@@ -857,11 +874,9 @@ def compute_charge(
                     # TODO: termini
                     c -= 1
                 # Check for charged N-terminus
-                if res_id in n_terminals \
-                    and res.has_id("N"): # exclude sugar chain terminus
-                    if resname != "PRO" or res.has_id("H"):
-                        # sometimes PRO has no H atom on N-terminus (Protoss's fault)
-                        c += 1
+                if res.has_id("N") and res_id in n_terminals and (resname != "PRO" or res.has_id("H")):
+                    # sometimes PRO has no H atom on N-terminus (Protoss's fault)
+                    c += 1
                 # Check for charged C-terminus
                 if res.has_id("OXT"):
                     c -= 1

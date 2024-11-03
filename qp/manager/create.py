@@ -129,7 +129,7 @@ def get_charge(structure_dir=None):
             elif section == 2:
                 ligand, value = line.split(',')
                 if ligand_in_spheres(ligand, structure_dir, num_sphere):
-                    charge += int(value)                  
+                    charge += int(value)
 
     spin = 0
     if os.path.exists(spin_csv_path):
