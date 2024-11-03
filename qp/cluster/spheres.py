@@ -439,7 +439,7 @@ def get_next_neighbors(
     return "_".join(sorted(metal_id)), seen, spheres
 
 
-def prune_atoms(center, residues, spheres, max_atom_count, ligands):
+def prune_atoms(center, residues, spheres, max_atom_count, ligands, kept_monomers):
     """
     Prune residues from the cluster model to meet the max atom count constraint,
     while keeping specified ligands and co-factors.
@@ -473,7 +473,7 @@ def prune_atoms(center, residues, spheres, max_atom_count, ligands):
     prune = set()
     for res in sorted(residues, key=dist, reverse=True):
         # Check if the residue is in the ligands_to_keep list
-        if res.get_resname() not in ligands:
+        if res.get_resname() not in ligands and res not in kept_monomers:
             prune.add(res)
             atom_cnt -= len(res)
             if atom_cnt <= max_atom_count:
@@ -914,7 +914,7 @@ def make_res_key(res):
     return f"{resname}_{chainid}{resid}"    
 
 
-def complete_oligomer(ligand_keys, model, residues, spheres, include_ligands):
+def complete_oligomer(ligand_keys, model, residues, spheres, include_ligands) -> List[Residue]:
     ligand_res_found = dict()
     oligomer_found = dict()
     for ligand_key in ligand_keys:
@@ -929,7 +929,8 @@ def complete_oligomer(ligand_keys, model, residues, spheres, include_ligands):
             }
             oligomer_found[ligand_key][ligand_res_key] = False
     if not oligomer_found:
-        return
+        return []
+    kept_monomers = []
     for i, sphere in enumerate(spheres):
         if include_ligands == 0 and i > 0:
             break
@@ -948,13 +949,16 @@ def complete_oligomer(ligand_keys, model, residues, spheres, include_ligands):
             ):
                 oligomer = ligand_res_found[res_key]["oligomer"]
                 found_sphere = ligand_res_found[res_key]["sphere"]
-                if found_sphere < 0 and any(oligomer_found[oligomer].values()):
-                    if include_ligands == 0:
-                        spheres[0].add(res)
-                    else:
-                        spheres[-1].add(res)
-                    residues.add(res)
-                    print(f"To avoid unpredictable charge error, {res_key} in {oligomer} is added to spheres")
+                if any(oligomer_found[oligomer].values()):
+                    kept_monomers.append(res)
+                    if found_sphere < 0:
+                        if include_ligands == 0:
+                            spheres[0].add(res)
+                        else:
+                            spheres[-1].add(res)
+                        residues.add(res)
+                        print(f"To avoid unpredictable charge error, {res_key} in {oligomer} is added to spheres")
+    return kept_monomers
 
 
 def find_RGP_atoms(structure: Structure, RGP_atoms: Dict[str, Dict[int, Dict[str, Any]]]) -> None:
@@ -1044,14 +1048,14 @@ def extract_clusters(
         metal_id, residues, spheres = get_next_neighbors(
             c, neighbors, sphere_count, ligands, first_sphere_radius, smooth_method, include_ligands, **smooth_params
         )
-        complete_oligomer(ligand_charge, model, residues, spheres, include_ligands)
+        kept_monomers = complete_oligomer(ligand_charge, model, residues, spheres, include_ligands)
         cluster_path = f"{out}/{metal_id}"
         cluster_paths.append(cluster_path)
         os.makedirs(cluster_path, exist_ok=True)
 
         find_RGP_atoms(structure, RGP_atoms)
         if max_atom_count is not None:
-            prune_atoms(c, residues, spheres, max_atom_count, ligands)
+            prune_atoms(c, residues, spheres, max_atom_count, ligands, kept_monomers)
         if charge:
             aa_charge[metal_id] = compute_charge(spheres, structure, ligand_charge, RGP_atoms)
         if count:

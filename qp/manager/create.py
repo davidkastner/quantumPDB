@@ -52,7 +52,7 @@ def residue_exists(sphere_path, res_name, chain, res_id):
 
 def ligand_in_spheres(ligand, structure_dir, num_sphere):
     ligand_residues = ligand.split()
-    partial_found = False
+    not_found = []
     for ligand_residue in ligand_residues:
         res_name, res_id_full = ligand_residue.split('_')
         chain = res_id_full[0]
@@ -61,14 +61,15 @@ def ligand_in_spheres(ligand, structure_dir, num_sphere):
         for i in range(num_sphere + 1):
             sphere_path = os.path.join(structure_dir, f"{i}.pdb")
             if residue_exists(sphere_path, res_name, chain, res_id):
-                partial_found = True
                 break
-        else: # if ligand residue is not found in any sphere
-            if len(ligand_residues) > 1 and partial_found:
-                print(f"For oligomer ligand {ligand}, {ligand_residue} is partially found in spheres. This will cause unpredictable charge error!")
-                pass
-            return False
-    return True
+        else: # if any ligand residue is not found in any sphere
+            not_found.append(ligand_residue)
+    if not not_found:
+        return True
+    else:
+        if len(ligand_residues) > 1 and len(not_found) < len(ligand_residues):
+            print(f"For oligomer ligand {ligand}, {', '.join(not_found)} not found in spheres {structure_dir}. This will cause unpredictable charge error!")
+        return False
 
 
 def get_electronic(pdb_id, pdb_list_path):
