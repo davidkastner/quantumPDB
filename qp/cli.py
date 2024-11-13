@@ -3,6 +3,7 @@
 **Usage** ``qp run --config path/to/config.yaml``
 """
 
+import os
 import sys
 import time
 import click
