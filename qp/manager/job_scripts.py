@@ -43,7 +43,7 @@ end
 
 
 def write_slurm_job(job_name, gpus, memory):
-    """Generate bash submission scripts with conditional sleep time."""
+    """Generate bash submission scripts with conditional sleep time and scratch directory usage."""
 
     jobscript_content = f"""#! /bin/bash
 #SBATCH --job-name={job_name}
@@ -51,17 +51,35 @@ def write_slurm_job(job_name, gpus, memory):
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:volta:{gpus}
 #SBATCH --ntasks-per-node={gpus * 20}
+#SBATCH --output={job_name}.log
 
 source /etc/profile
 
 #---TC setup---
 module load terachem/1.9-2023.11-dev
-LD_LIBRARY_PATH=/usr/local/pkg/cuda/cuda-11.8/lib64/stubs:${{LD_LIBRARY_PATH}}
+export LD_LIBRARY_PATH=/usr/local/pkg/cuda/cuda-11.8/lib64/stubs:${{LD_LIBRARY_PATH}}
 
-# your command to run terachem
-echo "Run Start Time: $(date '+%Y-%m-%d %H:%M:%S')" >> .submit_record
+# Step 1: Copy input files to the scratch directory
+echo "Copying files to local scratch directory ($TMPDIR)"
+cp * $TMPDIR/
+
+# Step 2: Change to the scratch directory
+echo "Changing to scratch directory ($TMPDIR)"
+cd $TMPDIR
+
+# Define a cleanup function to copy output files back to the submission directory
+function clean_up {{
+  echo "Copying results back to the original directory ($SLURM_SUBMIT_DIR)"
+  cp -r * $SLURM_SUBMIT_DIR/
+}}
+
+# Set up trap to run cleanup on exit
+trap clean_up EXIT
+
+# Step 3: Run TeraChem in scratch directory
+echo "Run Start Time: $(date '+%Y-%m-%d %H:%M:%S')" >> $SLURM_SUBMIT_DIR/.submit_record
 terachem qmscript.in > qmscript.out
-echo "Run End Time: $(date '+%Y-%m-%d %H:%M:%S')" >> .submit_record
+echo "Run End Time: $(date '+%Y-%m-%d %H:%M:%S')" >> $SLURM_SUBMIT_DIR/.submit_record
 """
 
     return jobscript_content
