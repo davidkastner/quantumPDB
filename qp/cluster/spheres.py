@@ -302,7 +302,7 @@ def get_next_neighbors(
     start, neighbors, sphere_count, ligands,
     first_sphere_radius=4,
     smooth_method="boxplot", 
-    include_ligands=2,
+    include_ligands=2, 
     **smooth_params):
     """
     Iteratively determines spheres around a given starting atom
@@ -364,13 +364,13 @@ def get_next_neighbors(
                         if Polypeptide.is_aa(res):
                             nxt.add(res)
                         else:
-                            if (
+                            if include_ligands != 3 and (
                                 include_ligands != 1 or
                                 res.get_resname() != "HOH" # mode 1: exclude all waters
                             ):
                                 lig_frontier_atoms.add(atom)
                                 lig_add.add(res)
-        else:   
+        else:
             candidates = []
             frontiers = spheres[-1] if spheres[-1] else spheres[0] # if no previous sphere, use the starting atoms
             frontier_atoms = [atom for res in frontiers for atom in res.get_unpacked_list()]
