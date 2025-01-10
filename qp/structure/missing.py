@@ -39,12 +39,19 @@ Optimization level (``optimize`` argument in ``missing.build_model``):
 """
 
 import os
+from typing import List, Tuple, Dict, Literal, Optional, Set
 from modeller import log, Environ, Selection
 from modeller.automodel import AutoModel
 from modeller import alignment, model
 from Bio import PDB
 
 log.none()
+CODE_TYPE = Literal[
+    ".", "A", "C", "D", "E", "F", 
+    "G", "H", "I", "K", "L", "M", 
+    "N", "P", "Q", "R", "S", "T", 
+    "V", "W", "Y", "w"
+]
 
 #: Amino acid 3 to 1 lookup table
 def define_residues():
@@ -83,7 +90,7 @@ def define_residues():
     return AA
 
 
-def get_residues(path, AA):
+def get_residues(path: str, AA: Dict[str, CODE_TYPE]) -> List[List[Tuple[Tuple[int, str], CODE_TYPE, Literal['R', 'A', '']]]]:
     """
     Extracts residues from a PDB file, filling in missing residues based on
     sequence number
@@ -103,11 +110,11 @@ def get_residues(path, AA):
     with open(path, "r") as f:
         p = f.read().splitlines()
 
-    missing_residues = {}
-    ind = {}
-    seen = {}
+    missing_residues: Dict[str, Set[Tuple[Tuple[int, str], str, Literal['R', 'A', '']]]] = {} # missing residues' information in each chain
+    ind: Dict[str, int] = {} # index pointing to the current missing residue in each chain
+    seen: Dict[str, Set[Tuple[Tuple[int, str], CODE_TYPE]]] = {} # seen residues' information (without flags) in each chain
     residues = []
-    cur = None
+    cur: Optional[str] = None # current chain id
 
     for line in p:
         if line.startswith("ENDMDL"):
@@ -117,8 +124,8 @@ def get_residues(path, AA):
             res = line[15:18]
             if res in AA and (line[13] == " " or line[13] == "1"): # want only the first model
                 chain = line[19]
-                rid = int(line[21:26])
-                ic = line[26]
+                rid = int(line[21:26]) # residue number
+                ic = line[26] # insertion code
                 missing_residues.setdefault(chain, set()).add(((rid, ic), AA[res], "R"))
 
         elif line.startswith("REMARK 470   "):  # missing atoms
@@ -145,28 +152,32 @@ def get_residues(path, AA):
                 cur = chain
 
             if chain in missing_residues:
+                # add missing residues before the current line's residue to the sequence
                 while (
                     ind[chain] < len(missing_residues[chain])
-                    and (rid, ic) >= missing_residues[chain][ind[chain]][0]
+                    and (rid, ic) >= missing_residues[chain][ind[chain]][0] # the current missing residue is before the current line's residue id
                 ):
-                    residues[-1].append(missing_residues[chain][ind[chain]])
+                    residues[-1].append(missing_residues[chain][ind[chain]]) # add the missing residue to the current chain
                     ind[chain] += 1
-                    seen[chain].add(residues[-1][-1][:2])
+                    seen[chain].add(residues[-1][-1][:2]) # mark the current residue's information as seen
 
             if line.startswith("HETATM") and res != "MSE":
                 resname = "w" if res == "HOH" else "."
             else:
                 resname = AA.get(res, ".")
             if ((rid, ic), resname) not in seen[chain]:
+                # if the current residue is not seen, add it to the sequence
                 residues[-1].append(((rid, ic), resname, ""))
                 seen[chain].add(residues[-1][-1][:2])
 
         elif line.startswith("TER"):
             chain = line[21]
+            # append the remaining missing residues to the sequence's end
             if chain in missing_residues:
                 while ind[chain] < len(missing_residues[chain]):
                     residues[-1].append(missing_residues[chain][ind[chain]])
                     ind[chain] += 1
+            residues.append([])
 
     return residues
 
@@ -201,7 +212,6 @@ def clean_termini(residues):
         # Add the processed chain to the stripped protein
         if chain:  # Only add non-empty chains
             stripped_residues.append(chain)
-
     return stripped_residues
     
 

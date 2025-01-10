@@ -195,13 +195,15 @@ def run(config):
                             get_protoss.repair_ligands(protoss_pdb, pdb_path)
 
                 # Get any residues identified by Protoss as problematic
-                from qp.protonate.parse_output import parse_log
-                AA = missing.define_residues()
-                residues_with_clashes = parse_log(protoss_log_file, protoss_pdb, AA)
-                if residues_with_clashes:
-                    print(f"> WARNING: Protoss has deleted {len(residues_with_clashes)} residues due to clashes, trying to fix them with Modeller")
+                    from qp.protonate.parse_output import parse_log
+                    AA = missing.define_residues()
+                    residues_with_clashes = parse_log(protoss_log_file, protoss_pdb, AA)
+                    if residues_with_clashes:
+                        print(f"> WARNING: Protoss has deleted {len(residues_with_clashes)} residues due to clashes, trying to fix them with Modeller")
+                    else:
+                        break # Don't loop again as no clashes were detected
                 else:
-                    break # Don't loop again as no clashes were detected
+                    break
 
             if protoss and convert_to_nhie_oxo:
                 click.echo("> Converting AKG to reactive OXO and SIN state")
