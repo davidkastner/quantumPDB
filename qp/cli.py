@@ -92,10 +92,12 @@ def run(config):
             protoss = True
 
     for pdb, path in pdb_all:
+        cwd = os.getcwd()
         try:
             click.secho("╔══════╗", bold=True)
             click.secho(f"║ {pdb.upper()} ║", bold=True)
             click.secho("╚══════╝", bold=True)
+            center_residue = center_residues.pop(0).split("_")
 
             # Skips fetching if PDB file exists
             if not os.path.isfile(path):
@@ -107,8 +109,12 @@ def run(config):
                     err["PDB"].append(pdb)
                     continue
             
+            with open(path, "r") as f:
+                if len(f.readlines()) > 45000:
+                    click.secho("> Error: PDB file contains more than 45000 lines, skipping", fg="red")
+                    err["PDB"].append(pdb)
+                    continue
             # Extract the current center residue from the list of all residues
-            center_residue = center_residues.pop(0).split("_")
             click.echo(f"> Using center residue: {center_residue}")
             
             residues_with_clashes = [] # Start by assuming no protoss clashes
@@ -279,10 +285,13 @@ def run(config):
                 if v:
                     click.echo(click.style(k + " errors: ", bold=True, fg="red") + ", ".join(v))
     
-        except:
+        except Exception as e:
+            if isinstance(e, KeyboardInterrupt):
+                raise KeyboardInterrupt
             # Log the exception details to stderr, which is already redirected to log.out
             click.echo(f"> CRITICAL FAILURE: Error processing {pdb.upper()}", err=True)
             traceback.print_exc(file=sys.stderr)
+            os.chdir(cwd)
 
 
 @cli.command()
