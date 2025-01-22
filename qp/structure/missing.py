@@ -270,7 +270,7 @@ def transfer_numbering(e, ali, path, out):
     file=os.path.basename(out)
     mdl_built.write(file)
 
-    with open(file, 'r') as f:
+    with open(file, 'r', errors='replace') as f:
         content = f.read()
 
     corrected_content = fix_numbering(content)
