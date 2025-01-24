@@ -21,6 +21,7 @@ performed by specifying ``capping`` in ``spheres.extract_clusters``:
 """
 
 import os
+from functools import reduce
 from typing import Set, Literal, Optional, List, Dict, Any
 import numpy as np
 from Bio.PDB import PDBParser, Polypeptide, PDBIO, Select
@@ -42,6 +43,12 @@ HX_BOND_LENGTH = {
     "O": 0.98,
     "S": 1.35
 }
+CHARGE_DEBUG_FLAG = False
+
+
+def charge_debug(msg, res=None):
+    if CHARGE_DEBUG_FLAG:
+        print(msg, "" if res is None else make_res_key(res))
 
 
 def get_grid_coord_idx(coord, coord_min, mean_distance):
@@ -362,11 +369,11 @@ def get_next_neighbors(
                         res = atom.get_parent()
                         seen.add(res)
                         if Polypeptide.is_aa(res):
-                            nxt.add(res)
+                            if include_ligands != 3 or Polypeptide.is_aa(res, standard=True):
+                                nxt.add(res)
                         else:
-                            if include_ligands != 3 and (
-                                include_ligands != 1 or
-                                res.get_resname() != "HOH" # mode 1: exclude all waters
+                            if (include_ligands != 3 or res.get_resname() == "HOH") and ( # mode 3: only include center, waters, standard AAs
+                                include_ligands != 1 or res.get_resname() != "HOH" # mode 1: exclude all waters
                             ):
                                 lig_frontier_atoms.add(atom)
                                 lig_add.add(res)
@@ -417,7 +424,8 @@ def get_next_neighbors(
                             (include_ligands == 0 and par.get_resname() in ligands) or 
                             # mode 0: only include ligands in the first sphere unless specified
                             (include_ligands == 1 and par.get_resname() != "HOH") or # mode 1: exclude all waters
-                            include_ligands == 2 # mode 2: include everything
+                            include_ligands == 2 or # mode 2: include everything 
+                            (include_ligands == 3 and par.get_resname() == "HOH") # mode 3: only include center, waters, standard AAs
                         ):
                             lig_frontier_atoms.add(atom)
                             lig_add.add(par)
@@ -436,7 +444,7 @@ def get_next_neighbors(
     for i in range(len(spheres)):
         spheres[i] = spheres[i] | lig_adds[i]
     
-    return "_".join(sorted(metal_id)), seen, spheres
+    return "_".join(sorted(metal_id)), reduce(lambda x, y: x | y, spheres), spheres
 
 
 def prune_atoms(center, residues, spheres, max_atom_count, ligands, kept_monomers):
@@ -514,20 +522,20 @@ def get_normalized_vector(atom1: Atom, atom2: Atom) -> np.array:
     return v / np.linalg.norm(v)
 
 
-def build_hydrogen(parent: Residue, template: Optional[Residue], atom: Literal["N", "C", "CG"]):
+def build_hydrogen(parent: Residue, template: Optional[Residue], atom: Literal["N", "C", "CG"], neighbors: List[Atom]=None):
     """
     Cap with hydrogen, building based on the upstream or downstream residue
 
     Parameters
     ----------
-    chain: Bio.PDB.Chain
-        Chain with desired residue
     parent: Bio.PDB.Residue
         Residue to cap
     template: Bio.PDB.Residue
         Upstream or downstream residue
     atom: str
         Flag for adding to the 'N' or 'C' or 'CG' (IAS) side of the residue
+    neighbors: List[Bio.PDB.Atom]
+        Neighbor atoms of the atom to be capped
 
     Returns
     -------
@@ -545,11 +553,19 @@ def build_hydrogen(parent: Residue, template: Optional[Residue], atom: Literal["
         if atom == "N":
             CA = parent["CA"]
             N = parent["N"]
+            H = None
             if parent.get_resname() == "PRO":
                 # Proline does not have an H atom on N-terminus
                 H = parent["CD"]
-            else:
+            elif "H" in parent:
                 H = parent["H"]
+            else:
+                for neighbor in neighbors:
+                    if neighbor.element == "H":
+                        H = neighbor
+                        break
+                if H is None:
+                    raise KeyError(f"No H atom found for {make_res_key(parent)}")
             bis = get_normalized_vector(N, CA) + get_normalized_vector(N, H)
             bis /= np.linalg.norm(bis)
             pos = N.get_coord() - bis
@@ -633,17 +649,20 @@ def build_heavy(chain, parent, template, atom):
     return res
 
 
-def check_atom_valence(res: Residue, tree: NeighborSearch, atom: Literal["N", "C", "CG"], cn: int, backbone: bool=True) -> bool:
+def check_atom_valence(res: Residue, tree: NeighborSearch, atom: Literal["N", "C", "CG"], cn: int, backbone: bool=True, same_residue: bool=False) -> bool:
     neighbors = tree.search(res[atom].get_coord(), radius=1.8)
+    if same_residue:
+        neighbors = [n for n in neighbors if n.get_parent() == res]
+    check_flag = False
     if len(neighbors) > cn:
-        return True
+        check_flag = True
     elif backbone:
         for neighbor in neighbors:
             if neighbor.get_name() in ["C", "CG"] and atom == "N":
-                return True
+                check_flag = True
             elif neighbor.get_name() == "N" and atom in ["C", "CG"]:
-                return True
-    return False 
+                check_flag = True
+    return check_flag, neighbors
 
 
 def cap_chains(model: Model, residues: Set[Residue], capping: int, RGP_atoms: Dict[str, Dict[int, Dict[str, Any]]]) -> Set[Residue]:
@@ -679,7 +698,6 @@ def cap_chains(model: Model, residues: Set[Residue], capping: int, RGP_atoms: Di
 
     for res in list(sorted(residues)):
         res_key = make_res_key(res)
-
         if res_key in RGP_atoms:
             for RGP_atom_info in RGP_atoms[res_key].values():
                 if RGP_atom_info["atom"] not in cluster_atom_list:
@@ -718,8 +736,9 @@ def cap_chains(model: Model, residues: Set[Residue], capping: int, RGP_atoms: Di
                     cap_residues.add(build_heavy(res, pre, "N"))
                 N_capped_flag = True
         if not N_capped_flag:
-            if not check_atom_valence(res, cluster_tree, "N", 3):
-                cap_residues.add(build_hydrogen(res, None, "N"))
+            check_flag, neighbors = check_atom_valence(res, cluster_tree, "N", 3)
+            if not check_flag:
+                cap_residues.add(build_hydrogen(res, None, "N", neighbors))
 
         C_capped_flag = False
         if res.get_resname() == "IAS":
@@ -740,11 +759,9 @@ def cap_chains(model: Model, residues: Set[Residue], capping: int, RGP_atoms: Di
                     cap_residues.add(build_heavy(res, nxt, C_name))
                 C_capped_flag = True
         if not C_capped_flag:
-            if not check_atom_valence(res, cluster_tree, C_name, 3):
-                cap_residues.add(build_hydrogen(res, None, C_name))
-
-    # capping covalent ligands
-    
+            check_flag, neighbors = check_atom_valence(res, cluster_tree, C_name, 3)
+            if not check_flag:
+                cap_residues.add(build_hydrogen(res, None, C_name, neighbors))
 
     return cap_residues
 
@@ -783,6 +800,7 @@ def residue_in_ligands(resname, resid, res_is_aa, ligand_keys):
 
 
 def compute_charge(
+    residues: Set[Residue],
     spheres: List[Set], 
     structure: Structure,
     ligand_charge: Dict[str, int],
@@ -834,7 +852,7 @@ def compute_charge(
     }
 
     charge = []
-
+    res_keys = set([make_res_key(res) for res in residues])
     s = spheres[0]
     sphere_tree = NeighborSearch([atom for res in s for atom in res.get_atoms()])
     for res in s:
@@ -858,28 +876,48 @@ def compute_charge(
             resname = res.get_resname()
             res_is_aa = Polypeptide.is_aa(res)
             if not residue_in_ligands(resname, res_id, res_is_aa, ligand_charge.keys()):
-                if resname in pos and all(res.has_id(h) for h in pos[resname]):
-                    c += 1
+                if resname in pos:
+                    if all(res.has_id(h) for h in pos[resname]):
+                        charge_debug(f"pos res +1", res)
+                        c += 1
+                    elif resname == "LYS":
+                        check_flag, neighbors = check_atom_valence(res, sphere_tree, "NZ", 4, backbone=False, same_residue=True)
+                        if check_flag:
+                            charge_debug(f"LYS +1", res)
+                            c += 1
+                            
                 elif resname in neg and all(not res.has_id(h) for h in neg[resname]):
                     RGP_flag = False
                     if resname == "CYS":
-                        for RGP_atom_list in RGP_atoms.values():
+                        for name, RGP_atom_list in RGP_atoms.items():
                             for RGP_atom_info in RGP_atom_list.values():
-                                if "SG" in res and res["SG"] == RGP_atom_info["atom"]:
+                                RGP_atom = RGP_atom_info["atom"]
+                                if res["SG"] == RGP_atom and "SG" in res and name in res_keys:
                                     RGP_flag = True
                                     break
                     if not RGP_flag:
+                        charge_debug(f"neg res -1", res)
                         c -= 1
+
                 if res_is_aa and resname != "PRO" and all(not res.has_id(h) for h in ["H", "H2"]):
                     # TODO: termini
-                    c -= 1
+                    check_flag, neighbors = check_atom_valence(res, sphere_tree, "N", 3, backbone=True)
+                    if not check_flag:
+                        charge_debug(f"backbone N -1", res)
+                        c -= 1
                 # Check for charged N-terminus
-                if res.has_id("N") and res_id in n_terminals and (resname != "PRO" or res.has_id("H")):
-                    # sometimes PRO has no H atom on N-terminus (Protoss's fault)
-                    c += 1
+                
+                if res.has_id("N") and res_id in n_terminals:
+                    check_flag, neighbors = check_atom_valence(res, sphere_tree, "N", 4, backbone=False)
+                    if check_flag:
+                        charge_debug(f"sphere 1+ N terminal +1", res)
+                        c += 1
                 # Check for charged C-terminus
                 if res.has_id("OXT"):
-                    c -= 1
+                    check_flag, neighbors = check_atom_valence(res, sphere_tree, "OXT", 2, backbone=False)
+                    if not check_flag:
+                        charge_debug(f"sphere 1+ C terminal -1", res)
+                        c -= 1
         charge.append(c)
     return charge
 
@@ -1056,14 +1094,14 @@ def extract_clusters(
         find_RGP_atoms(structure, RGP_atoms)
         if max_atom_count is not None:
             prune_atoms(c, residues, spheres, max_atom_count, ligands, kept_monomers)
-        if charge:
-            aa_charge[metal_id] = compute_charge(spheres, structure, ligand_charge, RGP_atoms)
         if count:
             res_count[metal_id] = count_residues(spheres)
         if capping:
             cap_residues = cap_chains(model, residues, capping, RGP_atoms)
             if capping == 2:
                 spheres[-1] |= cap_residues
+        if charge:
+            aa_charge[metal_id] = compute_charge(residues, spheres, structure, ligand_charge, RGP_atoms)
 
         sphere_paths = []
         for i, s in enumerate(spheres):
