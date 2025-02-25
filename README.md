@@ -1,8 +1,7 @@
+![Graphical Summary of README](docs/_static/header.jpg)
 QuantumPDB
 ==============================
-[//]: # (Badges)
-[![GitHub Actions Build Status](https://github.com/davidkastner/quantumpdb/workflows/CI/badge.svg)](https://github.com/davidkastner/quantumpdb/actions?query=workflow%3ACI)
-[![Documentation Status](https://readthedocs.org/projects/quantumpdb/badge/?version=latest)](https://quantumpdb.readthedocs.io/en/latest/?badge=latest)
+
 
 ## Table of Contents
 1. **Overview**
