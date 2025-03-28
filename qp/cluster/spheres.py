@@ -42,7 +42,6 @@ HX_BOND_LENGTH = {
     "N": 1.00,
     "O": 0.98,
     "S": 1.35,
-    "P": 1.42
 }
 
 global CHARGE_DEBUG_FLAG
@@ -705,7 +704,7 @@ def cap_chains(model: Model, residues: Set[Residue], capping: int, RGP_atoms: Di
                 if RGP_atom_info["atom"] not in cluster_atom_list:
                     bond_vector = RGP_atom_info["atom"].get_coord() - RGP_atom_info["linking_atom_coord"]
                     norm_bond_vector = bond_vector / np.linalg.norm(bond_vector)
-                    pos = RGP_atom_info["linking_atom_coord"] + norm_bond_vector * HX_BOND_LENGTH[RGP_atom_info["atom"].element]
+                    pos = RGP_atom_info["linking_atom_coord"] + norm_bond_vector * HX_BOND_LENGTH[RGP_atom_info["linking_atom"].element]
                     name = "H0"
                     for i in range(100):
                         if f"H{i}" not in res:
@@ -1010,6 +1009,8 @@ def find_RGP_atoms(structure: Structure, RGP_atoms: Dict[str, Dict[int, Dict[str
             for RGP_atom_info in RGP_atom_list.values():
                 if np.allclose(atom_coord, RGP_atom_info["coord"], atol=1e-3):
                     RGP_atom_info["atom"] = atom
+                if np.allclose(atom_coord, RGP_atom_info["linking_atom_coord"], atol=1e-3):
+                    RGP_atom_info["linking_atom"] = atom
 
 
 def extract_clusters(
