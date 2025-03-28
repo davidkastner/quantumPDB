@@ -41,10 +41,12 @@ HX_BOND_LENGTH = {
     "C": 1.09,
     "N": 1.00,
     "O": 0.98,
-    "S": 1.35
+    "S": 1.35,
+    "P": 1.42
 }
-CHARGE_DEBUG_FLAG = False
 
+global CHARGE_DEBUG_FLAG
+CHARGE_DEBUG_FLAG = True
 
 def charge_debug(msg, res=None):
     if CHARGE_DEBUG_FLAG:
@@ -837,6 +839,8 @@ def compute_charge(
         "ARG": ["HE", "HH11", "HH12", "HH21", "HH22"],
         "LYS": ["HZ1", "HZ2", "HZ3"],
         "HIS": ["HD1", "HD2", "HE1", "HE2"],
+        "HIP": ["HD1", "HD2", "HE1", "HE2"],
+        "HID": ["HD1", "HD2", "HE1", "HE2"],
         "MLZ": [],
         "M3L": []
     }
@@ -854,8 +858,8 @@ def compute_charge(
     charge = []
     res_keys = set([make_res_key(res) for res in residues])
     s = spheres[0]
-    sphere_tree = NeighborSearch([atom for res in s for atom in res.get_atoms()])
     for res in s:
+        sphere_tree = NeighborSearch([atom for res in s for atom in res.get_atoms()])
         c = 0
         res_id = res.get_full_id()
         resname = res.get_resname()
