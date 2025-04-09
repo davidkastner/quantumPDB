@@ -170,7 +170,7 @@ def create_jobs(pdb_list_path, output_dir, optimization, basis, method, guess, u
                 continue
             
             coord_file = os.path.join(qm_path, os.path.basename(xyz_files[0]))
-            shutil.copy(xyz_files[0], coord_file)
+            shutil.copyfile(xyz_files[0], coord_file)
             os.chdir(qm_path)
             
             oxidation, multiplicity = get_electronic(pdb.lower(), pdb_list_path)
