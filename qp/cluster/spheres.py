@@ -866,7 +866,7 @@ def compute_charge(
             if res.has_id("N") and res_id in n_terminals and (resname != "PRO" or res.has_id("H")):
                 # sometimes PRO has no H atom on N-terminus (Protoss's fault)
                 c += 1
-            elif check_atom_valence(res, sphere_tree, "N", 4, backbone=False):
+            elif res.has_id("N") and check_atom_valence(res, sphere_tree, "N", 4, backbone=False):
                 c += 1
             ligand_charge[make_res_key(res)] = c
 
