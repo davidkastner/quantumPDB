@@ -50,7 +50,7 @@ def write_slurm_job(job_name, gpus, memory):
 #SBATCH --partition=xeon-g6-volta
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:volta:{gpus}
-#SBATCH --ncpus-per-task={gpus * 20}
+#SBATCH --cpus-per-task={gpus * 20}
 #SBATCH --output={job_name}.log
 
 source /etc/profile

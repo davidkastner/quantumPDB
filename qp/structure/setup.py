@@ -47,7 +47,7 @@ def parse_input(input, output, center_yaml_residues):
 
 def fetch_pdb(pdb, out):
     """
-    Fetches the PDB file for a given PDB code
+    Fetches the PDB file for a given PDB code.
 
     Parameters
     ----------
@@ -55,15 +55,32 @@ def fetch_pdb(pdb, out):
         PDB code
     out: str
         Path to output PDB file
+
+    Raises
+    ------
+    ValueError
+        If the PDB ID returns a 404 error (invalid user input).
+    IOError
+        If there is a network or server-side error.
     """
     url = f"https://files.rcsb.org/view/{pdb}.pdb"
-    r = requests.get(url)
-    if r.status_code != 200:
-        raise ValueError("> ERROR: Could not fetch PDB file")
+    try:
+        r = requests.get(url, timeout=15)
+    except requests.exceptions.RequestException as e:
+        # Raise an IOError for network-level problems
+        raise IOError(f"Could not connect to the server. Details: {e}")
 
-    os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
-    with open(out, "w") as f:
-        f.write(r.text)
+    # Check the status code from the server's response
+    if r.status_code == 200:
+        os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
+        with open(out, "w") as f:
+            f.write(r.text)
+    elif r.status_code == 404:
+        # Raise a ValueError for an invalid PDB ID
+        raise ValueError(f"PDB ID '{pdb}' is not valid or does not exist.")
+    else:
+        # Raise an IOError for other server-side problems
+        raise IOError(f"Server returned an error with status code {r.status_code}.")
 
 
 def get_pdbs(input_path, output_path):

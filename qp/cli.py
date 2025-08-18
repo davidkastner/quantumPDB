@@ -102,8 +102,14 @@ def run(config):
                 click.echo(f"> Fetching PDB file")
                 try:
                     setup.fetch_pdb(pdb, path)
-                except ValueError:
-                    click.secho("> Error: Could not fetch PDB file\n", italic=True, fg="red")
+                except ValueError as e:
+                    # Catches invalid PDB ID
+                    click.secho(f"> Error: {e}\n", italic=True, fg="red")
+                    err["PDB"].append(pdb)
+                    continue
+                except IOError as e:
+                    # Catches network and server issues
+                    click.secho(f"> Error: A server or network issue occurred. {e}\n", italic=True, fg="red")
                     err["PDB"].append(pdb)
                     continue
             
@@ -347,6 +353,8 @@ def analyze(config):
         failure_counts, author_counts = checkup.check_all_jobs(method, output, delete_queued)
         checkup.plot_failures(failure_counts)
         checkup.plot_authors(author_counts)
+        checkup.write_author_credit_csv(author_counts)
+        checkup.plot_failure_modes_from_csv(os.path.join("checkup", "failure_modes.csv"))
 
     if calc_charge_schemes or calc_dipole:
         from qp.analyze import multiwfn
