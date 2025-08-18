@@ -1,8 +1,9 @@
 import os
+import csv
 import glob
+import shutil
 import matplotlib.pyplot as plt
 from collections import defaultdict
-import csv  # Import csv module
 
 def format_plot() -> None:
     """General plotting parameters for the Kulik Lab."""
@@ -89,12 +90,17 @@ def classify_job(qm_dir_path, delete_queued):
 
     return submit_status, author
 
+def write_author_credit_csv(author_counts):
+    """Write author job count CSV."""
+    with open(os.path.join("checkup", "author_credit.csv"), "w", newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(["author", "job_count"])
+        for author, count in author_counts.items():
+            writer.writerow([author, count])
+
 
 def plot_failures(failure_counts):
-    """Create a bar plot for the failure modes in a specific order."""
     format_plot()
-
-    # Ensure that the statuses are ordered as desired
     ordered_labels = ["done", "backlog", "queue", "running", "charge", "memory", "unknown"]
     counts = [failure_counts[status] for status in ordered_labels]
 
@@ -102,13 +108,10 @@ def plot_failures(failure_counts):
     plt.bar(ordered_labels, counts, color="silver")
     plt.xlabel('job status', fontsize=10, fontweight='bold')
     plt.ylabel('job count', fontsize=10, fontweight='bold')
-    plt.savefig('job_status.png', bbox_inches="tight", dpi=600)
-
+    plt.savefig(os.path.join("checkup", 'job_status.png'), bbox_inches="tight", dpi=600)
 
 def plot_authors(author_counts):
-    """Create a bar plot for author job counts."""
     format_plot()
-
     authors = list(author_counts.keys())
     counts = list(author_counts.values())
 
@@ -116,53 +119,79 @@ def plot_authors(author_counts):
     plt.bar(authors, counts, color="silver")
     plt.xlabel('authors', fontsize=10, fontweight='bold')
     plt.ylabel('job count', fontsize=10, fontweight='bold')
-    plt.savefig('author_credit.png', bbox_inches="tight", dpi=600)
+    plt.savefig(os.path.join("checkup", 'author_credit.png'), bbox_inches="tight", dpi=600)
 
+def plot_failure_modes_from_csv(csv_path):
+    """Plot counts of each failure mode from failure_modes.csv."""
+    format_plot()
+    failure_mode_counts = defaultdict(int)
+
+    with open(csv_path, newline='') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            failure_mode_counts[row['error']] += 1
+
+    labels = list(failure_mode_counts.keys())
+    counts = [failure_mode_counts[mode] for mode in labels]
+
+    plt.figure(figsize=(7, 4))
+    plt.bar(labels, counts, color="silver")
+    plt.xlabel('failure mode', fontsize=10, fontweight='bold')
+    plt.ylabel('count', fontsize=10, fontweight='bold')
+    plt.savefig(os.path.join("checkup", 'failure_modes.png'), bbox_inches="tight", dpi=600)
 
 def check_all_jobs(method, output, delete_queued):
-    """Loop over all jobs and check if they failed or are still queued."""
-    
     print(f"> Checking for failed QM jobs in the {output} directory.")
-    output_name = "failure_modes.csv"  # Changed to CSV file
-    failure_counts = {"done": 0, "backlog": 0, "queue": 0, "running": 0, 
-                      "charge": 0, "memory": 0, "unknown": 0}
-    author_counts = defaultdict(int)  # Track job counts per author
 
-    with open(output_name, "w", newline='') as output_file:
+    # Ensure checkup directory exists
+    checkup_dir = "checkup"
+    if os.path.exists(checkup_dir):
+        shutil.rmtree(checkup_dir)
+    os.makedirs(checkup_dir)
+
+    failure_counts = {"done": 0, "backlog": 0, "queue": 0, "running": 0,
+                      "charge": 0, "memory": 0, "unknown": 0}
+    author_counts = defaultdict(int)
+    job_status_rows = []  # For job_status.csv
+
+    with open(os.path.join(checkup_dir, "failure_modes.csv"), "w", newline='') as output_file:
         writer = csv.writer(output_file)
-        writer.writerow(['pdb', 'chain', 'error'])  # Write CSV header
+        writer.writerow(['pdb', 'chain', 'error'])
 
         base_dir = os.getcwd()
         os.chdir(output)
 
         all_pdb_dirs = sorted(glob.glob('[0-9]*'))
-        for pdb_dir in all_pdb_dirs:  # Loop over PDB directories
-            for chain_dir in os.listdir(pdb_dir):  # Loop over chain subdirectories
+        for pdb_dir in all_pdb_dirs:
+            for chain_dir in os.listdir(pdb_dir):
                 if chain_dir == "Protoss":
                     continue
                 chain_dir_path = os.path.join(pdb_dir, chain_dir)
 
                 if os.path.isdir(chain_dir_path):
                     qm_dir_path = os.path.join(chain_dir_path, method)
-
                     submit_record_path = os.path.join(qm_dir_path, ".submit_record")
 
-                    # Check if .submit_record exists
                     if os.path.exists(submit_record_path):
-                        # Classify the job and count failures or running statuses
                         job_status, author = classify_job(qm_dir_path, delete_queued)
                         failure_counts[job_status] += 1
+                        author_counts[author] += 1
 
-                        # Count author only if a submit record exists
-                        author_counts[author] += 1  # Increment author count
-                        
+                        job_status_rows.append([pdb_dir, chain_dir, job_status])
                         if job_status not in ["done", "running", "queue"]:
-                            writer.writerow([pdb_dir, chain_dir, job_status])  # Write CSV row
+                            writer.writerow([pdb_dir, chain_dir, job_status])
                     else:
-                        # If no .submit_record, count it as backlog for job_status
                         failure_counts["backlog"] += 1
+                        job_status_rows.append([pdb_dir, chain_dir, "backlog"])
 
-    os.chdir(base_dir)
-    print(f"> Saving checkup results in {output_name}\n")
+        os.chdir(base_dir)
 
+    # Write job_status.csv
+    with open(os.path.join(checkup_dir, "job_status.csv"), "w", newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(["pdb", "chain", "job_status"])
+        writer.writerows(job_status_rows)
+
+    print(f"> Saved checkup results to {checkup_dir}/\n")
     return failure_counts, author_counts
+
