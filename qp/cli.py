@@ -205,7 +205,9 @@ def run(config):
                 AA = missing.define_residues()
                 residues_with_clashes = parse_log(protoss_log_file, protoss_pdb, AA)
                 if residues_with_clashes:
-                    print(f"> WARNING: Protoss has deleted {len(residues_with_clashes)} residues due to clashes, trying to fix them with Modeller")
+                    print(f"> WARNING: Protoss removed {len(residues_with_clashes)} residues due to clashes")
+                    clash_details = ", ".join([f"{res_name}{res_id} in chain {chain}" for res_id, _, _, chain, res_name in sorted(list(residues_with_clashes))])
+                    print(f"> WARNING: Remodeling {clash_details} with Modeller.")
                 else:
                     break # Don't loop again as no clashes were detected
 
