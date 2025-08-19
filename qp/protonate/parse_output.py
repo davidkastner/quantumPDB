@@ -35,7 +35,7 @@ def parse_log(log_path, pdb_path, AA):
                 res_id = int(atom_line[22:26].strip())
                 one_letter_code = AA.get(res_name, 'X')  # Use 'X' for unknown residues
                 chain_index = chain_order.get(chain, -1)
-                residues_with_clashes.add((res_id, one_letter_code, chain_index, chain))
+                residues_with_clashes.add((res_id, one_letter_code, chain_index, chain, res_name))
 
     return residues_with_clashes
 

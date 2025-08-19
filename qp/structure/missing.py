@@ -454,7 +454,7 @@ def delete_clashes(pdb_path, residues_with_clashes):
         lines = file.readlines()
 
     # Create a set for quick lookup of residues to delete
-    residues_to_delete = {(chain, res_id) for res_id, _, _, chain in residues_with_clashes}
+    residues_to_delete = {(chain, res_id) for res_id, _, _, chain, _ in residues_with_clashes}
 
     # Write the new PDB file, excluding the residues to delete
     with open(pdb_path, "w") as file:
