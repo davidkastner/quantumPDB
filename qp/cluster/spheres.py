@@ -779,7 +779,19 @@ def residue_in_ligands(resname, resid, res_is_aa, ligand_keys):
         return False
 
 
-def compute_charge(spheres, structure, ligand_charge):
+def check_disulfide(res: Residue, tree: NeighborSearch):
+    if not res.has_id("HG"):
+        SG = res["SG"]
+        neighbors = tree.search(SG.get_coord(), radius=2.5)
+        for neighbor in neighbors:
+            if neighbor != SG and neighbor.get_name() == "SG":
+                neighbor_res = neighbor.get_parent()
+                if neighbor_res.get_resname() == "CYS" and not neighbor_res.has_id("HG"):
+                    return True
+    return False
+
+
+def compute_charge(spheres, structure, ligand_charge, center_residue):
     """
     Computes the total charge of coordinating AAs
 
@@ -791,6 +803,8 @@ def compute_charge(spheres, structure, ligand_charge):
         The protein structure
     ligand_charge: dict
         Key, value pairs of ligand names and charges
+    center_residue: CenterResidue
+        The residues to use as the cluster center
 
     Returns
     -------
@@ -826,7 +840,17 @@ def compute_charge(spheres, structure, ligand_charge):
     }
 
     charge = []
-    for s in spheres[1:]:
+    start_sphere_id = 0 if center_residue.mode == "strict" else 1
+    if start_sphere_id == 1:
+        charge.append(0)
+    
+    cluster_atom_list = []
+    for s in spheres:
+        for res in s:
+            cluster_atom_list.extend(list(res.get_atoms()))
+    cluster_tree = NeighborSearch(cluster_atom_list)
+
+    for s in spheres[start_sphere_id:]:
         c = 0
         for res in s:
             res_id = res.get_full_id()
@@ -836,7 +860,11 @@ def compute_charge(spheres, structure, ligand_charge):
                 if resname in pos and all(res.has_id(h) for h in pos[resname]):
                     c += 1
                 elif resname in neg and all(not res.has_id(h) for h in neg[resname]):
-                    c -= 1
+                    if resname == "CYS":
+                        if not check_disulfide(res, cluster_tree):
+                            c -= 1
+                    else:
+                        c -= 1
                 if res_is_aa and resname != "PRO" and all(not res.has_id(h) for h in ["H", "H2"]):
                     # TODO: termini
                     c -= 1
@@ -1012,7 +1040,7 @@ def extract_clusters(
         if max_atom_count is not None:
             prune_atoms(c, residues, spheres, max_atom_count, ligands)
         if charge:
-            aa_charge[metal_id] = compute_charge(spheres, structure, ligand_charge)
+            aa_charge[metal_id] = compute_charge(spheres, structure, ligand_charge, center_residue)
         if count:
             res_count[metal_id] = count_residues(spheres)
         if capping:
@@ -1034,7 +1062,7 @@ def extract_clusters(
 
     if charge:
         with open(f"{out}/charge.csv", "w") as f:
-            f.write(f"Name,{','.join(str(i + 1) for i in range(sphere_count))}\n")
+            f.write(f"Name,{','.join(str(i) for i in range(sphere_count + 1))}\n")
             for k, v in sorted(aa_charge.items()):
                 f.write(k)
                 for s in v:
