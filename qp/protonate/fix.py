@@ -10,7 +10,7 @@ from qp.cluster.spheres import CenterResidue
 
 
 def res_priority(res, res_info, center_residues):
-    if res.get_resname() in center_residues:
+    if res in center_residues:
         return 8e7
     elif Polypeptide.is_aa(res, standard=True):
         return 4e7
