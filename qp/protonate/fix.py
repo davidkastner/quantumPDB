@@ -87,7 +87,7 @@ def clean_occupancy(path: str, center_residues: CenterResidue) -> bool:
 
                 # if center is in clash with current atom
                 # reconsider this clash from the center's point of view with tighter search radius
-                if clash_res.get_resname() in center_residues:
+                if clash_res in center_residues:
                     # if center doesn't contain partial occupancy, put it into the queue for rechecking,
                     if clash_res not in kept_partial_res:
                         kept_partial_res[clash_res] = {
