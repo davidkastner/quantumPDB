@@ -144,7 +144,8 @@ def run(config):
                         ali_path = f"{output}/{pdb}/{pdb}.ali"
                         missing.write_alignment(residues, pdb, path, ali_path)
                         print("> Generated alignment file and starting Modeller run:\n")
-                        copy(path, f"{output}/{pdb}/{pdb}.pdb")
+                        if not os.path.isfile(f"{output}/{pdb}/{pdb}.pdb"):
+                            copy(path, f"{output}/{pdb}/{pdb}.pdb")
                         missing.build_model(residues, pdb, path, ali_path, mod_path, optimize)
 
                 prot_path = f"{output}/{pdb}/Protoss"
@@ -247,7 +248,6 @@ def run(config):
                     ligand_spin = compute_spin(f"{prot_path}/{pdb}_ligands.sdf")
                 else:
                     ligand_charge = dict()
-                print(center_residue)
                 cluster_paths = spheres.extract_clusters(
                     path, f"{output}/{pdb}", center_residue, sphere_count, 
                     first_sphere_radius, max_atom_count, merge_cutoff, smooth_method,
