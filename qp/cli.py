@@ -5,7 +5,6 @@
 
 import os
 import sys
-import time
 import click
 import traceback
 
@@ -45,6 +44,7 @@ def cli():
 def run(config):
     """Generates quantumPDB structures and files."""
     import os
+    from shutil import copy
     from Bio.PDB.PDBExceptions import PDBIOException
     from qp.structure import setup
 
@@ -114,8 +114,9 @@ def run(config):
                     continue
             
             # Extract the current center residue from the list of all residues
-            center_residue = [center_residues.pop(0)]
-            click.echo(f"> Using center residue: {center_residue[0]}")
+            from qp.cluster.spheres import CenterResidue
+            center_residue = CenterResidue(center_residues.pop(0))
+            click.echo(f"> Using center residue: {center_residue}")
             
             residues_with_clashes = [] # Start by assuming no protoss clashes
             for i in range(max_clash_refinement_iter):
@@ -149,6 +150,8 @@ def run(config):
                         ali_path = f"{output}/{pdb}/{pdb}.ali"
                         missing.write_alignment(residues, pdb, path, ali_path)
                         print("> Generated alignment file and starting Modeller run:\n")
+                        if not os.path.isfile(f"{output}/{pdb}/{pdb}.pdb"):
+                            copy(path, f"{output}/{pdb}/{pdb}.pdb")
                         missing.build_model(residues, pdb, path, ali_path, mod_path, optimize)
 
                 prot_path = f"{output}/{pdb}/Protoss"
@@ -169,7 +172,6 @@ def run(config):
                                 prepared_flag = True
                         if prepared_flag:
                             os.makedirs(prot_path, exist_ok=True)
-                            from shutil import copy
                             copy(os.path.join(prepared_prot_path, f"{pdbl}_protoss.pdb"), protoss_pdb)
                             copy(os.path.join(prepared_prot_path, f"{pdbl}_ligands.sdf"), ligands_sdf)
                             click.echo("> Using pre-prepared protoss file")
@@ -254,7 +256,6 @@ def run(config):
                     ligand_spin = compute_spin(f"{prot_path}/{pdb}_ligands.sdf")
                 else:
                     ligand_charge = dict()
-
                 cluster_paths = spheres.extract_clusters(
                     path, f"{output}/{pdb}", center_residue, sphere_count, 
                     first_sphere_radius, max_atom_count, merge_cutoff, smooth_method,

@@ -162,7 +162,10 @@ def get_residues(path, AA):
                 seen[chain].add(residues[-1][-1][:2])
 
         elif line.startswith("TER"):
-            chain = line[21]
+            if len(line) > 21:
+                chain = line[21]
+            else:
+                chain = cur
             if chain in missing_residues:
                 while ind[chain] < len(missing_residues[chain]):
                     residues[-1].append(missing_residues[chain][ind[chain]])

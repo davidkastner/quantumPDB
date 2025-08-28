@@ -21,7 +21,7 @@ performed by specifying ``capping`` in ``spheres.extract_clusters``:
 """
 
 import os
-from typing import Set, Literal, Optional
+from typing import Set, Literal, Optional, List
 import numpy as np
 from Bio.PDB import PDBParser, Polypeptide, PDBIO, Select
 from Bio.PDB.Atom import Atom
@@ -35,6 +35,29 @@ from sklearn.cluster import DBSCAN
 
 
 RANDOM_SEED = 66265
+
+class CenterResidue:
+    def __init__(self, center_residue: str):
+        self.center_residue_str = center_residue
+        residue_list = center_residue.split("-")
+        if len(residue_list) == 1:
+            self.mode = "fuzzy"
+            self.residue_list = center_residue.split("_")
+        else:
+            self.mode = "strict"
+            self.residue_list = residue_list
+        
+    def __str__(self):
+        return self.center_residue_str
+    
+    def __repr__(self):
+        return self.center_residue_str
+
+    def __contains__(self, res: Residue):
+        if self.mode == "fuzzy":
+            return res.get_resname() in self.residue_list and res.id[0] != ' '
+        elif self.mode == "strict":
+            return make_res_key(res) in self.residue_list
 
 
 def get_grid_coord_idx(coord, coord_min, mean_distance):
@@ -150,7 +173,7 @@ def calc_dist(point_a, point_b):
     return np.linalg.norm(point_a - point_b)
 
 
-def voronoi(model, center_residues, ligands, smooth_method, output_path, **smooth_params):
+def voronoi(model, center_residue: CenterResidue, ligands, smooth_method, output_path, **smooth_params):
     """
     Computes the Voronoi tessellation of a protein structure.
 
@@ -214,12 +237,12 @@ def merge_centers(cur, search, seen, radius=0.0):
     return center
 
 
-def get_center_residues(model, center_residues, merge_cutoff=0.0):
+def get_center_residues(model, center_residue: CenterResidue, merge_cutoff=0.0):
     found = set()
     center_atoms = []
     for res in model.get_residues():
         # We will assume the ligand is labeled as a heteroatom with res.id[0] != ' '
-        if res.get_resname() in center_residues and res.id[0] != ' ':
+        if res in center_residue:
             found.add(res)
             center_atoms.extend([atom for atom in res.get_unpacked_list() if atom.element != "H"])
     if not len(center_atoms):
@@ -756,7 +779,19 @@ def residue_in_ligands(resname, resid, res_is_aa, ligand_keys):
         return False
 
 
-def compute_charge(spheres, structure, ligand_charge):
+def check_disulfide(res: Residue, tree: NeighborSearch):
+    if not res.has_id("HG"):
+        SG = res["SG"]
+        neighbors = tree.search(SG.get_coord(), radius=2.5)
+        for neighbor in neighbors:
+            if neighbor != SG and neighbor.get_name() == "SG":
+                neighbor_res = neighbor.get_parent()
+                if neighbor_res.get_resname() == "CYS" and not neighbor_res.has_id("HG"):
+                    return True
+    return False
+
+
+def compute_charge(spheres, structure, ligand_charge, center_residue):
     """
     Computes the total charge of coordinating AAs
 
@@ -768,6 +803,8 @@ def compute_charge(spheres, structure, ligand_charge):
         The protein structure
     ligand_charge: dict
         Key, value pairs of ligand names and charges
+    center_residue: CenterResidue
+        The residues to use as the cluster center
 
     Returns
     -------
@@ -803,7 +840,17 @@ def compute_charge(spheres, structure, ligand_charge):
     }
 
     charge = []
-    for s in spheres[1:]:
+    start_sphere_id = 0 if center_residue.mode == "strict" else 1
+    if start_sphere_id == 1:
+        charge.append(0)
+    
+    cluster_atom_list = []
+    for s in spheres:
+        for res in s:
+            cluster_atom_list.extend(list(res.get_atoms()))
+    cluster_tree = NeighborSearch(cluster_atom_list)
+
+    for s in spheres[start_sphere_id:]:
         c = 0
         for res in s:
             res_id = res.get_full_id()
@@ -813,7 +860,11 @@ def compute_charge(spheres, structure, ligand_charge):
                 if resname in pos and all(res.has_id(h) for h in pos[resname]):
                     c += 1
                 elif resname in neg and all(not res.has_id(h) for h in neg[resname]):
-                    c -= 1
+                    if resname == "CYS":
+                        if not check_disulfide(res, cluster_tree):
+                            c -= 1
+                    else:
+                        c -= 1
                 if res_is_aa and resname != "PRO" and all(not res.has_id(h) for h in ["H", "H2"]):
                     # TODO: termini
                     c -= 1
@@ -907,7 +958,7 @@ def complete_oligomer(ligand_keys, model, residues, spheres, include_ligands):
 def extract_clusters(
     path,
     out,
-    center_residues,
+    center_residue: CenterResidue,
     sphere_count=2,
     first_sphere_radius=4.0,
     max_atom_count=None,
@@ -933,8 +984,8 @@ def extract_clusters(
         Path to PDB file
     out: str
         Path to output directory
-    center_residues: list
-        List of resnames of the residues to use as the cluster center
+    center_residue: CenterResidue
+        The residues to use as the cluster center
     sphere_count: int
         Number of coordinations spheres to extract
     first_sphere_radius: float
@@ -970,9 +1021,9 @@ def extract_clusters(
     io.set_structure(structure)
 
     model = structure[0]
-    neighbors = voronoi(model, center_residues, ligands, smooth_method, out,**smooth_params)
+    neighbors = voronoi(model, center_residue, ligands, smooth_method, out,**smooth_params)
 
-    centers = get_center_residues(model, center_residues, merge_cutoff)
+    centers = get_center_residues(model, center_residue, merge_cutoff)
 
     aa_charge = {}
     res_count = {}
@@ -989,7 +1040,7 @@ def extract_clusters(
         if max_atom_count is not None:
             prune_atoms(c, residues, spheres, max_atom_count, ligands)
         if charge:
-            aa_charge[metal_id] = compute_charge(spheres, structure, ligand_charge)
+            aa_charge[metal_id] = compute_charge(spheres, structure, ligand_charge, center_residue)
         if count:
             res_count[metal_id] = count_residues(spheres)
         if capping:
@@ -1007,11 +1058,11 @@ def extract_clusters(
                 cap.get_parent().detach_child(cap.get_id())
         if xyz:
             struct_to_file.to_xyz(f"{cluster_path}/{metal_id}.xyz", *sphere_paths)
-            struct_to_file.combine_pdbs(f"{cluster_path}/{metal_id}.pdb", center_residues, *sphere_paths, hetero_pdb=hetero_pdb)
+            struct_to_file.combine_pdbs(f"{cluster_path}/{metal_id}.pdb", center_residue, *sphere_paths, hetero_pdb=hetero_pdb)
 
     if charge:
         with open(f"{out}/charge.csv", "w") as f:
-            f.write(f"Name,{','.join(str(i + 1) for i in range(sphere_count))}\n")
+            f.write(f"Name,{','.join(str(i) for i in range(sphere_count + 1))}\n")
             for k, v in sorted(aa_charge.items()):
                 f.write(k)
                 for s in v:

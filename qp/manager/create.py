@@ -120,7 +120,7 @@ def get_charge(structure_dir=None):
             # Parse charge.csv section 1
             if section == 1 and line.startswith(chain_identifier):
                 parts = line.split(',')
-                num_sphere = len(parts) - 1
+                num_sphere = len(parts) - 2
                 current_chain_identifier = parts[0]
                 if current_chain_identifier == chain_identifier:
                     charge += sum([int(x) for x in parts[1:]])

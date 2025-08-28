@@ -6,10 +6,11 @@ from Bio.PDB.Polypeptide import is_aa
 from Bio.PDB.NeighborSearch import NeighborSearch
 from Bio.PDB.Residue import Residue
 from Bio.PDB import PDBParser, PDBIO, Select, Polypeptide
+from qp.cluster.spheres import CenterResidue
 
 
 def res_priority(res, res_info, center_residues):
-    if res.get_resname() in center_residues:
+    if res in center_residues:
         return 8e7
     elif Polypeptide.is_aa(res, standard=True):
         return 4e7
@@ -26,7 +27,7 @@ def partial_res_info(res, res_info):
     return f'residue {resname}_{chain}{resid} with avg. occupancy {res_info[res]["avg_occupancy"]:.2f} and {res_info[res]["num_atom"]} atoms'
 
 
-def clean_occupancy(path: str, center_residues: List[str]) -> bool:
+def clean_occupancy(path: str, center_residues: CenterResidue) -> bool:
     parser = PDBParser(QUIET=True)
     io = PDBIO()
     structure = parser.get_structure("PDB", path)
@@ -55,7 +56,7 @@ def clean_occupancy(path: str, center_residues: List[str]) -> bool:
                         "avg_occupancy": total_occupancy / num_atom,
                         "num_atom": num_atom,
                         "kept": True,
-                        "search_radius": 1.0 if res.get_resname() in center_residues else 2.5 # allow for bonding to center, otherwise vdw
+                        "search_radius": 1.0 if res in center_residues else 2.5 # allow for bonding to center, otherwise vdw
                     }
     
     # no partial occupancy detected
@@ -86,7 +87,7 @@ def clean_occupancy(path: str, center_residues: List[str]) -> bool:
 
                 # if center is in clash with current atom
                 # reconsider this clash from the center's point of view with tighter search radius
-                if clash_res.get_resname() in center_residues:
+                if clash_res in center_residues:
                     # if center doesn't contain partial occupancy, put it into the queue for rechecking,
                     if clash_res not in kept_partial_res:
                         kept_partial_res[clash_res] = {
@@ -297,7 +298,7 @@ def fix_OXT(path: str) -> None:
     io.save(path, Select())
 
 
-def adjust_activesites(path, metals):
+def adjust_activesites(path, center_residue: CenterResidue):
     """
     Deprotonates metal-coordinating residues that are (most likely) incorrectly
     protonated by Protoss. Removes hydrogens from coordinating tyrosines and
@@ -316,7 +317,7 @@ def adjust_activesites(path, metals):
 
     points = []
     for res in structure[0].get_residues():
-        if res.get_resname() in metals:
+        if res in center_residue:
             atoms = res.get_unpacked_list()
             if len(atoms) > 1:
                 continue # skip if not metal-like

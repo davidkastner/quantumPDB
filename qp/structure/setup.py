@@ -150,9 +150,7 @@ def get_centers(input_path):
         if os.path.isfile(pdb_id):
             pdb, ext = os.path.splitext(os.path.basename(pdb_id))
             pdb = pdb.replace(".", "_")
-            if ext == ".pdb":
-                centers.append((pdb, pdb_id))
-            elif ext == ".csv":
+            if ext == ".csv":
                 input_csv = pdb_id
                 with open(input_csv, "r") as csvfile:
                     reader = csv.DictReader(csvfile)
