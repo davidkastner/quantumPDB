@@ -344,7 +344,7 @@ def analyze(config):
     calc_charge_schemes = config_data.get('calc_charge_schemes', False)
     calc_dipole = config_data.get('calc_dipole', False)
     multiwfn_path = config_data.get('multiwfn_path', 'Multiwfn')
-    charge_scheme = config_data.get('charge_scheme', 'Hirshfeld-I')
+    charge_scheme = config_data.get('charge_scheme', 'Hirshfeld')
     input = config_data.get('input', [])
     output = config_data.get('output_dir', '')
     center_yaml_residues = config_data.get('center_residues', [])

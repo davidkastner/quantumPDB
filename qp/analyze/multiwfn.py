@@ -54,7 +54,7 @@ def iterate_qm_output(pdb_all, method, base_output_dir, multiwfn_path, settings_
                 # Copy the atmrad dir and settings.ini into the current working directory
                 atmrad_dest_path = os.path.join(scr_dir_path, 'atmrad/')
                 if not os.path.exists(atmrad_dest_path):
-                    shutil.copytree(atmrad_path, atmrad_dest_path)
+                    shutil.copytree(atmrad_path, atmrad_dest_path, dirs_exist_ok=True)
 
                 settings_ini_dest_path = os.path.join(scr_dir_path, 'settings.ini')
                 shutil.copy(settings_ini_path, settings_ini_dest_path)
@@ -71,8 +71,11 @@ def iterate_qm_output(pdb_all, method, base_output_dir, multiwfn_path, settings_
                     if molden_files:
                         molden_file = os.path.basename(molden_files[0])
                         task_function(scr_dir_path, molden_file, multiwfn_path, charge_scheme)
-                        shutil.rmtree('atmrad/')  # Delete the atmrad directory when done
-                        os.remove('settings.ini')  # Delete the settings.ini file when done
+                        shutil.rmtree('atmrad/', ignore_errors=True)
+                        try:
+                            os.remove('settings.ini')
+                        except FileNotFoundError:
+                            pass
                     else:
                         print(f"> WARNING: No molden file in {scr_dir_path}")
                     os.chdir(original_dir)
