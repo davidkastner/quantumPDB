@@ -62,25 +62,30 @@ def iterate_qm_output(pdb_all, method, base_output_dir, multiwfn_path, settings_
                 print(f"> Using {cpu_count} threads for Multiwfn")
 
                 if os.path.exists(scr_dir_path):
-                    # Move into the QM scr directory
                     original_dir = os.getcwd()
                     os.chdir(scr_dir_path)
-                    scr_dir_path = os.getcwd()
+                    try:
+                        scr_dir_path = os.getcwd()
 
-                    molden_files = glob.glob(f'{chain_dir}.molden')
-                    if molden_files:
-                        molden_file = os.path.basename(molden_files[0])
-                        task_function(scr_dir_path, molden_file, multiwfn_path, charge_scheme)
+                        molden_files = glob.glob(f'{chain_dir}.molden')
+                        if molden_files:
+                            molden_file = os.path.basename(molden_files[0])
+                            try:
+                                task_function(scr_dir_path, molden_file, multiwfn_path, charge_scheme)
+                            except Exception as e:
+                                print(f"> ERROR: {current_pdb_dir} {chain_dir} failed: {e}. Skipping.")
+                        else:
+                            print(f"> WARNING: No molden file in {scr_dir_path}")
+                    finally:
                         shutil.rmtree('atmrad/', ignore_errors=True)
                         try:
                             os.remove('settings.ini')
                         except FileNotFoundError:
                             pass
-                    else:
-                        print(f"> WARNING: No molden file in {scr_dir_path}")
-                    os.chdir(original_dir)
+                        os.chdir(original_dir)
                 else:
                     print(f"> WARNING: No scr directory in {method_dir_path}.")
+
         else:
             continue
 
