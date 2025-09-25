@@ -54,38 +54,34 @@ def iterate_qm_output(pdb_all, method, base_output_dir, multiwfn_path, settings_
                 # Copy the atmrad dir and settings.ini into the current working directory
                 atmrad_dest_path = os.path.join(scr_dir_path, 'atmrad/')
                 if not os.path.exists(atmrad_dest_path):
-                    shutil.copytree(atmrad_path, atmrad_dest_path, dirs_exist_ok=True)
+                    shutil.copytree(atmrad_path, atmrad_dest_path)
 
                 settings_ini_dest_path = os.path.join(scr_dir_path, 'settings.ini')
-                shutil.copy(settings_ini_path, settings_ini_dest_path)
+                # MODIFICATION: Add a check to avoid re-copying settings.ini if it already exists
+                if not os.path.exists(settings_ini_dest_path):
+                    shutil.copy(settings_ini_path, settings_ini_dest_path)
+                
                 cpu_count = get_cpu_count(settings_ini_dest_path)
-                print(f"> Using {cpu_count} threads for Multiwfn")
+                print(f"> Using {cpu_count} threads for Multiwfn", flush=True)
 
                 if os.path.exists(scr_dir_path):
+                    # Move into the QM scr directory
                     original_dir = os.getcwd()
                     os.chdir(scr_dir_path)
-                    try:
-                        scr_dir_path = os.getcwd()
+                    scr_dir_path = os.getcwd()
 
-                        molden_files = glob.glob(f'{chain_dir}.molden')
-                        if molden_files:
-                            molden_file = os.path.basename(molden_files[0])
-                            try:
-                                task_function(scr_dir_path, molden_file, multiwfn_path, charge_scheme)
-                            except Exception as e:
-                                print(f"> ERROR: {current_pdb_dir} {chain_dir} failed: {e}. Skipping.")
-                        else:
-                            print(f"> WARNING: No molden file in {scr_dir_path}")
-                    finally:
-                        shutil.rmtree('atmrad/', ignore_errors=True)
-                        try:
-                            os.remove('settings.ini')
-                        except FileNotFoundError:
-                            pass
-                        os.chdir(original_dir)
+                    molden_files = glob.glob(f'{chain_dir}.molden')
+                    if molden_files:
+                        molden_file = os.path.basename(molden_files[0])
+                        task_function(scr_dir_path, molden_file, multiwfn_path, charge_scheme)
+                        # MODIFICATION: Comment out the deletion lines to prevent race conditions
+                        # shutil.rmtree('atmrad/')  # Delete the atmrad directory when done
+                        # os.remove('settings.ini')  # Delete the settings.ini file when done
+                    else:
+                        print(f"> WARNING: No molden file in {scr_dir_path}", flush=True)
+                    os.chdir(original_dir)
                 else:
-                    print(f"> WARNING: No scr directory in {method_dir_path}.")
-
+                    print(f"> WARNING: No scr directory in {method_dir_path}.", flush=True)
         else:
             continue
 
@@ -187,7 +183,7 @@ def get_coc(scr_dir_path, molden_file, fragment_atom_indices, selected_charge_sc
 
     # Check if the .chg file exists
     if not os.path.exists(charge_file):
-        print(f"> Charge file {charge_file} not found. Generating it using charge_scheme function.")
+        print(f"> Charge file {charge_file} not found. Generating it using charge_scheme function.", flush=True)
         # Generate the .chg file using the charge_scheme function
         charge_scheme(scr_dir_path, molden_file, multiwfn_path, selected_charge_scheme)
 
@@ -293,9 +289,9 @@ def get_cpu_count(settings_ini_dest_path):
                     # Extract the first matching group (the number after 'nthreads=')
                     return int(match.group(1))
     except FileNotFoundError:
-        print(f"Error: The file {settings_ini_dest_path} was not found.")
+        print(f"Error: The file {settings_ini_dest_path} was not found.", flush=True)
     except ValueError:
-        print(f"Error: Unable to parse 'nthreads' in {settings_ini_dest_path}.")
+        print(f"Error: Unable to parse 'nthreads' in {settings_ini_dest_path}.", flush=True)
     
     # Default to 1 if nthreads isn't found or there is an error
     return 1
@@ -364,7 +360,7 @@ def charge_scheme(scr_dir_path, molden_file, multiwfn_path, charge_scheme):
 
     # If the charge file already exists, skip
     if os.path.exists(new_charge_file):
-        print(f"> Charge file {new_charge_file} already exists. Skipping {charge_scheme}...")
+        print(f"> Charge file {new_charge_file} already exists. Skipping {charge_scheme}...", flush=True)
         return
 
     # Run Multiwfn with the user-selected charge scheme
@@ -376,9 +372,9 @@ def charge_scheme(scr_dir_path, molden_file, multiwfn_path, charge_scheme):
     charge_output_file = Path(f"{molden_base_name}.chg")
     if charge_output_file.exists():
         charge_output_file.rename(new_charge_file)
-        print(f"> {pdb_name.upper()} {chain_name} {charge_scheme} scheme computed and saved to {new_charge_file}")
+        print(f"> {pdb_name.upper()} {chain_name} {charge_scheme} scheme computed and saved to {new_charge_file}", flush=True)
     else:
-        print(f"> ERROR: Multiwfn failed for {pdb_name} {chain_name} using {charge_scheme} scheme.")
+        print(f"> ERROR: Multiwfn failed for {pdb_name} {chain_name} using {charge_scheme} scheme.", flush=True)
 
 
 
@@ -434,4 +430,3 @@ def calc_dipole(scr_dir_path, molden_file, multiwfn_path, charge_scheme):
                 csv_writer.writerow(['Molecular dipole moment'] + dipole_a_u + [magnitude_a_u])
     
     print(f"> {pdb_name.upper()} {chain_name} dipole computed using center of mass\n", flush=True)
-

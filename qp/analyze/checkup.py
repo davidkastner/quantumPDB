@@ -53,22 +53,27 @@ def check_submit_record(submit_record_path, delete_queued):
     with open(submit_record_path, 'r') as f:
         content = f.read()
 
-        author = extract_author(content)
-        queue_time = "Queue Time:" in content
-        run_start_time = "Run Start Time:" in content
-        run_end_time = "Run End Time:" in content
+    author = extract_author(content)
+    queue_time     = "Queue Time:" in content
+    run_start_time = "Run Start Time:" in content
+    run_end_time   = "Run End Time:" in content
 
-        # if queue_time and not run_start_time:
-        if run_start_time and not run_end_time:
-            if delete_queued:
-                print(f"Deleting queued job record: {submit_record_path}")
-                os.remove(submit_record_path)
-            return "queue", author
-        elif run_start_time and not run_end_time:
-            return "running", author
-        elif run_end_time:
-            return "done", author
-        
+    # Queued but never started
+    if queue_time and not run_start_time:
+        if delete_queued:
+            print(f"Deleting queued job record: {submit_record_path}")
+            os.remove(submit_record_path)
+        return "queue", author
+
+    # Started but not finished
+    if run_start_time and not run_end_time:
+        return "running", author
+
+    # Finished
+    if run_end_time:
+        return "done", author
+
+    # Fallback (record present but missing expected markers)
     return "backlog", author
 
 
