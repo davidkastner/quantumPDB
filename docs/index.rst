@@ -14,20 +14,6 @@ region of the protein surrounding the catalytic center. Unlike simple distance-b
 QuantumPDB uses Voronoi tessellation to construct hierarchical interaction spheres that
 faithfully capture the chemical environment, even for non-spherical active sites.
 
-Key Features
-------------
-
-- **Automated structure preparation** --- models missing atoms, residues, and loops via Modeller
-- **Protonation state assignment** --- assigns hydrogen positions and resolves alternate conformations via Protoss
-- **Voronoi-based cluster extraction** --- contact-based interaction spheres instead of distance cutoffs
-- **Flexible center definitions** --- single metals, multi-metallic sites, heme groups, oligomeric substrates
-- **QM job management** --- generates input files for TeraChem (GPU) and ORCA (CPU) with optional MM charge embedding
-- **Post-processing analysis** --- partial charge schemes and dipole moments via Multiwfn
-- **High-throughput** --- processes hundreds of enzymes from a single CSV input file
-
-QuantumPDB works with any PDB-format structure, including those from X-ray crystallography,
-cryo-EM, NMR, MD simulation snapshots, and generative models.
-
 .. container:: .buttons
 
    `GitHub <https://github.com/davidkastner/quantumpdb>`_
