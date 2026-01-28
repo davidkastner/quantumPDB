@@ -1,0 +1,16 @@
+/* Custom styles for QuantumPDB documentation */
+
+/* Make sidebar logo larger */
+.wy-side-nav-search .brand > a img.logo {
+    height: 8.5rem !important;
+    max-height: 8.5rem !important;
+}
+
+/* Reduce space between logo and search bar */
+.wy-side-nav-search .brand {
+    margin-bottom: 0.5rem;
+}
+
+.wy-side-nav-search [role="search"] {
+    margin-top: 0;
+}
