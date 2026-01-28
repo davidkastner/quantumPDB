@@ -111,14 +111,12 @@ html_theme_options = {
     "navigation_depth": 4,
     "includehidden": True,
     "titles_only": False,
-    "logo_only": True,
     "github_url": "https://github.com/davidkastner/quantumpdb",
-    "logo": "_static/logo-white.svg",
-    "logo_mobile": "_static/logo-white.svg",
+    "logo_mobile": "logo-white.svg",
     "color_scheme": "dark",
 }
 
-html_logo = "_static/logo-white.svg"
+html_logo = "logo-white.svg"
 html_title = "quantumpdb"
 html_favicon = "_static/favicon.ico"
 
