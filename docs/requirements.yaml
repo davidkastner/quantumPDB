@@ -3,16 +3,24 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  # Base depends
   - python=3.11
   - pip
+  # Core dependencies needed for autoapi to parse the code
+  - biopython
+  - click
   - matplotlib
   - numpy
   - pandas
+  - periodictable
+  - pyyaml
+  - requests
   - scikit-learn
+  - scipy
+  - seaborn
+  - tqdm
 
   - pip:
-    # Pip-only installs
+    # Sphinx and theme
     - sphinx==6.2.1
     - sphinx-autoapi==3.0.0
     - https://github.com/revitron/revitron-sphinx-theme/archive/refs/tags/0.7.0.zip

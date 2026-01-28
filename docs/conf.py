@@ -59,7 +59,7 @@ extensions = [
 autosummary_generate = True
 autoapi_type = "python"
 autoapi_dirs = ["../qp"]
-autoapi_ignore = ["*/tests/*", "*_version.py"]
+autoapi_ignore = ["*/tests/*", "*_version.py", "*/structure/missing.py", "*/resources/*", "*/Archive/*", "*spheres_bad.py"]
 autodoc_member_order = "bysource"
 autodoc_mock_imports = [
     "modeller",
