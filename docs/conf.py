@@ -104,17 +104,17 @@ html_theme = "revitron_sphinx_theme"
 # documentation.
 #
 html_theme_options = {
-    "color_scheme": "",
     "canonical_url": "",
-    "analytics_id": "UA-XXXXXXX-1",
     "style_external_links": False,
     "collapse_navigation": True,
     "sticky_navigation": True,
     "navigation_depth": 4,
     "includehidden": True,
     "titles_only": False,
+    "logo_only": True,
     "github_url": "https://github.com/davidkastner/quantumpdb",
-    "logo_mobile": "logo-white.svg",
+    "logo": "_static/logo-white.svg",
+    "logo_mobile": "_static/logo-white.svg",
     "color_scheme": "dark",
 }
 
@@ -146,7 +146,6 @@ html_context = {
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
-html_logo = "_static/logo-white.svg"
 
 # Custom sidebar templates, must be a dictionary that maps document names
 # to template names.
