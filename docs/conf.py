@@ -45,7 +45,6 @@ release = ""
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    "autoapi.extension",
     "sphinx.ext.autosummary",
     "sphinx.ext.autodoc",
     "sphinx.ext.mathjax",
@@ -57,29 +56,9 @@ extensions = [
 ]
 
 autosummary_generate = True
-autoapi_type = "python"
-autoapi_dirs = ["../qp"]
-autoapi_ignore = ["*/tests/*", "*_version.py", "*/structure/missing.py", "*/resources/*", "*/Archive/*", "*spheres_bad.py"]
 autodoc_member_order = "bysource"
 autodoc_mock_imports = [
     "modeller",
-    "Bio",
-    "click",
-    "scipy",
-    "sklearn",
-    "periodictable",
-    "requests",
-    "seaborn",
-    "tqdm",
-    "yaml",
-]
-
-autoapi_options = [
-    "members",
-    "undoc-members",
-    "show-inheritance",
-    "show-module-summary",
-    "imported-members",
 ]
 napoleon_google_docstring = False
 napoleon_use_param = False

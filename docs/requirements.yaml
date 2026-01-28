@@ -5,7 +5,7 @@ channels:
 dependencies:
   - python=3.11
   - pip
-  # Core dependencies needed for autoapi to parse the code
+  # Core dependencies needed for autodoc to import the code
   - biopython
   - click
   - matplotlib
@@ -22,5 +22,4 @@ dependencies:
   - pip:
     # Sphinx and theme
     - sphinx==6.2.1
-    - sphinx-autoapi==3.0.0
     - https://github.com/revitron/revitron-sphinx-theme/archive/refs/tags/0.7.0.zip
