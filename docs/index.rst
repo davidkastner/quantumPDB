@@ -16,8 +16,10 @@ faithfully capture the chemical environment, even for non-spherical active sites
 
 .. container:: .buttons
 
+   `Installation <getting_started.html>`_
+   `Quickstart <quickstart.html>`_
+   `Configuration <configuration.html>`_
    `GitHub <https://github.com/davidkastner/quantumpdb>`_
-   `Zenodo Dataset <https://doi.org/10.5281/zenodo.17239737>`_
 
 .. toctree::
    :maxdepth: 2
