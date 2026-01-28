@@ -79,6 +79,20 @@ def rename_and_clean_resnames(input_pdb, output_pdb):
             outfile.write(line)
 
 def parse_pdb(input_pdb, output_pdb, ff_dict):
+    """Write ff14SB partial charges into the B-factor column of a PDB file.
+
+    Only ATOM lines whose residue and atom names match entries in ``ff_dict``
+    are written to the output file.
+
+    Parameters
+    ----------
+    input_pdb : str
+        Path to the input PDB file.
+    output_pdb : str
+        Path to the output PDB file with charges in the B-factor column.
+    ff_dict : dict
+        Nested dict from :func:`~qp.manager.ff14SB_dict.get_ff14SB_dict`.
+    """
     with open(input_pdb, 'r') as infile, open(output_pdb, 'w') as outfile:
         for line in infile:
             if line.startswith('ATOM'):
@@ -144,7 +158,22 @@ def write_pdb(output_path, pdb_lines):
             pdb_file.write(line)
 
 def remove_qm_atoms(pdb_file, xyz_file, output_pdb_file, threshold=0.5):
+    """Remove QM cluster atoms from a PDB file based on coordinate matching.
 
+    Atoms in the PDB whose coordinates are within ``threshold`` angstroms
+    of any atom in the XYZ file are removed.
+
+    Parameters
+    ----------
+    pdb_file : str
+        Path to the full-protein PDB file.
+    xyz_file : str
+        Path to the QM cluster XYZ file.
+    output_pdb_file : str
+        Path to write the PDB with QM atoms removed.
+    threshold : float, optional
+        Distance threshold in angstroms for matching atoms (default 0.5).
+    """
     pdb_lines = read_pdb(pdb_file)
     xyz_coords = read_xyz(xyz_file)
 
@@ -184,6 +213,19 @@ def parse_pdb_to_xyz(pdb_file_path, output_file_path, qm_centroid, cutoff_distan
             output_file.write(f"{charges} {x_coord} {y_coord} {z_coord}\n")
 
 def get_charges(charge_embedding_cutoff):
+    """Generate the MM point charge embedding file (``ptchrges.xyz``).
+
+    Orchestrates the full charge embedding pipeline: renames residues for
+    ff14SB compatibility, assigns partial charges into the B-factor column,
+    removes QM cluster atoms, and writes the remaining MM atoms within the
+    cutoff distance as a point charge XYZ file.
+
+    Parameters
+    ----------
+    charge_embedding_cutoff : float
+        Distance cutoff in angstroms from the QM cluster centroid for
+        including MM point charges.
+    """
     # Setup a temporary directory to store files
     temporary_files_dir = "ptchrges_temp"
     # Check if the directory exists

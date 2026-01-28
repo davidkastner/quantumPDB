@@ -61,7 +61,18 @@ autoapi_type = "python"
 autoapi_dirs = ["../qp"]
 autoapi_ignore = ["*/tests/*", "*_version.py"]
 autodoc_member_order = "bysource"
-autodoc_mock_imports = ["modeller", "Bio", "click"]
+autodoc_mock_imports = [
+    "modeller",
+    "Bio",
+    "click",
+    "scipy",
+    "sklearn",
+    "periodictable",
+    "requests",
+    "seaborn",
+    "tqdm",
+    "yaml",
+]
 
 autoapi_options = [
     "members",
@@ -137,8 +148,16 @@ html_context = {
         "menu": [
             {"title": "quantumpdb", "url": "https://quantumpdb.readthedocs.io/"},
             {
-                "title": "User Guide",
+                "title": "Installation",
                 "url": "https://quantumpdb.readthedocs.io/en/latest/getting_started.html",
+            },
+            {
+                "title": "Quickstart",
+                "url": "https://quantumpdb.readthedocs.io/en/latest/quickstart.html",
+            },
+            {
+                "title": "User Guide",
+                "url": "https://quantumpdb.readthedocs.io/en/latest/cli.html",
             },
         ]
     }

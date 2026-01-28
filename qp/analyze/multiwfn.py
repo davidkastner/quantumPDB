@@ -53,11 +53,26 @@ def iterate_qm_output(pdb_all, method, base_output_dir, multiwfn_path, settings_
 
                 # Copy the atmrad dir and settings.ini into the current working directory
                 atmrad_dest_path = os.path.join(scr_dir_path, 'atmrad/')
-                if not os.path.exists(atmrad_dest_path):
-                    shutil.copytree(atmrad_path, atmrad_dest_path)
+                # Make sure scr_dir_path exists (defensive)
+                os.makedirs(scr_dir_path, exist_ok=True)
+
+                # Copy atmrad with race-safe semantics
+                try:
+                    # Works on Python 3.8+ (your env is 3.8)
+                    shutil.copytree(atmrad_path, atmrad_dest_path, dirs_exist_ok=True)
+                except TypeError:
+                    # For safety if running under <3.8 somewhere else:
+                    if not os.path.exists(atmrad_dest_path):
+                        try:
+                            shutil.copytree(atmrad_path, atmrad_dest_path)
+                        except FileExistsError:
+                            # Someone else created it between exists() and copytree(); ignore
+                            pass
+                except FileExistsError:
+                    # Created by another process between the check and copy; ignore
+                    pass
 
                 settings_ini_dest_path = os.path.join(scr_dir_path, 'settings.ini')
-                # MODIFICATION: Add a check to avoid re-copying settings.ini if it already exists
                 if not os.path.exists(settings_ini_dest_path):
                     shutil.copy(settings_ini_path, settings_ini_dest_path)
                 
@@ -73,8 +88,31 @@ def iterate_qm_output(pdb_all, method, base_output_dir, multiwfn_path, settings_
                     molden_files = glob.glob(f'{chain_dir}.molden')
                     if molden_files:
                         molden_file = os.path.basename(molden_files[0])
-                        task_function(scr_dir_path, molden_file, multiwfn_path, charge_scheme)
-                        # MODIFICATION: Comment out the deletion lines to prevent race conditions
+                        
+                        # Correct the Molden file and get modification status
+                        was_modified = molden.correct_ecp_charges_inplace(molden_file)
+                        
+                        # If the molden file was updated, delete old analysis files to force re-calculation.
+                        if was_modified:
+                            print("> Molden file was updated. Deleting old analysis files to force re-calculation.")
+                            molden_base_name = os.path.splitext(molden_file)[0]
+                            
+                            # Potential output filenames to delete
+                            charge_file_to_delete = f"{molden_base_name}_{charge_scheme}.chg"
+                            dipole_csv_to_delete = f"{molden_base_name}_dipole_com.csv"
+                            dipole_raw_to_delete = f"{molden_base_name}_dipole_com.out"
+
+                            # Delete files if they exist
+                            for f in [charge_file_to_delete, dipole_csv_to_delete, dipole_raw_to_delete]:
+                                if os.path.exists(f):
+                                    os.remove(f)
+                                    print(f">   Deleted old file: {f}")
+
+                        try:
+                            task_function(scr_dir_path, molden_file, multiwfn_path, charge_scheme)
+                        except Exception as e:
+                            print(f"> ERROR: {current_pdb_dir} {chain_dir} failed: {e}. Skipping.")             
+                        # Commenting out the deletion lines to prevent race conditions
                         # shutil.rmtree('atmrad/')  # Delete the atmrad directory when done
                         # os.remove('settings.ini')  # Delete the settings.ini file when done
                     else:
@@ -360,7 +398,7 @@ def charge_scheme(scr_dir_path, molden_file, multiwfn_path, charge_scheme):
 
     # If the charge file already exists, skip
     if os.path.exists(new_charge_file):
-        print(f"> Charge file {new_charge_file} already exists. Skipping {charge_scheme}...", flush=True)
+        print(f"> Charge file {new_charge_file} for {pdb_name} already exists. Skipping {charge_scheme}...", flush=True)
         return
 
     # Run Multiwfn with the user-selected charge scheme

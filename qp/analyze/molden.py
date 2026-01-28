@@ -1,22 +1,42 @@
 import numpy as np
 import os
 
-VALENCE_ELECTRONS = {
-    'CA': 2, 'CD': 12, 'CO': 9, 'CU': 11, 'FE': 8, 'K': 1,
-    'MN': 7, 'NI': 10, 'PB': 14, 'V': 5, 'ZN': 12
+ECP_ACTIVE_ELECTRONS = {
+    # s-block
+    'K': 9, 'CA': 10,
+    'RB': 9, 'SR': 10,
+    'CS': 9, 'BA': 10,
+
+    # 3d transition metals (LANL, 10e core except Zn)
+    'SC': 11, 'TI': 12, 'V': 13, 'CR': 14, 'MN': 15,
+    'FE': 16, 'CO': 17, 'NI': 18, 'CU': 19, 'ZN': 12,
+
+    # 4d transition metals (ECP28)
+    'Y': 11, 'ZR': 12, 'NB': 13, 'MO': 14, 'TC': 15,
+    'RU': 16, 'RH': 17, 'PD': 18, 'AG': 19, 'CD': 12,
+
+    # 5d transition metals
+    'LA': 11,
+    'HF': 12, 'TA': 13, 'W': 14, 'RE': 15,
+    'OS': 16, 'IR': 17, 'PT': 18, 'AU': 19, 'HG': 12,
+
+    # p-block heavier main-group
+    'GA': 3, 'GE': 4, 'AS': 5, 'SE': 6, 'BR': 7,
+    'IN': 3, 'SN': 4, 'SB': 5, 'TE': 6, 'I': 7,
+    'TL': 13, 'PB': 4, 'BI': 5,
 }
 
 def correct_ecp_charges_inplace(molden_file):
     """
     Corrects the nuclear charge in a Molden file for elements with ECPs,
-    overwriting the original file.
+    overwriting the original file. Returns True if the file was modified.
     """
     try:
         with open(molden_file, 'r') as f:
             lines = f.readlines()
     except FileNotFoundError:
         print(f"> ERROR: Molden file not found at {molden_file}")
-        return
+        return False
 
     modified_lines = []
     in_atoms_section = False
@@ -34,8 +54,8 @@ def correct_ecp_charges_inplace(molden_file):
             if len(parts) >= 6:
                 element_symbol = parts[0].upper()
                 # Check if the element needs correction and if it hasn't been corrected already
-                if element_symbol in VALENCE_ELECTRONS and parts[2] != str(VALENCE_ELECTRONS[element_symbol]):
-                    parts[2] = str(VALENCE_ELECTRONS[element_symbol])
+                if element_symbol in ECP_ACTIVE_ELECTRONS and parts[2] != str(ECP_ACTIVE_ELECTRONS[element_symbol]):
+                    parts[2] = str(ECP_ACTIVE_ELECTRONS[element_symbol])
                     line_to_write = '     '.join(parts) + '\n'
                     modified_lines.append(line_to_write)
                     was_modified = True
@@ -50,6 +70,8 @@ def correct_ecp_charges_inplace(molden_file):
         with open(molden_file, 'w') as f:
             f.writelines(modified_lines)
         print(f"> Overwrote {os.path.basename(molden_file)} with ECP-corrected nuclear charges.")
+    
+    return was_modified
 
 
 def translate_to_origin(coordinates, center_of_mass):

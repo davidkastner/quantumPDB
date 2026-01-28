@@ -1,4 +1,13 @@
 def get_ff14SB_dict():
+    """Return the ff14SB partial charge dictionary.
+
+    Returns
+    -------
+    dict
+        Nested dict keyed by residue name then atom name, with partial
+        charge values from the AMBER ff14SB force field (plus TIP3P water
+        and common ion charges).
+    """
     ff14SB_dict = {
         "DUM": {
             "M": -0.0,

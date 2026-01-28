@@ -38,6 +38,19 @@ RANDOM_SEED = 66265
 
 class CenterResidue:
     def __init__(self, center_residue: str):
+        """Parse a center residue definition string.
+
+        If the string contains dashes (e.g., ``'CU_A357-CU_A358'``), strict
+        mode is used and each dash-separated token must exactly match a
+        residue's ``RESNAME_CHAINID`` key. Otherwise, fuzzy mode is used
+        and underscore-separated tokens are matched against HETATM residue
+        names.
+
+        Parameters
+        ----------
+        center_residue : str
+            Center definition string from the config or CSV input.
+        """
         self.center_residue_str = center_residue
         residue_list = center_residue.split("-")
         if len(residue_list) == 1:
@@ -54,6 +67,20 @@ class CenterResidue:
         return self.center_residue_str
 
     def __contains__(self, res: Residue):
+        """Test whether a residue matches this center definition.
+
+        In fuzzy mode, matches any HETATM residue whose name appears in the
+        residue list. In strict mode, matches by exact ``RESNAME_CHAINID`` key.
+
+        Parameters
+        ----------
+        res : Bio.PDB.Residue.Residue
+            Residue to test.
+
+        Returns
+        -------
+        bool
+        """
         if self.mode == "fuzzy":
             return res.get_resname() in self.residue_list and res.id[0] != ' '
         elif self.mode == "strict":
@@ -107,7 +134,15 @@ def get_grid(coords, mean_distance):
 
 
 def visualize_dummy(dummy, path):
-    # debug function
+    """Write dummy atom positions to an XYZ file for debugging.
+
+    Parameters
+    ----------
+    dummy : list of array-like
+        3D coordinates of dummy atoms.
+    path : str
+        Directory where ``dummy.xyz`` will be written.
+    """
     with open(path + "/dummy.xyz", "w") as f:
         f.write(f"{len(dummy)}\n\n")
         for coord in dummy:
@@ -219,6 +254,28 @@ def voronoi(model, center_residue: CenterResidue, ligands, smooth_method, output
 
 
 def merge_centers(cur, search, seen, radius=0.0):
+    """Recursively merge center residues that are within a distance cutoff.
+
+    Starting from ``cur``, finds all neighboring residues within ``radius``
+    using a NeighborSearch and recursively merges them into a single center
+    set. Hydrogen atoms are excluded from the distance search.
+
+    Parameters
+    ----------
+    cur : Bio.PDB.Residue.Residue
+        Starting residue.
+    search : Bio.PDB.NeighborSearch
+        Spatial search object built from center atom coordinates.
+    seen : set
+        Already-visited residues (modified in place to prevent cycles).
+    radius : float, optional
+        Merge distance cutoff in angstroms (default 0.0 disables merging).
+
+    Returns
+    -------
+    set
+        Set of residues that form the merged center.
+    """
     if radius == 0.0:
         return {cur}
 
@@ -238,6 +295,26 @@ def merge_centers(cur, search, seen, radius=0.0):
 
 
 def get_center_residues(model, center_residue: CenterResidue, merge_cutoff=0.0):
+    """Find all center residues in a model and optionally merge nearby ones.
+
+    Scans all residues in the model for matches against the center definition,
+    then groups them using :func:`merge_centers` if ``merge_cutoff > 0``.
+
+    Parameters
+    ----------
+    model : Bio.PDB.Model.Model
+        Protein structure model to search.
+    center_residue : CenterResidue
+        Center residue definition.
+    merge_cutoff : float, optional
+        Distance cutoff in angstroms for merging nearby centers (default 0.0).
+
+    Returns
+    -------
+    list of set
+        Each set contains the residues forming one (possibly merged) center.
+        Returns an empty list if no matching center is found.
+    """
     found = set()
     center_atoms = []
     for res in model.get_residues():
@@ -526,6 +603,7 @@ def scale_hydrogen(a, b, scale):
 
 
 def get_normalized_vector(atom1: Atom, atom2: Atom) -> np.array:
+    """Return the unit vector pointing from ``atom1`` to ``atom2``."""
     v = atom2.get_coord() - atom1.get_coord()
     return v / np.linalg.norm(v)
 
@@ -650,6 +728,27 @@ def build_heavy(chain, parent, template, atom):
 
 
 def check_atom_valence(res: Residue, tree: NeighborSearch, atom: Literal["N", "C", "CG"], cn: int) -> bool:
+    """Check whether a backbone atom already has sufficient bonded neighbors.
+
+    Uses a 1.8 A distance search to find neighbors. Also checks for
+    peptide bond partners (C/CG bonded to N, or N bonded to C/CG).
+
+    Parameters
+    ----------
+    res : Bio.PDB.Residue.Residue
+        Residue containing the atom.
+    tree : Bio.PDB.NeighborSearch
+        Spatial search object for the structure.
+    atom : str
+        Atom name to check (``'N'``, ``'C'``, or ``'CG'``).
+    cn : int
+        Minimum coordination number indicating the atom is already saturated.
+
+    Returns
+    -------
+    bool
+        True if the atom already has enough neighbors (no capping needed).
+    """
     neighbors = tree.search(res[atom].get_coord(), radius=1.8)
     if len(neighbors) > cn:
         return True
@@ -768,6 +867,27 @@ def write_pdbs(io, sphere, out):
 
 
 def residue_in_ligands(resname, resid, res_is_aa, ligand_keys):
+    """Check whether a residue matches any key in the ligand charge dictionary.
+
+    For amino acids, an exact key match is required. For non-amino-acid
+    residues, the key may be part of a space-separated oligomer key.
+
+    Parameters
+    ----------
+    resname : str
+        Three-letter residue name.
+    resid : tuple
+        Residue full ID tuple from BioPython.
+    res_is_aa : bool
+        Whether the residue is an amino acid.
+    ligand_keys : iterable of str
+        Ligand charge dictionary keys.
+
+    Returns
+    -------
+    bool
+        True if the residue matches a ligand key.
+    """
     res_key = f"{resname}_{resid[2]}{resid[3][1]}"
     if res_is_aa:
         return res_key in ligand_keys
@@ -780,6 +900,23 @@ def residue_in_ligands(resname, resid, res_is_aa, ligand_keys):
 
 
 def check_disulfide(res: Residue, tree: NeighborSearch):
+    """Detect whether a cysteine residue is involved in a disulfide bond.
+
+    A disulfide is detected when both the query CYS and a neighboring CYS
+    lack an HG atom and their SG atoms are within 2.5 A.
+
+    Parameters
+    ----------
+    res : Bio.PDB.Residue.Residue
+        A cysteine residue to check.
+    tree : Bio.PDB.NeighborSearch
+        Spatial search object for the structure.
+
+    Returns
+    -------
+    bool
+        True if the residue is part of a disulfide bond.
+    """
     if not res.has_id("HG"):
         SG = res["SG"]
         neighbors = tree.search(SG.get_coord(), radius=2.5)
@@ -906,6 +1043,7 @@ def count_residues(spheres):
 
 
 def make_res_key(res):
+    """Format a residue as a ``'RESNAME_CHAINID'`` string key (e.g., ``'FE_A199'``)."""
     resname = res.get_resname()
     resid = res.get_id()[1]
     chainid = res.get_parent().get_id()
@@ -913,6 +1051,25 @@ def make_res_key(res):
 
 
 def complete_oligomer(ligand_keys, model, residues, spheres, include_ligands):
+    """Ensure that partially included oligomeric ligands are fully added.
+
+    If any residue of a multi-residue ligand (oligomer) is present in the
+    extracted spheres, all remaining residues of that oligomer are added to
+    avoid unpredictable charge errors.
+
+    Parameters
+    ----------
+    ligand_keys : iterable of str
+        Ligand charge dictionary keys (space-separated for oligomers).
+    model : Bio.PDB.Model.Model
+        Full protein structure model.
+    residues : set
+        Current set of extracted residues (modified in place).
+    spheres : list of set
+        Sphere-separated residue sets (modified in place).
+    include_ligands : int
+        Ligand inclusion level (0 = first sphere only, 1 = non-water, 2 = all).
+    """
     ligand_res_found = dict()
     oligomer_found = dict()
     for ligand_key in ligand_keys:

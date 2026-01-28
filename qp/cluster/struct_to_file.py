@@ -3,6 +3,7 @@
 from Bio.PDB import PDBParser
 
 def format_element(element):
+    """Capitalize an element symbol (e.g., ``'FE'`` -> ``'Fe'``)."""
     return element[0].upper() + element[1:].lower()
 
 def to_xyz(out, *paths):

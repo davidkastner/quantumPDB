@@ -30,6 +30,18 @@ ATOM_ELECTRON_MAP = {
 
 
 def count_electron(xyzfile):
+    """Count the total number of electrons in an XYZ file.
+
+    Parameters
+    ----------
+    xyzfile : str
+        Path to an XYZ coordinate file.
+
+    Returns
+    -------
+    int
+        Total electron count based on element types.
+    """
     with open(xyzfile) as f:
         lines = f.readlines()[2:]
     count = 0
@@ -41,6 +53,16 @@ def count_electron(xyzfile):
 
 
 def check_charge(cluster_path):
+    """Validate that charge, spin multiplicity, and electron count are consistent.
+
+    Prints an error message if the parity of (electrons - charge) does not
+    match the parity of the spin multiplicity.
+
+    Parameters
+    ----------
+    cluster_path : str
+        Path to a cluster directory containing charge/spin CSVs and an XYZ file.
+    """
     charge, extraspin = get_charge(cluster_path)
     print(f"charge: {charge}, extraspin: {extraspin} for {os.path.basename(cluster_path)}")
     spinmult = 1 + extraspin

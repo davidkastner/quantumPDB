@@ -144,6 +144,20 @@ def download(job, out, key="protein"):
 
 
 def repair_ligands(path, orig):
+    """Repair ligands that Protoss renamed to ``MOL``.
+
+    Protoss sometimes replaces unrecognized ligand residues with a generic
+    ``MOL`` label. This function restores the original residue names and
+    structures by matching them back from the pre-Protoss PDB, then
+    reassigns hydrogen atoms to the closest heavy atoms.
+
+    Parameters
+    ----------
+    path : str
+        Path to the Protoss output PDB file (modified in place).
+    orig : str
+        Path to the original (pre-Protoss) PDB file.
+    """
     parser = PDBParser(QUIET=True)
     prot_structure = parser.get_structure("Prot", path)
     orig_structure = parser.get_structure("Orig", orig)

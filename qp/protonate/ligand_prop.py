@@ -87,6 +87,21 @@ def compute_charge(path_ligand, path_pdb):
 
 
 def compute_spin(path_ligand):
+    """Compute extra spin contributions from radical ligands in an SDF file.
+
+    NO is treated as a doublet (spin = 1) and O2 (OXY) as a triplet
+    (spin = 2). All other ligands are assumed to have zero extra spin.
+
+    Parameters
+    ----------
+    path_ligand : str
+        Path to the Protoss-generated ligand SDF file.
+
+    Returns
+    -------
+    dict
+        Keyed by ligand ID string, values are extra spin integers.
+    """
     with open(path_ligand, "r") as f:
         sdf = f.read()
 

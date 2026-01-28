@@ -51,6 +51,26 @@ def residue_exists(sphere_path, res_name, chain, res_id):
 
 
 def ligand_in_spheres(ligand, structure_dir, num_sphere):
+    """Check whether a ligand is present in any of the sphere PDB files.
+
+    For oligomeric ligands (multi-residue), all component residues must be
+    found. A warning is printed if only some residues of an oligomer are
+    present, as this can cause charge errors.
+
+    Parameters
+    ----------
+    ligand : str
+        Ligand key string (space-separated residue keys for oligomers).
+    structure_dir : str
+        Path to the cluster directory containing numbered sphere PDB files.
+    num_sphere : int
+        Number of spheres to search (0 through ``num_sphere``).
+
+    Returns
+    -------
+    bool
+        True if the ligand (all residues for oligomers) is found.
+    """
     ligand_residues = ligand.split()
     partial_found = False
     for ligand_residue in ligand_residues:

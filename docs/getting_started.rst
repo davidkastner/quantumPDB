@@ -1,95 +1,102 @@
 Getting Started
 ===============
 
-*Welcome to quantumPDB!*
+This page covers how to install QuantumPDB and its dependencies.
 
-1 Overview
-----------
-The purpose of quantumPDB (qp) is to serve as a toolkit for working with our database of DFT-calculated proteins.
+Prerequisites
+-------------
 
+- **Python 3.8+**
+- **Conda** (recommended for managing the environment and installing Modeller)
+- **Internet access** (required for Protoss protonation via the ProteinsPlus web server)
 
-2 Installation
+Installation
+------------
+
+1. **Clone the repository:**
+
+   .. code-block:: bash
+
+      git clone https://github.com/davidkastner/quantumPDB.git
+      cd quantumPDB
+
+2. **Create the conda environment:**
+
+   The provided ``environment.yml`` installs all required dependencies, including
+   Modeller from the ``salilab`` channel:
+
+   .. code-block:: bash
+
+      conda env create -f environment.yml
+      conda activate qp
+
+3. **Install the package:**
+
+   .. code-block:: bash
+
+      pip install -e .
+
+   This performs a development install so that the ``qp`` command is available
+   on your path.
+
+Modeller Setup
 --------------
-Install the package by running the follow commands inside the repository. This will perform a developmental version install. It is good practice to do this inside of a virtual environment. A yaml environmental file has been created to automate the installation of dependencies.
 
-**Creating python environment**
+`Modeller <https://salilab.org/modeller/>`_ is used for modeling missing atoms,
+residues, and loops (Stage 1). It is installed automatically via the conda
+environment, but requires a **free academic license key**.
 
-All the dependencies can be loaded together using the prebuilt environment.yml or environment_dev.yml files.
-We provide two YAML files. The dev version contains additional packages for code maintenance.
-Compatibility is automatically tested for python versions 3.8 and higher.
-If you are only going to be using the package run:
+1. Register at https://salilab.org/modeller/ to obtain a license key.
+2. Set the key as an environment variable:
 
-::
+   .. code-block:: bash
 
-    bash
-    conda env create -f environment.yml
-    source activate ml
+      export KEY_MODELLER="XXXX"
 
+   Replace ``XXXX`` with your key. Add this line to your ``~/.bashrc`` or
+   ``~/.zshrc`` so it persists across sessions.
 
-**Setup developing environment**
+Protoss
+-------
 
-To begin working with quantumPDB, first clone the repo and then move into the top-level directory of the package.
-The perform a developer install.
-Remember to update your GitHub [ssh keys](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account).
+`Protoss <https://proteins.plus/>`_ assigns protonation states and resolves
+alternate conformations (Stage 2). QuantumPDB accesses Protoss through the
+ProteinsPlus web API, so no local installation is needed --- just an internet
+connection.
 
-::
+.. note::
 
-    bash
-    git clone git@github.com:davidkastner/quantumPDB.git
-    cd quantumPDB
-    python -m pip install -e .
+   The Protoss web server may throttle users who submit too many requests in a
+   short period. If you are processing a large batch, expect some requests to be
+   rate-limited. QuantumPDB handles retries automatically, but very large batches
+   may require patience.
 
+Optional Dependencies
+---------------------
 
-3 What is included?
--------------------
-**File structure**
+These are only needed for specific pipeline stages and are **not** required to
+generate cluster models.
 
+**TeraChem** (Stage 4 --- QM calculations)
+   TeraChem is the primary GPU-accelerated quantum chemistry code supported by
+   QuantumPDB. A license is required. See https://www.petachem.com/.
 
-::
+**ORCA** (Stage 4 --- QM calculations)
+   ORCA is supported as a CPU-based alternative. See https://orcaforum.kofo.mpg.de/.
 
-    .
-    |── cli.py          # Command-line interface entry point
-    ├── docs            # Readthedocs documentation site
-    ├── ml              # Directory containing the quantumAllostery modules
-    │   ├── process     # Processes raw dynamics data
-    │   ├── predict     # Machine learning analysis
-    │   ├── manage      # File management functionality and routines
-    │   ├── analyze     # Data analysis to combine process and plot routines
-    │   └── plot        # Automated plotting and vizualization 
-    └── ...
+**Multiwfn** (Stage 5 --- post-processing)
+   `Multiwfn <http://sobereva.com/multiwfn/>`_ is required only for charge
+   scheme analysis and dipole moment calculations in the analyze stage. Install
+   it separately and ensure the ``Multiwfn`` executable is on your ``PATH``, or
+   set the ``multiwfn_path`` parameter in your config file.
 
+Verifying the Installation
+--------------------------
 
+After installation, verify that the ``qp`` command is available:
 
-4 Documentation
----------------
-Run the following commands to update the ReadTheDocs site:
+.. code-block:: bash
 
-::
+   qp --help
 
-    bash
-    make clean
-    make html
-
-
-
-5 Developer guide
------------------
-
-GitHub refresher for those who would like to contribute
-**Push new changes**
-
-::
-    
-    bash
-    git status
-    git pull
-    git add .
-    git commit -m "Change a specific functionality"
-    git push -u origin main
-
-
-
-Copyright
----------
-
-Copyright (c) 2023, David W. Kastner
+This should display the three available commands: ``run``, ``submit``, and ``analyze``.

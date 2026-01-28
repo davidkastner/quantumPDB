@@ -105,6 +105,13 @@ def write_author_credit_csv(author_counts):
 
 
 def plot_failures(failure_counts):
+    """Generate a bar chart of job status counts and save to ``checkup/job_status.png``.
+
+    Parameters
+    ----------
+    failure_counts : dict
+        Mapping of status labels (e.g., ``'done'``, ``'running'``) to counts.
+    """
     format_plot()
     ordered_labels = ["done", "backlog", "queue", "running", "charge", "memory", "unknown"]
     counts = [failure_counts[status] for status in ordered_labels]
@@ -116,6 +123,13 @@ def plot_failures(failure_counts):
     plt.savefig(os.path.join("checkup", 'job_status.png'), bbox_inches="tight", dpi=600)
 
 def plot_authors(author_counts):
+    """Generate a bar chart of job counts per author and save to ``checkup/author_credit.png``.
+
+    Parameters
+    ----------
+    author_counts : dict
+        Mapping of author names to job counts.
+    """
     format_plot()
     authors = list(author_counts.keys())
     counts = list(author_counts.values())
@@ -146,6 +160,29 @@ def plot_failure_modes_from_csv(csv_path):
     plt.savefig(os.path.join("checkup", 'failure_modes.png'), bbox_inches="tight", dpi=600)
 
 def check_all_jobs(method, output, delete_queued):
+    """Classify all QM jobs by status and generate summary reports.
+
+    Scans the output directory for submitted jobs, classifies each as
+    done, running, queued, backlog, charge error, memory error, or unknown,
+    and writes ``checkup/failure_modes.csv`` and ``checkup/job_status.csv``.
+
+    Parameters
+    ----------
+    method : str
+        DFT method name (subdirectory under each chain directory).
+    output : str
+        Path to the top-level output directory.
+    delete_queued : bool
+        If True, delete ``.submit_record`` files for unfinished jobs so
+        they can be resubmitted.
+
+    Returns
+    -------
+    tuple of (dict, dict)
+        ``(failure_counts, author_counts)`` where ``failure_counts`` maps
+        status labels to counts and ``author_counts`` maps author names
+        to job counts.
+    """
     print(f"> Checking for failed QM jobs in the {output} directory.")
 
     # Ensure checkup directory exists

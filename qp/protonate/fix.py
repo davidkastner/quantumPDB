@@ -10,6 +10,26 @@ from qp.cluster.spheres import CenterResidue
 
 
 def res_priority(res, res_info, center_residues):
+    """Compute a priority score for a residue during partial occupancy resolution.
+
+    Higher scores mean higher priority (kept over lower-priority residues).
+    Center residues get the highest priority, followed by standard amino acids,
+    then non-standard residues scored by atom count and average occupancy.
+
+    Parameters
+    ----------
+    res : Bio.PDB.Residue.Residue
+        The residue to score.
+    res_info : dict
+        Partial occupancy info dict with ``'avg_occupancy'`` and ``'num_atom'`` keys.
+    center_residues : CenterResidue
+        The center residue definition for the current structure.
+
+    Returns
+    -------
+    float
+        Priority score.
+    """
     if res in center_residues:
         return 8e7
     elif Polypeptide.is_aa(res, standard=True):
@@ -21,6 +41,20 @@ def res_priority(res, res_info, center_residues):
 
 
 def partial_res_info(res, res_info):
+    """Format a residue's partial occupancy information as a human-readable string.
+
+    Parameters
+    ----------
+    res : Bio.PDB.Residue.Residue
+        The residue to describe.
+    res_info : dict
+        Partial occupancy info dict with ``'avg_occupancy'`` and ``'num_atom'`` keys.
+
+    Returns
+    -------
+    str
+        Formatted string, e.g. ``'residue FE_A199 with avg. occupancy 0.75 and 1 atoms'``.
+    """
     _, _, chain, code = res.get_full_id()
     _, resid, _ = code
     resname = res.get_resname()
@@ -28,6 +62,28 @@ def partial_res_info(res, res_info):
 
 
 def clean_occupancy(path: str, center_residues: CenterResidue) -> bool:
+    """Resolve partial occupancy conflicts by selecting a self-consistent coordinate set.
+
+    Iterates over all residues with partial occupancy and removes lower-priority
+    residues that clash spatially. Priority order: center residues > standard
+    amino acids > non-standard residues > higher average occupancy > more atoms.
+    Distance criteria are 1.0 A for center residues (allowing coordination bonds)
+    and 2.5 A for all others.
+
+    The PDB file at ``path`` is overwritten in place with the cleaned structure.
+
+    Parameters
+    ----------
+    path : str
+        Path to the PDB file (modified in place).
+    center_residues : CenterResidue
+        The center residue definition for priority assignment.
+
+    Returns
+    -------
+    bool
+        True if partial occupancy was detected and cleaned, False otherwise.
+    """
     parser = PDBParser(QUIET=True)
     io = PDBIO()
     structure = parser.get_structure("PDB", path)
@@ -266,6 +322,17 @@ def add_hydrogen_CSO(res, structure):
 
 
 def fix_OXT(path: str) -> None:
+    """Fix corrupted C-terminal OXT atoms by reflecting their coordinates.
+
+    When the OXT and O atoms of a C-terminal residue are too close (< 1.8 A),
+    the O atom is reflected across the CA--C bond axis to restore correct
+    geometry. The PDB file is overwritten in place.
+
+    Parameters
+    ----------
+    path : str
+        Path to the PDB file (modified in place).
+    """
     parser = PDBParser(QUIET=True)
     io = PDBIO()
     structure = parser.get_structure("PDB", path)
