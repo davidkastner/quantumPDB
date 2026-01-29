@@ -1,3 +1,5 @@
+"""Compute atomic charges and dipole moments using Multiwfn."""
+
 import os
 import re
 import csv

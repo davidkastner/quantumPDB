@@ -1,3 +1,5 @@
+"""Submit QM jobs to cluster schedulers (SLURM/SGE)."""
+
 import os
 import sys
 import glob

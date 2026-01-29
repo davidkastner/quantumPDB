@@ -1,3 +1,5 @@
+"""Parse Protoss output logs and detect residue type changes."""
+
 from Bio.PDB import PDBParser
 from qp.structure.missing import get_chain_order
 

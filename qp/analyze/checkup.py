@@ -1,3 +1,5 @@
+"""Check QM job status and classify failure modes."""
+
 import os
 import csv
 import glob

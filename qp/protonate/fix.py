@@ -1,3 +1,5 @@
+"""Fix protonation errors in metal coordination sites."""
+
 import numpy as np
 from typing import List
 from queue import Queue

@@ -1,3 +1,6 @@
+"""AMBER ff14SB force field partial charges for charge embedding."""
+
+
 def get_ff14SB_dict():
     """Return the ff14SB partial charge dictionary.
 

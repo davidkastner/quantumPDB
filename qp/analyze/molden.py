@@ -1,3 +1,5 @@
+"""Process Molden files for Multiwfn analysis."""
+
 import numpy as np
 import os
 
