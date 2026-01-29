@@ -1,8 +1,35 @@
+"""Convert NHIE active sites to reactive OXO/succinate state.
+
+This module provides specialized functions for converting non-heme iron
+enzyme (NHIE) active sites from the resting state (with alpha-ketoglutarate
+and water/NO ligands) to the reactive ferryl-oxo state (with succinate
+and OXO ligands). This is useful for modeling the reactive intermediate
+in NHIE catalysis.
+
+Note: This is a specialized module for NHIE enzyme studies and is not
+part of the standard QuantumPDB workflow.
+"""
+
 import numpy as np
 import shutil
 from Bio.PDB import PDBParser, PDBIO
 
+
 def read_pdb(pdb_path):
+    """Parse a PDB file and extract all ATOM/HETATM records.
+
+    Parameters
+    ----------
+    pdb_path : str
+        Path to the PDB file.
+
+    Returns
+    -------
+    list of dict
+        Each dict contains PDB atom fields: record, serial, name, altLoc,
+        resName, chainID, resSeq, iCode, x, y, z, occupancy, tempFactor,
+        element, charge.
+    """
     atoms = []
     with open(pdb_path, 'r') as file:
         for line in file:
@@ -28,12 +55,43 @@ def read_pdb(pdb_path):
     return atoms
 
 def write_pdb(atoms, pdb_path):
+    """Write a list of atom dictionaries to a PDB file.
+
+    Atoms with ``record == 'DELETE'`` are skipped.
+
+    Parameters
+    ----------
+    atoms : list of dict
+        Atom records as returned by :func:`read_pdb`.
+    pdb_path : str
+        Path to the output PDB file.
+    """
     with open(pdb_path, 'w') as file:
         for atom in atoms:
             if atom['record'] != 'DELETE':
                 file.write(f"{atom['record']:<6}{atom['serial']:>5} {atom['name']:<4}{atom['altLoc']:<1}{atom['resName']:<3} {atom['chainID']:<1}{atom['resSeq']:>4}{atom['iCode']:<1}   {atom['x']:>8.3f}{atom['y']:>8.3f}{atom['z']:>8.3f}{atom['occupancy']:>6.2f}{atom['tempFactor']:>6.2f}          {atom['element']:>2}{atom['charge']:>2}\n")
 
 def find_and_convert_ligands_to_oxo(atoms, iron_names, distance_cutoff=2.8):
+    """Convert water or NO ligands near iron to OXO residues.
+
+    Searches for water (HOH, WAT) or nitric oxide (HOA, NO) ligands within
+    the distance cutoff of any iron atom and converts them to OXO (oxo)
+    ligands with the Fe-O bond set to 1.65 A.
+
+    Parameters
+    ----------
+    atoms : list of dict
+        Atom records from :func:`read_pdb`.
+    iron_names : list of str
+        Iron atom names to search for (e.g., ``['FE', 'FE2']``).
+    distance_cutoff : float, optional
+        Maximum Fe-ligand distance in angstroms (default 2.8).
+
+    Returns
+    -------
+    set
+        Serial numbers of iron atoms that received an OXO ligand.
+    """
     ligands_to_convert = {'HOH': 'O', 'WAT': 'O', 'HOA': 'N', 'NO': 'N'}
     oxo_placed = set()
 
@@ -58,6 +116,20 @@ def find_and_convert_ligands_to_oxo(atoms, iron_names, distance_cutoff=2.8):
     return oxo_placed
 
 def find_histidines(atoms, iron):
+    """Find histidine NE2 atoms coordinating an iron center.
+
+    Parameters
+    ----------
+    atoms : list of dict
+        Atom records from :func:`read_pdb`.
+    iron : dict
+        Iron atom record.
+
+    Returns
+    -------
+    list of dict
+        Histidine NE2 atom records within 3.0 A of the iron.
+    """
     iron_coord = np.array([iron['x'], iron['y'], iron['z']])
     histidines = []
     for residue in atoms:
@@ -71,6 +143,18 @@ def find_histidines(atoms, iron):
     return histidines
 
 def calculate_dihedral(p1, p2, p3, p4):
+    """Calculate the dihedral angle defined by four points.
+
+    Parameters
+    ----------
+    p1, p2, p3, p4 : numpy.ndarray
+        3D coordinates of the four points.
+
+    Returns
+    -------
+    float
+        Dihedral angle in degrees.
+    """
     b0 = -1.0 * (p2 - p1)
     b1 = p3 - p2
     b2 = p4 - p3
@@ -86,6 +170,25 @@ def calculate_dihedral(p1, p2, p3, p4):
     return np.degrees(np.arctan2(y, x))
 
 def place_oxo_manually(atoms, iron):
+    """Place an OXO ligand opposite the coordinating histidines.
+
+    For NHIE enzymes with two facial histidines, this function places
+    the OXO ligand at the position opposite to one of the histidines,
+    selecting the position with a dihedral angle closest to 90 degrees
+    relative to the AKG C2-O5-Fe axis and avoiding steric clashes.
+
+    Parameters
+    ----------
+    atoms : list of dict
+        Atom records from :func:`read_pdb` (modified in place).
+    iron : dict
+        Iron atom record.
+
+    Returns
+    -------
+    bool
+        True if OXO was successfully placed, False otherwise.
+    """
     histidines = find_histidines(atoms, iron)
     if len(histidines) != 2:
         print(f"> Error: Expected two His coordinating iron {iron['serial']}")
@@ -168,6 +271,17 @@ def place_oxo_manually(atoms, iron):
     return True
 
 def convert_akg_to_sin(atoms):
+    """Convert alpha-ketoglutarate (AKG) to succinate (SIN).
+
+    Removes the C1 carbonyl oxygens and converts C1 to an oxo group,
+    simulating the decarboxylation that occurs during NHIE catalysis.
+    Atoms are modified in place; deleted atoms have ``record = 'DELETE'``.
+
+    Parameters
+    ----------
+    atoms : list of dict
+        Atom records from :func:`read_pdb` (modified in place).
+    """
     for atom in atoms:
         if atom['resName'] == 'AKG':
             if atom['name'] == 'O1' or atom['name'] == 'O2':
@@ -187,6 +301,20 @@ def convert_akg_to_sin(atoms):
                 atom['resName'] = 'SIN'
 
 def add_oxo_sin(pdb_path):
+    """Convert an NHIE structure from resting to reactive state.
+
+    Main orchestration function that:
+    1. Converts water/NO ligands near iron to OXO
+    2. Places OXO manually if no suitable ligand found
+    3. Converts AKG to succinate (SIN)
+
+    The original file is backed up with ``_akg`` suffix.
+
+    Parameters
+    ----------
+    pdb_path : str
+        Path to the PDB file (modified in place).
+    """
     # Start by making a copy of the file
     shutil.copy(pdb_path, f'{pdb_path[:-4]}_akg.pdb')
     atoms = read_pdb(pdb_path)
@@ -209,6 +337,16 @@ def add_oxo_sin(pdb_path):
     write_pdb(atoms, pdb_path)
 
 def remove_oxo_hydrogens(protoss_pdb):
+    """Remove hydrogen atoms from OXO residues.
+
+    Protoss may add hydrogens to the OXO oxygen; this function removes
+    them to maintain the correct oxo (O2-) charge state.
+
+    Parameters
+    ----------
+    protoss_pdb : str
+        Path to the PDB file (modified in place).
+    """
     parser = PDBParser(QUIET=True)
     structure = parser.get_structure('structure', protoss_pdb)
     
@@ -228,6 +366,18 @@ def remove_oxo_hydrogens(protoss_pdb):
     io.save(protoss_pdb)
 
 def update_oxo_sdf(pdb_path, sdf_path):
+    """Append OXO entries to the ligand SDF file.
+
+    Creates SDF entries for OXO residues with -2 formal charge so that
+    the charge embedding correctly accounts for the oxo ligand.
+
+    Parameters
+    ----------
+    pdb_path : str
+        Path to the PDB file containing OXO residues.
+    sdf_path : str
+        Path to the SDF file to append to.
+    """
     atoms = read_pdb(pdb_path)
     oxo_atoms = [atom for atom in atoms if atom['resName'] == 'OXO']
 
@@ -242,6 +392,19 @@ def update_oxo_sdf(pdb_path, sdf_path):
             sdf_file.write("M  END\n$$$$\n")
 
 def update_sin_sdf(akg_sdf_path, sin_sdf_path):
+    """Replace AKG entries with SIN entries in the ligand SDF file.
+
+    Removes all AKG (alpha-ketoglutarate) entries from the original SDF
+    and appends the SIN (succinate) entries from the Protoss-processed
+    temporary file.
+
+    Parameters
+    ----------
+    akg_sdf_path : str
+        Path to the original SDF file (modified in place).
+    sin_sdf_path : str
+        Path to the temporary SDF file with SIN entries from Protoss.
+    """
     # Read the old SDF file and remove AKG entries
     with open(akg_sdf_path, 'r') as old_sdf_file:
         old_sdf_lines = old_sdf_file.readlines()

@@ -9,7 +9,11 @@ import click
 import traceback
 
 def welcome():
-    """Print first to welcome the user while it waits to load the modules"""
+    """Print the QuantumPDB welcome banner with ASCII art and usage hints.
+
+    Displays the package logo, links to documentation and GitHub, and
+    basic usage examples. Called automatically when the CLI is invoked.
+    """
     click.secho("\n")
     click.secho("             ╔════════════════════════╗             ", bold=True)
     click.secho("             ║       __________       ║             ", bold=True)
@@ -36,13 +40,23 @@ welcome()
 
 @click.group()
 def cli():
-    """CLI entry point"""
+    """QuantumPDB command-line interface.
+
+    Use ``qp run``, ``qp submit``, or ``qp analyze`` with a configuration
+    YAML file to execute different stages of the pipeline.
+    """
     pass
 
 @cli.command()
 @click.option("--config", "-c", required=True, type=click.Path(exists=True), help="Path to the configuration YAML file")
 def run(config):
-    """Generates quantumPDB structures and files."""
+    """Execute the structure preparation, protonation, and cluster extraction pipeline.
+
+    This command runs stages 1-3 of the QuantumPDB workflow: fetching PDB
+    structures, modeling missing residues with MODELLER, assigning protonation
+    states with Protoss, and extracting QM cluster models using Voronoi
+    tessellation.
+    """
     import os
     from shutil import copy
     from Bio.PDB.PDBExceptions import PDBIOException
@@ -293,7 +307,12 @@ def run(config):
 @cli.command()
 @click.option("--config", "-c", required=True, type=click.Path(exists=True), help="Path to the configuration YAML file")
 def submit(config):
-    """Handles the submission of jobs for the quantumPDB."""
+    """Create QM input files and submit calculations to the job scheduler.
+
+    This command runs stage 4 of the QuantumPDB workflow: generating
+    TeraChem or ORCA input files and submitting them to SLURM or SGE
+    job schedulers.
+    """
 
     from qp.structure import setup
     from qp.manager import create
@@ -333,7 +352,12 @@ def submit(config):
 @cli.command()
 @click.option("--config", "-c", required=True, type=click.Path(exists=True), help="Path to the configuration YAML file")
 def analyze(config):
-    """Functionality for analyzing complete jobs."""
+    """Check job status and run post-processing analysis with Multiwfn.
+
+    This command runs stage 5 of the QuantumPDB workflow: classifying
+    job outcomes (done, failed, queued), and optionally computing
+    partial charges and dipole moments using Multiwfn.
+    """
 
     from qp.structure import setup
 

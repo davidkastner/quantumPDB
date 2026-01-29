@@ -209,18 +209,34 @@ def calc_dist(point_a, point_b):
 
 
 def voronoi(model, center_residue: CenterResidue, ligands, smooth_method, output_path, **smooth_params):
-    """
-    Computes the Voronoi tessellation of a protein structure.
+    """Compute the Voronoi tessellation of a protein structure.
+
+    Builds a Voronoi diagram from all atoms in the model and returns an
+    adjacency list of neighboring atoms. Optionally applies smoothing via
+    dummy atoms to improve boundary handling for surface-exposed residues.
 
     Parameters
     ----------
-    model: Bio.PDB.Model
-        Protein structure model
+    model : Bio.PDB.Model.Model
+        Protein structure model containing all residues.
+    center_residue : CenterResidue
+        Center residue definition (currently unused but kept for API).
+    ligands : list
+        Ligand residue names to include (currently unused but kept for API).
+    smooth_method : str
+        Smoothing method: ``'dummy_atom'`` fills voids with dummy atoms,
+        otherwise no smoothing is applied.
+    output_path : str
+        Directory for debug output (e.g., ``dummy.xyz``).
+    **smooth_params
+        Additional parameters passed to :func:`fill_dummy` (e.g.,
+        ``mean_distance``, ``noise_amp``).
 
     Returns
     -------
-    neighbors: dict
-        Adjacency list corresponding to neighboring Voronoi cells
+    dict
+        Adjacency list mapping each ``Bio.PDB.Atom`` to a list of
+        ``(neighbor_atom, distance)`` tuples for all Voronoi neighbors.
     """
     atoms = []
     points = []
@@ -533,22 +549,29 @@ def get_next_neighbors(
 
 
 def prune_atoms(center, residues, spheres, max_atom_count, ligands):
-    """
-    Prune residues from the cluster model to meet the max atom count constraint,
-    while keeping specified ligands and co-factors.
+    """Prune residues from the cluster to meet the max atom count constraint.
+
+    Removes residues furthest from the center first, while preserving
+    specified ligands and co-factors. Modifies ``residues`` and ``spheres``
+    in place. Empty outer spheres are removed from the list.
 
     Parameters
     ----------
-    center: set
-        Set of central residues
-    residues: set
-        Set of residues in the cluster
-    spheres: list of sets
-        List of residue sets, each corresponding to a coordination sphere
-    max_atom_count: int
-        Maximum allowed atom count in the cluster
-    ligands_to_keep: list
-        List of ligand names to keep in the cluster
+    center : set
+        Set of central residues (used as distance reference).
+    residues : set
+        Set of all residues in the cluster (modified in place).
+    spheres : list of set
+        Residue sets by coordination sphere (modified in place).
+    max_atom_count : int
+        Maximum allowed total atom count in the cluster.
+    ligands : list
+        Ligand residue names to preserve regardless of distance.
+
+    Notes
+    -----
+    This function operates in place and does not return a value. Residues
+    are removed in order of decreasing distance from the center atoms.
     """
 
     atom_cnt = 0
@@ -1131,46 +1154,56 @@ def extract_clusters(
     include_ligands=2,
     **smooth_params
 ):
-    """
-    Extract active site coordination spheres. Neighboring residues determined by
-    Voronoi tessellation.
+    """Extract active site coordination spheres using Voronoi tessellation.
+
+    The main entry point for cluster extraction. Identifies center residues,
+    builds coordination spheres using Voronoi neighbors, applies optional
+    capping, and writes output files (PDB, XYZ, charge.csv, count.csv).
 
     Parameters
     ----------
-    path: str
-        Path to PDB file
-    out: str
-        Path to output directory
-    center_residue: CenterResidue
-        The residues to use as the cluster center
-    sphere_count: int
-        Number of coordinations spheres to extract
-    first_sphere_radius: float
-        the radius cutoff of the first sphere
-    max_atom_count: int
-        the maximum number of atoms in the whole cluster
-    merge_cutoff: int
-        the distance cutoff when merging two centers of spheres
-    smooth_method: ("boxplot" | "dbscan" | "dummy_atom")
-        The method used to smoothen the spheres
-    ligands: list
-        Other ligand IDs to include, in addition to AAs and waters
-    capping: int
-        Whether to cap chains with nothing (0), H (1), or ACE/NME (2)
-    charge: bool
-        If true, total charge of coordinating AAs will be written to out/charge.csv
-    ligand_charge: dict
-        The dict containing each ligand's name and charge
-    count: bool
-        If true, residue counts will be written to out/count.csv
-    xyz: bool
-        If true, XYZ files will be written according to the output PDBs
-    hetero_pdb: bool
-        If true, keep all the heteroatoms in the cluster PDB output
-    include_ligands: int
-        the mode of including ligands in the sphere
-    smooth_params:
-        params of the specific smooth method 
+    path : str
+        Path to the input PDB file.
+    out : str
+        Path to the output directory.
+    center_residue : CenterResidue
+        Definition of residues to use as the cluster center.
+    sphere_count : int, optional
+        Number of coordination spheres to extract (default 2).
+    first_sphere_radius : float, optional
+        Distance cutoff in angstroms for the first sphere (default 4.0).
+    max_atom_count : int, optional
+        Maximum atom count; residues are pruned if exceeded (default None).
+    merge_cutoff : float, optional
+        Distance cutoff for merging nearby centers (default 0.0).
+    smooth_method : str, optional
+        Sphere smoothing method: ``'box_plot'``, ``'dbscan'``, or
+        ``'dummy_atom'`` (default ``'box_plot'``).
+    ligands : list, optional
+        Additional ligand residue names to include (default []).
+    capping : int, optional
+        Capping mode: 0 = none, 1 = hydrogen, 2 = ACE/NME (default 1).
+    charge : bool, optional
+        If True, write amino acid charges to ``charge.csv`` (default True).
+    ligand_charge : dict, optional
+        Mapping of ligand IDs to formal charges (default {}).
+    count : bool, optional
+        If True, write residue counts to ``count.csv`` (default True).
+    xyz : bool, optional
+        If True, write XYZ coordinate files (default True).
+    hetero_pdb : bool, optional
+        If True, include HETATM records in combined PDB (default False).
+    include_ligands : int, optional
+        Ligand inclusion mode: 0 = first sphere only unless in ``ligands``,
+        1 = all non-water, 2 = all (default 2).
+    **smooth_params
+        Additional parameters for the smoothing method.
+
+    Returns
+    -------
+    list of str
+        Paths to the generated cluster directories (e.g.,
+        ``['out/A199', 'out/B350']``).
     """
     parser = PDBParser(QUIET=True)
     structure = parser.get_structure("PDB", path)

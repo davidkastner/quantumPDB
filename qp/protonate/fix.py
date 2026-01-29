@@ -184,21 +184,25 @@ def clean_occupancy(path: str, center_residues: CenterResidue) -> bool:
 
 
 def flip_coordinated_HIS(points, res):
-    """
-    Flip the imidazole ring of HIS if it can be coordinated with the metal
+    """Flip a histidine imidazole ring to orient nitrogen toward a metal.
 
-    The conformation and tautomerism states of HIS is adjusted by Protoss. 
-    However, sometimes the coordinated nitrogen will be flipped away from 
-    where it's supposed to be. This procedure detect if the nitrogen (NE2/ND1) is
-    more favorable to be nearer to the metal than its neighbor carbon (CE1/CD2) and
-    re-flip the ring and re-arrange the hydrogen.
+    Protoss assigns histidine tautomers and conformations, but sometimes
+    the coordinating nitrogen (NE2 or ND1) is oriented away from the metal.
+    This function detects when a carbon (CE1 or CD2) is closer to the metal
+    than its adjacent nitrogen and flips the ring around the CB--CG axis
+    to restore proper coordination geometry.
 
     Parameters
     ----------
-    points: list of Bio.PDB.Atom.Atom
-        Metal atoms
-    res: Bio.PDB.Residue.Residue
-        A HIS residue
+    points : list of Bio.PDB.Atom.Atom
+        Metal atoms to check coordination against.
+    res : Bio.PDB.Residue.Residue
+        A histidine residue (modified in place).
+
+    Notes
+    -----
+    The residue is modified in place. Hydrogen positions are adjusted
+    to match the new ring orientation.
     """
     flip_flag = ""
     try:
@@ -262,20 +266,24 @@ def flip_coordinated_HIS(points, res):
 
 
 def add_hydrogen_CSO(res, structure):
-    """
-    Add hydrogens to CSO
+    """Add hydrogens to cysteine sulfenic acid (CSO) residues.
 
-    CSO is a non-standard amino acid which cannot be identified by Protoss REST API.
-    This procedure add hydrogens by geometric rules to its carbons 
-    and the hydroxyl oxygen (not added in the special case where a TAN ligand
-    is reacting with CSO's hydroxyl group).
+    CSO is a post-translational modification not recognized by Protoss.
+    This function adds hydrogens to CA (HA), CB (HB1, HB2), and the
+    hydroxyl oxygen (HD) using ideal geometry. The hydroxyl hydrogen
+    is omitted if a TAN (2,3,3-trichloroallyl alcohol) ligand is
+    covalently bonded to the OD atom.
 
     Parameters
     ----------
-    res: Bio.PDB.Residue.Residue
-        A CSO residue
-    structure: Bio.PDB.Structure.Structure
-        The whole structure of the protein
+    res : Bio.PDB.Residue.Residue
+        A CSO residue (modified in place).
+    structure : Bio.PDB.Structure.Structure
+        The full protein structure (used to detect TAN--CSO bonds).
+
+    Notes
+    -----
+    The residue is modified in place. Existing hydrogens are not replaced.
     """
     coords = dict()
     try:
@@ -366,18 +374,29 @@ def fix_OXT(path: str) -> None:
 
 
 def adjust_activesites(path, center_residue: CenterResidue):
-    """
-    Deprotonates metal-coordinating residues that are (most likely) incorrectly
-    protonated by Protoss. Removes hydrogens from coordinating tyrosines and
-    cysteines, N-ligands and backbones using a distance cutoff of 3 A. Removes hydrogens
-    from NO, which is protonated as an hydroxylamine.
+    """Deprotonate metal-coordinating residues incorrectly protonated by Protoss.
+
+    Removes hydrogens from residues coordinating to metal centers:
+
+    - Tyrosine OH groups within 3 A of a metal
+    - Cysteine SG groups within 3 A of a metal
+    - Backbone N atoms within 3 A of a metal
+    - All hydrogens on NO ligands (protonated as hydroxylamine by Protoss)
+    - Any ligand H atoms within 1.5 A of a metal
+
+    Also flips incorrectly oriented histidine rings and adds hydrogens to
+    CSO (cysteine sulfenic acid) residues.
 
     Parameters
     ----------
-    path: str
-        Path to existing Protoss output file, will be overwritten
-    metals: list
-        List of active site metal IDs
+    path : str
+        Path to the Protoss output PDB file (modified in place).
+    center_residue : CenterResidue
+        Center residue definition identifying metal atoms.
+
+    Notes
+    -----
+    The file at ``path`` is overwritten with the corrected structure.
     """
     parser = PDBParser(QUIET=True)
     structure = parser.get_structure("PDB", path)

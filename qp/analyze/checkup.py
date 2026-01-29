@@ -24,7 +24,22 @@ def format_plot() -> None:
 
 
 def check_failure_mode(filepath):
-    """Checks for specific failure mode keywords in generated output."""
+    """Classify a completed QM job based on its output file content.
+
+    Parses the TeraChem output file to identify the job outcome:
+    successful completion, charge/spin error, memory error, or unknown failure.
+
+    Parameters
+    ----------
+    filepath : str
+        Path to the ``qmscript.out`` file.
+
+    Returns
+    -------
+    str
+        Status code: ``'done'``, ``'charge'``, ``'memory'``, ``'unknown'``,
+        or ``'running'`` (if output exists but has no termination marker).
+    """
     with open(filepath, 'r') as f:
         content = f.read()
 
@@ -41,7 +56,18 @@ def check_failure_mode(filepath):
 
 
 def extract_author(content):
-    """Extract the author from the .submit_record content."""
+    """Extract the submitting user's name from a submit record.
+
+    Parameters
+    ----------
+    content : str
+        Contents of the ``.submit_record`` file.
+
+    Returns
+    -------
+    str
+        Username of the person who submitted the job, or ``'Unknown'``.
+    """
     for line in content.splitlines():
         if line.startswith("Author:"):
             return line.split("Author:")[1].strip()
@@ -49,7 +75,25 @@ def extract_author(content):
 
 
 def check_submit_record(submit_record_path, delete_queued):
-    """Check the .submit_record file for backlog, queue, running, or done status, and return author."""
+    """Determine job status from the submit record file.
+
+    Parses timestamps in the ``.submit_record`` file to determine whether
+    the job is queued, running, or completed. Optionally deletes records
+    for queued (but never started) jobs to allow resubmission.
+
+    Parameters
+    ----------
+    submit_record_path : str
+        Path to the ``.submit_record`` file.
+    delete_queued : bool
+        If True, delete records for jobs that were queued but never started.
+
+    Returns
+    -------
+    tuple of (str, str)
+        ``(status, author)`` where status is one of ``'queue'``, ``'running'``,
+        ``'done'``, or ``'backlog'``.
+    """
     with open(submit_record_path, 'r') as f:
         content = f.read()
 
@@ -78,7 +122,25 @@ def check_submit_record(submit_record_path, delete_queued):
 
 
 def classify_job(qm_dir_path, delete_queued):
-    """Classify the job status based on the presence of .submit_record and qmscript.out, and return the author."""
+    """Classify a single QM job's status.
+
+    Combines information from the submit record and output file to
+    determine the overall job status. For completed jobs, also checks
+    for specific failure modes.
+
+    Parameters
+    ----------
+    qm_dir_path : str
+        Path to the QM calculation directory (e.g., ``output/1os7/A200/wpbeh``).
+    delete_queued : bool
+        If True, delete records for queued but never-started jobs.
+
+    Returns
+    -------
+    tuple of (str, str)
+        ``(status, author)`` where status is one of ``'backlog'``, ``'queue'``,
+        ``'running'``, ``'done'``, ``'charge'``, ``'memory'``, or ``'unknown'``.
+    """
     submit_record_path = os.path.join(qm_dir_path, ".submit_record")
     qmscript_path = os.path.join(qm_dir_path, "qmscript.out")
 
@@ -96,7 +158,13 @@ def classify_job(qm_dir_path, delete_queued):
     return submit_status, author
 
 def write_author_credit_csv(author_counts):
-    """Write author job count CSV."""
+    """Write a CSV summarizing job counts per submitting author.
+
+    Parameters
+    ----------
+    author_counts : dict
+        Mapping of author names to the number of jobs they submitted.
+    """
     with open(os.path.join("checkup", "author_credit.csv"), "w", newline='') as f:
         writer = csv.writer(f)
         writer.writerow(["author", "job_count"])
@@ -141,7 +209,13 @@ def plot_authors(author_counts):
     plt.savefig(os.path.join("checkup", 'author_credit.png'), bbox_inches="tight", dpi=600)
 
 def plot_failure_modes_from_csv(csv_path):
-    """Plot counts of each failure mode from failure_modes.csv."""
+    """Generate a bar chart of failure mode counts from CSV and save to file.
+
+    Parameters
+    ----------
+    csv_path : str
+        Path to the ``failure_modes.csv`` file.
+    """
     format_plot()
     failure_mode_counts = defaultdict(int)
 

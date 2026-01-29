@@ -27,9 +27,28 @@ ECP_ACTIVE_ELECTRONS = {
 }
 
 def correct_ecp_charges_inplace(molden_file):
-    """
-    Corrects the nuclear charge in a Molden file for elements with ECPs,
-    overwriting the original file. Returns True if the file was modified.
+    """Correct nuclear charges in a Molden file for ECP-treated elements.
+
+    Multiwfn requires the nuclear charge in Molden files to reflect the
+    number of active electrons (not the full atomic number) for elements
+    using effective core potentials (ECPs). This function reads the Molden
+    file, corrects charges for known ECP elements, and overwrites the file.
+
+    Parameters
+    ----------
+    molden_file : str
+        Path to the Molden file to correct.
+
+    Returns
+    -------
+    bool
+        True if the file was modified, False otherwise.
+
+    Notes
+    -----
+    The ECP electron counts are defined in :data:`ECP_ACTIVE_ELECTRONS` and
+    cover common LANL/ECP28 basis sets for transition metals and heavy
+    main-group elements.
     """
     try:
         with open(molden_file, 'r') as f:
@@ -75,11 +94,43 @@ def correct_ecp_charges_inplace(molden_file):
 
 
 def translate_to_origin(coordinates, center_of_mass):
-    """Translates the molecule so the center of mass is at the origin."""
+    """Translate coordinates so a reference point is at the origin.
+
+    Parameters
+    ----------
+    coordinates : numpy.ndarray of shape (N, 3)
+        Atomic coordinates to translate.
+    center_of_mass : array-like of shape (3,)
+        Reference point to move to the origin.
+
+    Returns
+    -------
+    numpy.ndarray of shape (N, 3)
+        Translated coordinates.
+    """
     return coordinates - center_of_mass
 
 def process_molden(input_file, output_file, com):
-    """Process the Molden file and modify only the coordinates section."""
+    """Translate atomic coordinates in a Molden file to center on a reference point.
+
+    Reads the ``[Atoms] Angs`` section of the input Molden file, subtracts
+    the provided center of mass from all coordinates, and writes the
+    modified file. All other sections are copied unchanged.
+
+    Parameters
+    ----------
+    input_file : str
+        Path to the input Molden file.
+    output_file : str
+        Path for the output (centered) Molden file.
+    com : array-like of shape (3,)
+        Center of mass coordinates to subtract from all atoms.
+
+    Raises
+    ------
+    ValueError
+        If the ``[Atoms] Angs`` section is not found or contains no atoms.
+    """
     with open(input_file, 'r') as infile:
         lines = infile.readlines()
 
@@ -161,7 +212,24 @@ def process_molden(input_file, output_file, com):
         outfile.writelines(tail_lines)
 
 def center_molden(molden_file, com):
-    """Centers the molecule in the Molden file using the provided center of mass."""
+    """Create a centered copy of a Molden file for dipole calculations.
+
+    Generates a new Molden file with atomic coordinates translated so
+    the substrate center of mass is at the origin. This is required
+    for meaningful dipole moment calculations.
+
+    Parameters
+    ----------
+    molden_file : str
+        Path to the input Molden file.
+    com : array-like of shape (3,)
+        Center of mass coordinates.
+
+    Returns
+    -------
+    str
+        Path to the output file (``centered_{original_name}``).
+    """
     output_molden = f"centered_{molden_file}"
     process_molden(molden_file, output_molden, com)
     print(f"> Centered coordinates written to: {output_molden}")

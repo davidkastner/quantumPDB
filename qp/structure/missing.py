@@ -84,21 +84,27 @@ def define_residues():
 
 
 def get_residues(path, AA):
-    """
-    Extracts residues from a PDB file, filling in missing residues based on
-    sequence number
+    """Extract residues from a PDB file, including missing residue annotations.
+
+    Parses REMARK 465 (missing residues) and REMARK 470 (missing atoms)
+    records to identify gaps in the structure that need to be filled by
+    MODELLER.
 
     Parameters
     ----------
-    path: str
-        Path to PDB file
+    path : str
+        Path to the PDB file.
+    AA : dict
+        Amino acid lookup table mapping 3-letter codes to 1-letter codes
+        (from :func:`define_residues`).
 
     Returns
     -------
-    residues: list of list
-        Residues separated by chain. Stored as a tuple of
-        ``((sequence number, insertion code), one letter code, flag)``,
-        where flag is R for completely absent, A for missing atoms, empty otherwise
+    list of list
+        Residues separated by chain. Each residue is a tuple of
+        ``((sequence_number, insertion_code), one_letter_code, flag)``,
+        where ``flag`` is ``'R'`` for completely absent residues,
+        ``'A'`` for residues with missing atoms, or ``''`` for complete.
     """
     with open(path, "r") as f:
         p = f.read().splitlines()
@@ -209,22 +215,26 @@ def clean_termini(residues):
     
 
 def write_alignment(residues, pdb, path, out):
-    """
-    Writes MODELLER alignment file for missing residues, according to
-    https://salilab.org/modeller/10.4/manual/node501.html and
-    https://salilab.org/modeller/wiki/Missing_residues
+    """Write a MODELLER alignment file for filling missing residues.
+
+    Creates a PIR-format alignment file with two sequences: the template
+    (with gaps for missing residues) and the target (complete sequence).
 
     Parameters
     ----------
-    residues: list of list
-        Residues separated by chain. Stored as a tuple of
-        ``((sequence number, insertion code), one letter code, flag)``
-    pdb: str
-        PDB code
-    path: str
-        Path to PDB file
-    out: str
-        Path to output file
+    residues : list of list
+        Residues separated by chain, as returned by :func:`get_residues`.
+    pdb : str
+        PDB code (used as sequence identifier).
+    path : str
+        Path to the template PDB file.
+    out : str
+        Path to the output alignment file (``.ali``).
+
+    References
+    ----------
+    .. [1] https://salilab.org/modeller/10.4/manual/node501.html
+    .. [2] https://salilab.org/modeller/wiki/Missing_residues
     """
     seq = "/".join(
         "".join(res[1] if res[2] != "R" else "-" for res in chain) for chain in residues
@@ -238,18 +248,27 @@ def write_alignment(residues, pdb, path, out):
 
 
 def transfer_numbering(e, ali, path, out):
-    """
-    Transfer residue numbers and chain ids from reference model to the built model.
+    """Transfer residue numbers and chain IDs from template to built model.
 
-    By default, Modeller will restart the number at 1 and rename the chains.
-    This function, we transfer the numbering over from the template PDB.
-    However, it can cause some issues with the numbering in some cases.
-    We use fix_numbering() to fix those issues.
+    MODELLER restarts residue numbering at 1 and reassigns chain IDs. This
+    function restores the original numbering from the template PDB file.
+    Insertion codes introduced by the transfer are corrected by
+    :func:`fix_numbering`.
+
+    Parameters
+    ----------
+    e : modeller.Environ
+        MODELLER environment object.
+    ali : str
+        Path to the alignment file.
+    path : str
+        Path to the original template PDB file.
+    out : str
+        Path to the output PDB file (will be overwritten in place).
 
     See Also
     --------
-    qp.structure.missing.fix_numbering()
-
+    fix_numbering : Corrects insertion code issues after transfer.
     """
     # Read the alignment for the transfer
     aln = alignment(e, file=ali)
@@ -330,27 +349,35 @@ def fix_numbering(pdb_content):
 
 
 def build_model(residues, pdb, path, ali, out, optimize=1):
-    """
-    Runs MODELLER for the given alignment file
+    """Run MODELLER to build missing residues and atoms.
+
+    Constructs a complete model by filling in missing residues and atoms
+    using MODELLER's homology modeling capabilities. The level of
+    structure optimization can be controlled.
 
     Parameters
     ----------
-    residues: list of list
-        Residues separated by chain. Stored as a tuple of
-        ``((sequence number, insertion code), one letter code, flag)``
-    pdb: str
-        PDB code
-    path: str
-        Path to PDB file
-    ali: str
-        Path to alignment file
-    out: str
-        Path to output PDB file
-    optimize: int
-        Flag for level of optimization to use
-        (0 - no optimization,
-        1 - only missing residues or residues with missing atoms,
-        2 - everything)
+    residues : list of list
+        Residues separated by chain, as returned by :func:`get_residues`.
+    pdb : str
+        PDB code (must match the alignment file identifiers).
+    path : str
+        Path to the template PDB file.
+    ali : str
+        Path to the MODELLER alignment file.
+    out : str
+        Path to the output PDB file.
+    optimize : int, optional
+        Optimization level (default 1):
+
+        - 0: No optimization; coordinates from topology library only.
+        - 1: Optimize only missing residues and residues with missing atoms.
+        - 2: Optimize the entire structure (heteroatoms as rigid bodies).
+
+    Notes
+    -----
+    The output PDB file will have residue numbering transferred from the
+    template. MODELLER intermediate files are cleaned up automatically.
     """
     ali = os.path.abspath(ali)
     cwd = os.getcwd()

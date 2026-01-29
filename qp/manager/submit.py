@@ -8,7 +8,23 @@ import subprocess
 
 
 def create_marker(submission_marker_path, job_name, submission_command, submission_output):
-    """Creates a comprehensive summary of submission information that doubles as a tracker."""
+    """Create a submission record file to track job status.
+
+    Writes a ``.submit_record`` file containing job metadata including
+    the job name, submitting user, queue time, and scheduler output.
+    This file prevents duplicate submissions and enables job status tracking.
+
+    Parameters
+    ----------
+    submission_marker_path : str
+        Path to the ``.submit_record`` file to create.
+    job_name : str
+        Name of the submitted job.
+    submission_command : str
+        The shell command used to submit the job.
+    submission_output : str
+        Output returned by the scheduler (e.g., job ID).
+    """
     with open(submission_marker_path, 'w') as marker:
         marker.write(f"Jobname: {job_name}\n")
         marker.write(f"Author: {getpass.getuser()}\n")
@@ -18,7 +34,25 @@ def create_marker(submission_marker_path, job_name, submission_command, submissi
 
 
 def prepare_jobs(job_count, method):
-    """Prepare the jobs but do not submit them yet."""
+    """Identify jobs ready for submission without submitting them.
+
+    Scans the output directory for cluster directories that have
+    QM input files but no ``.submit_record`` or ``qmscript.out``,
+    indicating they haven't been submitted yet.
+
+    Parameters
+    ----------
+    job_count : int
+        Maximum number of jobs to prepare.
+    method : str
+        DFT method name (subdirectory under each chain directory).
+
+    Returns
+    -------
+    list of tuple
+        Each tuple contains ``(qm_path, pdb_dir, structure_dir)`` for
+        jobs ready to submit.
+    """
     base_dir = os.getcwd()
     prepared_jobs = []
     
@@ -61,7 +95,24 @@ def prepare_jobs(job_count, method):
 
 
 def submit_jobs(prepared_jobs, scheduler):
-    """Submit the prepared jobs to the scheduler."""
+    """Submit prepared jobs to the cluster scheduler.
+
+    Iterates through the prepared job list and submits each using
+    the appropriate scheduler command (``sbatch`` for SLURM, ``qsub``
+    for SGE). Creates a ``.submit_record`` file for each submitted job.
+
+    Parameters
+    ----------
+    prepared_jobs : list of tuple
+        Jobs to submit, as returned by :func:`prepare_jobs`.
+    scheduler : str
+        Scheduler type (``'slurm'`` or ``'sge'``).
+
+    Returns
+    -------
+    int
+        Number of jobs successfully submitted.
+    """
     base_dir = os.getcwd()
     submitted_jobs = 0
 
@@ -93,7 +144,27 @@ def submit_jobs(prepared_jobs, scheduler):
     return submitted_jobs
 
 def manage_jobs(output, job_count, method, scheduler):
-    """Main function for managing QM jobs."""
+    """Orchestrate job preparation and submission.
+
+    Main entry point for the job submission workflow. Prepares up to
+    ``job_count`` unsubmitted jobs and submits them to the specified
+    scheduler.
+
+    Parameters
+    ----------
+    output : str
+        Path to the output directory containing cluster subdirectories.
+    job_count : int
+        Maximum number of jobs to submit in this batch.
+    method : str
+        DFT method name (subdirectory under each chain directory).
+    scheduler : str
+        Scheduler type (``'slurm'`` or ``'sge'``).
+
+    Notes
+    -----
+    This function calls ``sys.exit(0)`` upon completion.
+    """
     # Change into the directory of the generated cluster models
     os.chdir(output)
     print(f"> Attempting to submit {job_count} jobs.")

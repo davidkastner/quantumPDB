@@ -31,17 +31,22 @@ def to_xyz(out, *paths):
             f.write(f"{format_element(element):>3}  {x:8.3f} {y:8.3f} {z:8.3f}\n")
 
 def combine_pdbs(out_path, metals, *input_paths, hetero_pdb=False):
-    """
-    Combines multiple PDB files into a single PDB file, excluding atoms of type "H1",
-    while maintaining the order of residues and atoms as they appear in the input files,
-    and ensuring only the final "END" line is kept.
+    """Combine multiple sphere PDB files into a single cluster PDB.
+
+    Concatenates the contents of multiple PDB files (typically the numbered
+    sphere files ``0.pdb``, ``1.pdb``, etc.) while ensuring only one ``END``
+    record appears at the end.
 
     Parameters
     ----------
-    out_path: str
-        Path to the output PDB file.
-    input_paths: str
-        Paths to the input PDB files.
+    out_path : str
+        Path to the output combined PDB file.
+    metals : CenterResidue
+        Center residue definition (currently unused but kept for API).
+    *input_paths : str
+        Paths to input PDB files to concatenate.
+    hetero_pdb : bool, optional
+        If True, include HETATM records (default False, currently unused).
     """
     with open(out_path, 'w') as outfile:
         for path in input_paths:

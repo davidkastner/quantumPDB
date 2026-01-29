@@ -13,26 +13,37 @@ from qp.analyze import molden
 
 
 def iterate_qm_output(pdb_all, method, base_output_dir, multiwfn_path, settings_ini_path, atmrad_path, charge_scheme, task_function):
-    """
-    Loop over all QM job folders and apply the provided task function 
-    for successful jobs with a .molden file inside the 'scr' directory.
+    """Iterate over QM job folders and apply an analysis function.
+
+    Loops through all completed QM calculations, copying necessary Multiwfn
+    configuration files and applying the provided task function to each
+    job that has a ``.molden`` file in its ``scr/`` directory.
 
     Parameters
     ----------
-    method: str
-        The name of the method (e.g., wpbeh) being used for QM jobs.
-    
-    base_output_dir: str
-        The base directory containing all QM job folders.
+    pdb_all : list of tuple
+        List of ``(pdb_id, pdb_path)`` tuples from the input CSV.
+    method : str
+        QM method name (e.g., ``'wpbeh'``) used to locate job directories.
+    base_output_dir : str
+        Base directory containing all PDB subdirectories with QM jobs.
+    multiwfn_path : str
+        Path to the Multiwfn executable.
+    settings_ini_path : str
+        Path to the Multiwfn ``settings.ini`` configuration file.
+    atmrad_path : str
+        Path to the ``atmrad/`` directory containing atomic radii data
+        for Hirshfeld-I calculations.
+    charge_scheme : str
+        Charge scheme to use (e.g., ``'Hirshfeld'``, ``'CM5'``).
+    task_function : callable
+        Function to apply to each valid job. Called as
+        ``task_function(scr_dir_path, molden_file, multiwfn_path, charge_scheme)``.
 
-    settings_ini_path: str
-        The path to the settings.ini file to be copied into each QM job folder.
-    
-    atmrad_path: str
-        The path to the atmrad directory to be copied into each QM job folder.
-
-    task_function: callable
-        A function that will be applied to each valid QM job directory.
+    Notes
+    -----
+    If the molden file was modified by ECP charge correction, old analysis
+    files are deleted to force re-calculation.
     """
     pdb_ids = {pdb[0] for pdb in pdb_all}
     # Loop over all PDB directories in the base_output_dir
@@ -125,7 +136,13 @@ def iterate_qm_output(pdb_all, method, base_output_dir, multiwfn_path, settings_
 
 
 def get_settings_ini_path():
-    """Reads in custom Multiwfn parameters"""
+    """Get the path to the bundled Multiwfn settings.ini file.
+
+    Returns
+    -------
+    str
+        Absolute path to the ``settings.ini`` file in the package resources.
+    """
     # Dynamically get path to package settings.ini file
     with resources.path('qp.resources', 'settings.ini') as ini_path:
         settings_ini_path = str(ini_path)
@@ -134,7 +151,16 @@ def get_settings_ini_path():
 
 
 def get_atmrad_path():
-    """Path to the atmrad files which is needed for Hirshfeld-I calculations"""
+    """Get the path to the bundled atomic radii files for Hirshfeld-I.
+
+    The ``atmrad/`` directory contains free-atom electron density data
+    required by Multiwfn for Hirshfeld-I charge calculations.
+
+    Returns
+    -------
+    str
+        Absolute path to the ``atmrad/`` directory in the package resources.
+    """
     # Dynamically get path to package atmrad/ directory
     with resources.path('qp.resources', '') as resources_path:
         atmrad_path = os.path.join(str(resources_path), 'atmrad')
@@ -337,13 +363,21 @@ def get_cpu_count(settings_ini_dest_path):
 
 
 def is_valid_dipole_file(file_path):
-    """
-    Check if the dipole output file exists and contains the expected completion text.
-    
-    We do this instead of just checking if the file exists because sometimes a job will not finish.
-    This jobs can take a long time and might not always finish correctly.
-    If one does not finish correctly, we rerun it.
-    
+    """Check whether a dipole calculation output file is complete.
+
+    Multiwfn dipole calculations can sometimes fail or be interrupted.
+    This function checks for the presence of a completion marker in
+    the output file to determine if the calculation finished successfully.
+
+    Parameters
+    ----------
+    file_path : str
+        Path to the dipole output file (``*_dipole_com.out``).
+
+    Returns
+    -------
+    bool
+        True if the file exists and contains the completion marker.
     """
     if not os.path.exists(file_path):
         return False
@@ -355,21 +389,34 @@ def is_valid_dipole_file(file_path):
 
 
 def charge_scheme(scr_dir_path, molden_file, multiwfn_path, charge_scheme):
-    """
-    Calculate a specific charge scheme with Multiwfn for a given .molden file and
-    process the output to extract relevant information, saving it in a readable format.
+    """Calculate atomic partial charges using Multiwfn.
+
+    Runs Multiwfn to compute atomic charges using the specified charge
+    partitioning scheme and saves the results to a ``.chg`` file.
 
     Parameters
     ----------
-    scr_dir_path: str
-        The directory containing the molden file.
-    
-    molden_file: str
-        The full path to the molden file to be processed with Multiwfn.
-    
-    charge_scheme: str
-        The charge scheme to use. Must be one of:
-        'Hirshfeld', 'Voronoi', 'Mulliken', 'ADCH', 'Hirshfeld-I', 'CM5'.
+    scr_dir_path : str
+        Directory containing the molden file (used for logging).
+    molden_file : str
+        Filename of the molden file to process.
+    multiwfn_path : str
+        Path to the Multiwfn executable.
+    charge_scheme : str
+        Charge partitioning scheme. Must be one of: ``'Hirshfeld'``,
+        ``'Voronoi'``, ``'Mulliken'``, ``'ADCH'``, ``'Hirshfeld-I'``,
+        ``'CM5'``.
+
+    Raises
+    ------
+    ValueError
+        If ``charge_scheme`` is not one of the supported schemes.
+
+    Notes
+    -----
+    Output is written to ``{molden_base}_{charge_scheme}.chg`` in the
+    current working directory. If this file already exists, the
+    calculation is skipped.
     """
 
     # Mapping of charge schemes to their corresponding Multiwfn codes
@@ -417,18 +464,31 @@ def charge_scheme(scr_dir_path, molden_file, multiwfn_path, charge_scheme):
 
 
 def calc_dipole(scr_dir_path, molden_file, multiwfn_path, charge_scheme):
-    """
-    Calculate dipole of the substrate with Multiwfn for a given .molden file and
-    process the output to extract relevant information, saving it in a readable format.
-    Uses the center of mass as the reference point.
+    """Calculate the substrate dipole moment using Multiwfn.
+
+    Computes the molecular dipole moment of the substrate fragment using the
+    center of mass as the reference point. The molden file is first
+    translated so that the substrate center of mass is at the origin.
 
     Parameters
     ----------
-    scr_dir_path: str
-        The directory containing the molden file.
-    
-    molden_file: str
-        The full path to the molden file to be processed with Multiwfn.
+    scr_dir_path : str
+        Directory containing the molden file (typically ``method/scr/``).
+    molden_file : str
+        Filename of the molden file to process.
+    multiwfn_path : str
+        Path to the Multiwfn executable.
+    charge_scheme : str
+        Charge scheme name (passed for API consistency but not used in
+        dipole calculation).
+
+    Notes
+    -----
+    Outputs are written to:
+    - ``{molden_base}_dipole_com.out`` - raw Multiwfn output
+    - ``{molden_base}_dipole_com.csv`` - parsed dipole components (a.u.)
+
+    The substrate atoms are identified from ``0.pdb`` in the cluster directory.
     """
     pdb_name = scr_dir_path.split("/")[-4]
     chain_name = scr_dir_path.split("/")[-3]

@@ -33,18 +33,24 @@ from Bio.PDB import PDBParser, PDBIO
 
 
 def upload(path):
-    """
-    Uploads a PDB file to the ProteinsPlus web server
+    """Upload a PDB file to the ProteinsPlus web server.
 
     Parameters
     ----------
-    path: str
-        Path to PDB file
+    path : str
+        Path to the PDB file to upload.
 
     Returns
     -------
-    pid: str
-        ProteinsPlus ID
+    str
+        ProteinsPlus ID for the uploaded structure.
+
+    Raises
+    ------
+    ValueError
+        If the server returns a 400 Bad Request error.
+    KeyError
+        If the upload fails after 5 retry attempts.
     """
     retries = 5
     delay = 60  # seconds
@@ -73,18 +79,24 @@ def upload(path):
 
 
 def submit(pid):
-    """
-    Submits a PDB code to the Protoss web API
+    """Submit a PDB code or ProteinsPlus ID to the Protoss web API.
 
     Parameters
     ----------
-    pid: str
-        PDB code or ProteinsPlus ID
+    pid : str
+        Four-character PDB code or ProteinsPlus ID from :func:`upload`.
 
     Returns
     -------
-    job: str
-        URL of the Protoss job location
+    str
+        URL of the Protoss job location for status polling.
+
+    Raises
+    ------
+    ValueError
+        If the PDB code is invalid (server returns 400).
+    KeyError
+        If the submission fails after 5 retry attempts.
     """
     retries = 5
     delay = 60  # seconds
@@ -108,17 +120,26 @@ def submit(pid):
 
 
 def download(job, out, key="protein"):
-    """
-    Downloads a Protoss output file
+    """Download a Protoss output file.
+
+    Polls the Protoss job URL until completion, then downloads the
+    requested output file.
 
     Parameters
     ----------
-    job: str
-        URL of the Protoss job location
-    out: str
-        Path to output file
-    key: str
-        Determines which file to download ("protein", "ligand", or "log")
+    job : str
+        URL of the Protoss job location from :func:`submit`.
+    out : str
+        Path to the output file (directory created if needed).
+    key : str, optional
+        File type to download: ``'protein'`` (protonated PDB),
+        ``'ligand'`` (ligand SDF), or ``'log'`` (processing log).
+        Default is ``'protein'``.
+
+    Raises
+    ------
+    KeyError
+        If the download fails after 5 retry attempts.
     """
     # Sometimes the Protoss server doesn't respond correctly with the first query
     retries = 5

@@ -1,8 +1,44 @@
 """Stored job submission scripts"""
 
 def write_qm(optimization, coord_file, basis, method, total_charge, multiplicity, guess, pcm_radii_file, constraint_freeze, dielectric, use_charge_embedding):
-    """Generate TeraChem job submission scripts."""
-    
+    """Generate a TeraChem input file (qmscript.in).
+
+    Creates the input file content for TeraChem with the specified
+    calculation parameters. Supports both single-point energy and
+    geometry optimization calculations with either PCM implicit solvent
+    or explicit point charge embedding.
+
+    Parameters
+    ----------
+    optimization : bool
+        If True, include geometry optimization keywords.
+    coord_file : str
+        Name of the XYZ coordinate file.
+    basis : str
+        Basis set name (e.g., ``'lacvps_ecp'``).
+    method : str
+        DFT functional (e.g., ``'wpbeh'``, ``'ub3lyp'``).
+    total_charge : int
+        Total system charge.
+    multiplicity : int
+        Spin multiplicity (1 = singlet, 2 = doublet, etc.).
+    guess : str
+        Initial guess method (e.g., ``'generate'``).
+    pcm_radii_file : str
+        Path to PCM radii file for cavity construction.
+    constraint_freeze : str
+        TeraChem constraint block for frozen atoms.
+    dielectric : float
+        Dielectric constant for PCM solvent.
+    use_charge_embedding : bool
+        If True, use point charges instead of PCM.
+
+    Returns
+    -------
+    str
+        Complete TeraChem input file content.
+    """
+
     minimization_keywords = """new_minimizer yes\nrun minimize\n""" if optimization else ""
 
     if use_charge_embedding:
@@ -43,7 +79,25 @@ end
 
 
 def write_slurm_job(job_name, gpus, memory):
-    """Generate bash submission scripts with conditional sleep time and scratch directory usage."""
+    """Generate a SLURM submission script for TeraChem.
+
+    Creates a bash script with SLURM directives for GPU job submission.
+    Configured for systems with NVIDIA Volta GPUs and the TeraChem module.
+
+    Parameters
+    ----------
+    job_name : str
+        Name for the SLURM job (used in output filenames).
+    gpus : int
+        Number of GPUs to request.
+    memory : str
+        Memory allocation (currently unused but kept for API consistency).
+
+    Returns
+    -------
+    str
+        Complete SLURM submission script content.
+    """
 
     jobscript_content = f"""#! /bin/bash
 #SBATCH --job-name={job_name}
@@ -67,7 +121,26 @@ echo "Run End Time: $(date '+%Y-%m-%d %H:%M:%S')" >> .submit_record
     return jobscript_content
 
 def write_sge_job(job_name, gpus, memory):
-    """Generate bash submission scripts with conditional sleep time."""
+    """Generate a Sun Grid Engine (SGE) submission script for TeraChem.
+
+    Creates a bash script with SGE directives for GPU job submission.
+    Includes a minimum runtime enforcement (10 minutes) to prevent
+    scheduler issues with very short jobs.
+
+    Parameters
+    ----------
+    job_name : str
+        Name for the SGE job (prefixed with 'Z' in the script).
+    gpus : int
+        Number of GPUs/parallel threads to request.
+    memory : str
+        Memory allocation string (e.g., ``'8G'``).
+
+    Returns
+    -------
+    str
+        Complete SGE submission script content.
+    """
 
     jobscript_content = f"""#!/bin/bash
 #$ -N Z{job_name}

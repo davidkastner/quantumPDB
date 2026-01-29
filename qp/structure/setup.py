@@ -8,13 +8,50 @@ import requests
 
 
 def read_config(config_file):
-    """Read in the configuration yaml file"""
+    """Read and parse a YAML configuration file.
+
+    Parameters
+    ----------
+    config_file : str
+        Path to the configuration YAML file.
+
+    Returns
+    -------
+    dict
+        Parsed configuration data with all pipeline parameters.
+    """
     with open(config_file, 'r') as file:
         return yaml.safe_load(file)
 
 
 def parse_input(input, output, center_yaml_residues):
-    """Returns system information from the provided input"""
+    """Parse input sources and determine center residues for each structure.
+
+    Processes the user-provided input (PDB codes, file paths, or CSV) and
+    determines the center residue definitions from either the CSV ``center``
+    column or the YAML ``center_residues`` parameter.
+
+    Parameters
+    ----------
+    input : str or list
+        Input specification: PDB code(s), path to PDB file(s), or path to CSV.
+    output : str
+        Path to the output directory.
+    center_yaml_residues : list
+        Center residue definitions from the YAML config file.
+
+    Returns
+    -------
+    tuple of (list, list)
+        ``(pdb_all, center_residues)`` where ``pdb_all`` is a list of
+        ``(pdb_id, pdb_path)`` tuples and ``center_residues`` is a list
+        of center definition strings.
+
+    Raises
+    ------
+    SystemExit
+        If no center residues are provided in either the CSV or YAML.
+    """
 
     # If the input was a path or a single PDB, convert it to a list
     if isinstance(input, str):

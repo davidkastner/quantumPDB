@@ -7,21 +7,42 @@ from qp.manager import ff14SB_dict
 from scipy.spatial import KDTree
 
 def calculate_centroid(coords):
-    """
-    Calculate the centroid of the given coordinates.
+    """Calculate the geometric centroid of a set of coordinates.
+
+    Parameters
+    ----------
+    coords : array-like of shape (N, 3)
+        Cartesian coordinates of N atoms.
+
+    Returns
+    -------
+    numpy.ndarray of shape (3,)
+        The centroid (mean position) of the input coordinates.
     """
     return np.mean(coords, axis=0)
 
 def rename_and_clean_resnames(input_pdb, output_pdb):
-    """
-    Changes the names of protoss-generated resnames from HIS to HIP, HIE, or HID.
-    Similiar rules with OXT also renames HETATM to ATOM.
-    HETATMs in QM region will get removed anyway.
+    """Rename histidine residues for ff14SB compatibility and convert HETATM to ATOM.
+
+    Protoss outputs all histidines as HIS, but ff14SB requires specific
+    protonation states: HIP (doubly protonated), HID (delta-protonated),
+    or HIE (epsilon-protonated). This function determines the correct
+    name based on hydrogen atoms present.
+
+    Also handles N-terminal (NXXX) and C-terminal (CXXX) residue naming,
+    and converts all HETATM records to ATOM for force field assignment.
+
+    Parameters
+    ----------
+    input_pdb : str
+        Path to the input PDB file (typically Protoss output).
+    output_pdb : str
+        Path to write the renamed PDB file.
 
     Notes
     -----
-    Current issues: need to deal with spacing issues down the line caused by creating a four letter residue name
-
+    The four-letter residue names (NALA, CALA, etc.) may cause column
+    alignment issues in strict PDB format parsers.
     """
     with open(input_pdb, 'r') as infile, open(output_pdb, 'w') as outfile:
         lines = infile.readlines()
@@ -105,8 +126,17 @@ def parse_pdb(input_pdb, output_pdb, ff_dict):
                     outfile.write(line)
 
 def read_pdb(file_path):
-    """
-    Read a PDB file and extract atom lines.
+    """Read a PDB file and extract ATOM record lines.
+
+    Parameters
+    ----------
+    file_path : str
+        Path to the PDB file.
+
+    Returns
+    -------
+    list of str
+        Lines starting with 'ATOM'.
     """
     atom_lines = []
     with open(file_path, 'r') as pdb_file:
@@ -116,8 +146,17 @@ def read_pdb(file_path):
     return atom_lines
 
 def read_xyz(file_path):
-    """
-    Read an XYZ file and extract atom coordinates.
+    """Read an XYZ file and extract atomic coordinates.
+
+    Parameters
+    ----------
+    file_path : str
+        Path to the XYZ file.
+
+    Returns
+    -------
+    numpy.ndarray of shape (N, 3)
+        Cartesian coordinates of N atoms.
     """
     coordinates = []
     with open(file_path, 'r') as xyz_file:
@@ -131,8 +170,24 @@ def read_xyz(file_path):
     return np.array(coordinates)
 
 def remove_atoms_from_pdb(pdb_lines, xyz_coords, threshold):
-    """
-    Remove atoms from the PDB file whose coordinates are within the threshold distance of any XYZ coordinates.
+    """Filter PDB lines to remove atoms close to XYZ coordinates.
+
+    Uses a KD-tree for efficient spatial queries to identify and remove
+    atoms within the threshold distance of any atom in the XYZ file.
+
+    Parameters
+    ----------
+    pdb_lines : list of str
+        ATOM record lines from a PDB file.
+    xyz_coords : numpy.ndarray of shape (M, 3)
+        Reference coordinates (typically QM cluster atoms).
+    threshold : float
+        Distance threshold in angstroms.
+
+    Returns
+    -------
+    list of str
+        PDB lines with nearby atoms removed.
     """
     threshold_sq = threshold ** 2
     xyz_tree = KDTree(xyz_coords)
@@ -150,8 +205,14 @@ def remove_atoms_from_pdb(pdb_lines, xyz_coords, threshold):
     return new_pdb_lines
 
 def write_pdb(output_path, pdb_lines):
-    """
-    Write the remaining atoms to a new PDB file.
+    """Write PDB lines to a file.
+
+    Parameters
+    ----------
+    output_path : str
+        Path to the output PDB file.
+    pdb_lines : list of str
+        PDB record lines to write.
     """
     with open(output_path, 'w') as pdb_file:
         for line in pdb_lines:
@@ -182,8 +243,22 @@ def remove_qm_atoms(pdb_file, xyz_file, output_pdb_file, threshold=0.5):
     write_pdb(output_pdb_file, remaining_lines)
 
 def parse_pdb_to_xyz(pdb_file_path, output_file_path, qm_centroid, cutoff_distance):
-    """
-    Write terachem file test with distance cutoff for point charges.
+    """Convert PDB with charges to TeraChem point charge XYZ format.
+
+    Reads the B-factor column (containing ff14SB partial charges) from
+    the PDB file and writes atoms within the cutoff distance of the
+    QM centroid to a point charge file.
+
+    Parameters
+    ----------
+    pdb_file_path : str
+        Path to PDB file with charges in B-factor column.
+    output_file_path : str
+        Path for the output point charge file (``ptchrges.xyz``).
+    qm_centroid : array-like of shape (3,)
+        Centroid of the QM cluster for distance calculations.
+    cutoff_distance : float
+        Maximum distance in angstroms from centroid to include.
     """
     cutoff_distance_sq = cutoff_distance ** 2
 
