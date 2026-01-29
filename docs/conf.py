@@ -56,9 +56,19 @@ extensions = [
 ]
 
 autosummary_generate = True
+autosummary_generate_overwrite = True
+autosummary_imported_members = False
 autodoc_member_order = "bysource"
+autodoc_default_options = {
+    'members': True,
+    'undoc-members': True,
+    'show-inheritance': True,
+}
 autodoc_mock_imports = [
     "modeller",
+    "Bio",
+    "Bio.PDB",
+    "periodictable",
 ]
 napoleon_google_docstring = False
 napoleon_use_param = False
@@ -112,15 +122,16 @@ html_theme_options = {
     "includehidden": True,
     "titles_only": False,
     "github_url": "https://github.com/davidkastner/quantumpdb",
-    "logo_mobile": "logo-white.svg",
+    "logo_mobile": "_static/logo-white.svg",
     "color_scheme": "dark",
 }
 
-html_logo = "logo-white.svg"
+html_logo = "_static/logo-white.svg"
 html_title = "quantumpdb"
 html_favicon = "_static/favicon.ico"
 
 html_context = {
+    "style": "dark",
     "landing_page": {
         "menu": [
             {"title": "quantumpdb", "url": "https://quantumpdb.readthedocs.io/"},

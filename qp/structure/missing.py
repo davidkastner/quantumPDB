@@ -231,10 +231,12 @@ def write_alignment(residues, pdb, path, out):
     out : str
         Path to the output alignment file (``.ali``).
 
-    References
-    ----------
-    .. [1] https://salilab.org/modeller/10.4/manual/node501.html
-    .. [2] https://salilab.org/modeller/wiki/Missing_residues
+    See Also
+    --------
+    https://salilab.org/modeller/10.4/manual/node501.html
+        MODELLER alignment file format documentation.
+    https://salilab.org/modeller/wiki/Missing_residues
+        MODELLER missing residues tutorial.
     """
     seq = "/".join(
         "".join(res[1] if res[2] != "R" else "-" for res in chain) for chain in residues
