@@ -37,6 +37,7 @@ gpus: 1                                # How many GPUs to use
 memory: 4G                             # How much memory to use
 dielectric : 10                        # The dieletric to use if using implicit solvent  
 charge_embedding: true                 # Prepare QM with charge embedding
+charge_embedding_charges: null         # Path to custom charges JSON file (null uses built-in ff14SB)
 scheduler: slurm                       # What scheduler do you use (e.g., slurm, sge)
 pcm_radii_file: /path/to/pcm_radii     # The path to the pcm_radii file if using terachem
 # Submit QM jobs

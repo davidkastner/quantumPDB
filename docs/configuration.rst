@@ -165,12 +165,19 @@ These parameters control ``qp submit`` (QM job creation and submission).
        protein interior, ``78.4`` for aqueous solvent.
    * - ``charge_embedding``
      - ``false``
-     - Include MM point charges around the QM cluster. Uses ff14SB partial
-       charges (also TIP3P for water, standard charges for common ions).
+     - Include MM point charges around the QM cluster. By default uses
+       ff14SB partial charges (also TIP3P for water, standard charges for
+       common ions). The charge source can be customized with
+       ``charge_embedding_charges``.
    * - ``charge_embedding_cutoff``
      - ``20``
      - Distance cutoff in angstroms for MM point charges, measured from the
        QM cluster centroid.
+   * - ``charge_embedding_charges``
+     - ``null``
+     - Path to a JSON file with custom partial charges, keyed by residue
+       name then atom name (e.g., ``{"ALA": {"N": -0.4157, ...}}``).
+       When ``null``, uses the built-in AMBER ff14SB charges.
    * - ``scheduler``
      - ``'slurm'``
      - Job scheduler: ``'slurm'`` or ``'sge'``.

@@ -261,7 +261,7 @@ def get_charge(structure_dir=None):
     return charge, spin
 
 
-def create_jobs(pdb_list_path, output_dir, optimization, basis, method, guess, use_charge_embedding, charge_embedding_cutoff, gpus, memory, scheduler, pcm_radii_file, dielectric):
+def create_jobs(pdb_list_path, output_dir, optimization, basis, method, guess, use_charge_embedding, charge_embedding_cutoff, charge_embedding_charges, gpus, memory, scheduler, pcm_radii_file, dielectric):
     """Generate QM job input files for all extracted clusters.
 
     Creates TeraChem input files (``qmscript.in``) and scheduler submission
@@ -287,6 +287,9 @@ def create_jobs(pdb_list_path, output_dir, optimization, basis, method, guess, u
         If True, generate point charge embedding file.
     charge_embedding_cutoff : float
         Distance cutoff in angstroms for MM point charges.
+    charge_embedding_charges : str or None
+        Path to a JSON file with custom partial charges. When ``None``,
+        the built-in AMBER ff14SB charges are used.
     gpus : int
         Number of GPUs to request.
     memory : str
@@ -351,7 +354,7 @@ def create_jobs(pdb_list_path, output_dir, optimization, basis, method, guess, u
                 f.write(jobscript)
 
             if use_charge_embedding:
-                charge_embedding.get_charges(charge_embedding_cutoff)
+                charge_embedding.get_charges(charge_embedding_cutoff, charge_embedding_charges)
 
             print(f"> Created QM job files for {pdb}/{structure_name}/{method}/")
             

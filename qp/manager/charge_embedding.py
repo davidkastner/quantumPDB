@@ -1,6 +1,13 @@
-"""Generate charge embedding ptchrges.xyz file for TeraChem input."""
+"""Generate charge embedding ptchrges.xyz file for TeraChem input.
+
+By default, partial charges are taken from the built-in AMBER ff14SB
+dictionary.  Users can supply a custom JSON file of charges via the
+``charge_embedding_charges`` configuration option to support other
+force fields.
+"""
 
 import os
+import json
 import shutil
 import numpy as np
 from qp.manager import ff14SB_dict
@@ -287,7 +294,50 @@ def parse_pdb_to_xyz(pdb_file_path, output_file_path, qm_centroid, cutoff_distan
             z_coord = float(line[46:54])
             output_file.write(f"{charges} {x_coord} {y_coord} {z_coord}\n")
 
-def get_charges(charge_embedding_cutoff):
+def load_custom_charges(filepath):
+    """Load custom partial charges from a JSON file.
+
+    The JSON file must contain a nested dictionary keyed first by residue
+    name, then by atom name, with partial charges as float values.
+
+    Parameters
+    ----------
+    filepath : str
+        Path to the JSON file.
+
+    Returns
+    -------
+    dict
+        Nested ``{residue_name: {atom_name: charge}}`` dictionary, in the
+        same format returned by
+        :func:`~qp.manager.ff14SB_dict.get_ff14SB_dict`.
+
+    Raises
+    ------
+    FileNotFoundError
+        If *filepath* does not exist.
+    json.JSONDecodeError
+        If the file contents are not valid JSON.
+
+    Examples
+    --------
+    A minimal JSON file might look like::
+
+        {
+            "ALA": {"N": -0.4157, "H": 0.2719, "CA": 0.0337},
+            "GLY": {"N": -0.4157, "H": 0.2719}
+        }
+    """
+    if not os.path.exists(filepath):
+        raise FileNotFoundError(f"Custom charges file not found: {filepath}")
+
+    with open(filepath, 'r') as f:
+        charges = json.load(f)
+
+    return charges
+
+
+def get_charges(charge_embedding_cutoff, charge_embedding_charges=None):
     """Generate the MM point charge embedding file (``ptchrges.xyz``).
 
     Orchestrates the full charge embedding pipeline: renames residues for
@@ -300,6 +350,10 @@ def get_charges(charge_embedding_cutoff):
     charge_embedding_cutoff : float
         Distance cutoff in angstroms from the QM cluster centroid for
         including MM point charges.
+    charge_embedding_charges : str, optional
+        Path to a JSON file containing custom partial charges. When
+        ``None`` (default), the built-in AMBER ff14SB charges are used.
+        See :func:`load_custom_charges` for the expected file format.
     """
     # Setup a temporary directory to store files
     temporary_files_dir = "ptchrges_temp"
@@ -313,7 +367,10 @@ def get_charges(charge_embedding_cutoff):
     protoss_pdb_path = os.path.join("/".join(os.getcwd().split('/')[:-2]),"Protoss",protoss_pdb_name)
     chain_name = os.getcwd().split('/')[-2]
     renamed_his_pdb_file = f'{temporary_files_dir}/{chain_name}_rename_his.pdb'
-    ff_dict = ff14SB_dict.get_ff14SB_dict()  # residue names, atom names, and charge values
+    if charge_embedding_charges is not None:
+        ff_dict = load_custom_charges(charge_embedding_charges)
+    else:
+        ff_dict = ff14SB_dict.get_ff14SB_dict()
     charges_pdb = f'{temporary_files_dir}/{chain_name}_added_charges.pdb'
     xyz_file = f'{chain_name}.xyz'
     pdb_no_qm_atoms = f'{temporary_files_dir}/{chain_name}_without_qm_atoms.pdb'

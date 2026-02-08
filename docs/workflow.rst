@@ -111,8 +111,10 @@ QuantumPDB generates ready-to-run QM input files and manages job submission.
    - The user-provided ``oxidation`` and ``multiplicity`` columns in the
      input CSV
 
-3. If charge embedding is enabled, MM point charges from an ff14SB force
-   field are placed around the QM cluster within the cutoff distance.
+3. If charge embedding is enabled, MM point charges are placed around the
+   QM cluster within the cutoff distance. By default AMBER ff14SB charges
+   are used, but users can supply a custom charge file via
+   ``charge_embedding_charges``.
 4. Scheduler scripts (SLURM or SGE) are generated alongside the QM input.
 5. Jobs are submitted up to the ``job_count`` limit, with a ``.submit_record``
    file preventing duplicate submissions.
