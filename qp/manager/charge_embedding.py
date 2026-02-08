@@ -256,6 +256,11 @@ def parse_pdb_to_xyz(pdb_file_path, output_file_path, qm_centroid, cutoff_distan
     the PDB file and writes atoms within the cutoff distance of the
     QM centroid to a point charge file.
 
+    Selection is residue-based: if any atom in a residue falls within
+    the cutoff distance of the QM centroid, all atoms of that residue
+    are included.  This prevents partial residues with non-integer
+    charge contributions.
+
     Parameters
     ----------
     pdb_file_path : str
@@ -266,24 +271,39 @@ def parse_pdb_to_xyz(pdb_file_path, output_file_path, qm_centroid, cutoff_distan
         Centroid of the QM cluster for distance calculations.
     cutoff_distance : float
         Maximum distance in angstroms from centroid to include.
+        If any atom of a residue is within this distance, the
+        entire residue is included.
     """
     cutoff_distance_sq = cutoff_distance ** 2
 
     with open(pdb_file_path, 'r') as pdb_file:
         lines = pdb_file.readlines()
 
-    atom_count = 0
-    atom_lines = []
+    # Pass 1: identify residues with at least one atom within cutoff
+    included_residues = set()
     for line in lines:
         if line.startswith('ATOM'):
-            charges = float(line[60:66])
             x_coord = float(line[30:38])
             y_coord = float(line[38:46])
             z_coord = float(line[46:54])
             atom_coord = np.array([x_coord, y_coord, z_coord])
             if np.sum((atom_coord - qm_centroid) ** 2) <= cutoff_distance_sq:
+                residue_name = line[17:20].strip()
+                chain_id = line[21].strip()
+                residue_id = line[22:26].strip()
+                included_residues.add((residue_name, chain_id, residue_id))
+
+    # Pass 2: collect all atoms belonging to included residues
+    atom_lines = []
+    for line in lines:
+        if line.startswith('ATOM'):
+            residue_name = line[17:20].strip()
+            chain_id = line[21].strip()
+            residue_id = line[22:26].strip()
+            if (residue_name, chain_id, residue_id) in included_residues:
                 atom_lines.append(line)
-                atom_count += 1
+
+    atom_count = len(atom_lines)
 
     with open(output_file_path, 'w') as output_file:
         output_file.write(f"{atom_count}\nGenerated from PDB file\n")

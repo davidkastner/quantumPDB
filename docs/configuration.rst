@@ -172,7 +172,9 @@ These parameters control ``qp submit`` (QM job creation and submission).
    * - ``charge_embedding_cutoff``
      - ``20``
      - Distance cutoff in angstroms for MM point charges, measured from the
-       QM cluster centroid.
+       QM cluster centroid. If any atom of a residue falls within this
+       distance, all atoms of that residue are included to preserve
+       integer per-residue charge contributions.
    * - ``charge_embedding_charges``
      - ``null``
      - Path to a JSON file with custom partial charges, keyed by residue

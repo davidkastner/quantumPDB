@@ -112,9 +112,11 @@ QuantumPDB generates ready-to-run QM input files and manages job submission.
      input CSV
 
 3. If charge embedding is enabled, MM point charges are placed around the
-   QM cluster within the cutoff distance. By default AMBER ff14SB charges
-   are used, but users can supply a custom charge file via
-   ``charge_embedding_charges``.
+   QM cluster within the cutoff distance. Selection is residue-based: if
+   any atom of a residue is within the cutoff, all atoms of that residue
+   are included to ensure integer per-residue charge sums. By default
+   AMBER ff14SB charges are used, but users can supply a custom charge
+   file via ``charge_embedding_charges``.
 4. Scheduler scripts (SLURM or SGE) are generated alongside the QM input.
 5. Jobs are submitted up to the ``job_count`` limit, with a ``.submit_record``
    file preventing duplicate submissions.
