@@ -10,9 +10,9 @@
 
     # Write alignment file
     >>> missing.write_alignment(
-    ...     residues, 
-    ...     pdb, 
-    ...     "path/to/PDB.pdb", 
+    ...     residues,
+    ...     pdb,
+    ...     "path/to/PDB.pdb",
     ...     "path/to/ALI.ali"
     ... )
     >P1;1lnh (template from original PDB file)
@@ -24,21 +24,28 @@
 
     # Run MODELLER with the given alignment file
     >>> missing.build_model(
-    ...     residues, 
-    ...     pdb, 
-    ...     "path/to/PDB.pdb", 
-    ...     "path/to/ALI.ali", 
+    ...     residues,
+    ...     pdb,
+    ...     "path/to/PDB.pdb",
+    ...     "path/to/ALI.ali",
     ...     "path/to/OUT.pdb"
     ... )
 
-Optimization level (``optimize`` argument in ``missing.build_model``): 
+Optimization level (``optimize`` argument in ``missing.build_model``):
 
 * 0. No optimization. Missing coordinates filled in using MODELLER's topology library.
 * 1. Optimize missing residues and residues with missing atoms only. (Default)
-* 2. Optimize the entire structure. Hetero atoms are included but treated as rigid bodies. 
+* 2. Optimize the entire structure. Hetero atoms are included but treated as rigid bodies.
+
+.. note::
+   Non-standard residues (substrates, cofactors, and other HETATM
+   entries) are preserved as rigid bodies by MODELLER and any missing
+   atoms in these residues will not be modeled.  A warning is emitted
+   listing the non-standard residues encountered during parsing.
 """
 
 import os
+import warnings
 from modeller import log, Environ, Selection
 from modeller.automodel import AutoModel
 from modeller import alignment, model
@@ -90,6 +97,12 @@ def get_residues(path, AA):
     records to identify gaps in the structure that need to be filled by
     MODELLER.
 
+    Non-standard residues (substrates, cofactors, and other HETATM
+    entries except water and selenomethionine) are treated as rigid
+    bodies by MODELLER.  Their existing coordinates are preserved, but
+    any missing atoms in these residues will not be modeled.  A warning
+    is emitted listing the non-standard residue names encountered.
+
     Parameters
     ----------
     path : str
@@ -114,6 +127,8 @@ def get_residues(path, AA):
     seen = {}
     residues = []
     cur = None
+    # Track non-standard residues to warn the user after parsing
+    nonstandard_residues = set()
 
     for line in p:
         if line.startswith("ENDMDL"):
@@ -161,6 +176,9 @@ def get_residues(path, AA):
 
             if line.startswith("HETATM") and res != "MSE":
                 resname = "w" if res == "HOH" else "."
+                # Track non-standard residues (exclude water and MSE)
+                if res != "HOH":
+                    nonstandard_residues.add(res)
             else:
                 resname = AA.get(res, ".")
             if ((rid, ic), resname) not in seen[chain]:
@@ -176,6 +194,16 @@ def get_residues(path, AA):
                 while ind[chain] < len(missing_residues[chain]):
                     residues[-1].append(missing_residues[chain][ind[chain]])
                     ind[chain] += 1
+
+    # Warn user about non-standard residues that MODELLER treats as rigid bodies
+    if nonstandard_residues:
+        names = ", ".join(sorted(nonstandard_residues))
+        warnings.warn(
+            f"Non-standard residues detected: {names}. These residues are "
+            f"preserved as rigid bodies by MODELLER and any missing atoms "
+            f"will not be modeled.",
+            stacklevel=2,
+        )
 
     return residues
 
