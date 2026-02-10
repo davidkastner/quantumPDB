@@ -53,7 +53,7 @@ def run(config):
     """Execute the structure preparation, protonation, and cluster extraction pipeline.
 
     This command runs stages 1-3 of the QuantumPDB workflow: fetching PDB
-    structures, modeling missing residues with MODELLER, assigning protonation
+    structures, modeling missing residues with Modeller, assigning protonation
     states with Protoss, and extracting QM cluster models using Voronoi
     tessellation.
     """
@@ -137,7 +137,7 @@ def run(config):
                 mod_path = f"{output}/{pdb}/{pdb}_modeller.pdb"
                 if modeller:
                     if skip in ["modeller", "all"] and os.path.isfile(mod_path) and not residues_with_clashes:
-                        click.echo("> MODELLER file found")
+                        click.echo("> Modeller file found")
                     else:
                         click.echo("> Building model")
                         AA = missing.define_residues()

@@ -7,7 +7,7 @@ import filecmp
 from qp.protonate import get_protoss, fix
 from qp.structure import struct_to_file
 
-# Skip MODELLER tests if in Github actions
+# Skip Modeller tests if in Github actions
 MISSING_LICENSE = False
 try:
     import modeller
@@ -76,7 +76,7 @@ def test_compute_charge(tmpdir, sample_pdb):
 
 # ========== missing_loops ==========
 
-@pytest.mark.skipif(MISSING_LICENSE, reason="MODELLER license not found")
+@pytest.mark.skipif(MISSING_LICENSE, reason="Modeller license not found")
 @pytest.mark.parametrize("sample_pdb", ["1lm6", "1sp9", "2q4a", "2r6s", "3a8g", "4ilv"], indirect=True)
 def test_write_alignment(tmpdir, sample_pdb):
     pdb, path = sample_pdb
@@ -91,7 +91,7 @@ def test_write_alignment(tmpdir, sample_pdb):
     assert filecmp.cmp(expected_ali, output_ali), "Alignment file does not match expected"
 
 
-@pytest.mark.skipif(MISSING_LICENSE, reason="MODELLER license not found")
+@pytest.mark.skipif(MISSING_LICENSE, reason="Modeller license not found")
 @pytest.mark.parametrize("sample_pdb", ["2r6s"], indirect=True)
 def test_build_model(tmpdir, sample_pdb):
     pdb, path = sample_pdb
@@ -110,7 +110,7 @@ def test_build_model(tmpdir, sample_pdb):
     with open(expected_modeller, "r") as e, open(output_modeller, "r") as o:
         expected_lines = e.readlines()
         output_lines = o.readlines()
-        assert expected_lines[1:] == output_lines[1:], "MODELLER output does not match expected"
+        assert expected_lines[1:] == output_lines[1:], "Modeller output does not match expected"
 
 
 # ========== struct_to_file ==========

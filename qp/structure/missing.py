@@ -1,4 +1,4 @@
-"""Build missing residues and atoms using MODELLER
+"""Build missing residues and atoms using Modeller
 
 **Usage**::
 
@@ -22,7 +22,7 @@
     sequence:::::::::
     MLGGLLHRGHKIKGTVVLMRKNVLDVNSVTSVGGIIGQGLDLVGSTLDTLTAFLGRSVSLQLISAT...
 
-    # Run MODELLER with the given alignment file
+    # Run Modeller with the given alignment file
     >>> missing.build_model(
     ...     residues,
     ...     pdb,
@@ -33,13 +33,13 @@
 
 Optimization level (``optimize`` argument in ``missing.build_model``):
 
-* 0. No optimization. Missing coordinates filled in using MODELLER's topology library.
+* 0. No optimization. Missing coordinates filled in using Modeller's topology library.
 * 1. Optimize missing residues and residues with missing atoms only. (Default)
 * 2. Optimize the entire structure. Hetero atoms are included but treated as rigid bodies.
 
 .. note::
    Non-standard residues (substrates, cofactors, and other HETATM
-   entries) are preserved as rigid bodies by MODELLER and any missing
+   entries) are preserved as rigid bodies by Modeller and any missing
    atoms in these residues will not be modeled.  A warning is emitted
    listing the non-standard residues encountered during parsing.
 """
@@ -95,11 +95,11 @@ def get_residues(path, AA):
 
     Parses REMARK 465 (missing residues) and REMARK 470 (missing atoms)
     records to identify gaps in the structure that need to be filled by
-    MODELLER.
+    Modeller.
 
     Non-standard residues (substrates, cofactors, and other HETATM
     entries except water and selenomethionine) are treated as rigid
-    bodies by MODELLER.  Their existing coordinates are preserved, but
+    bodies by Modeller.  Their existing coordinates are preserved, but
     any missing atoms in these residues will not be modeled.  A warning
     is emitted listing the non-standard residue names encountered.
 
@@ -195,12 +195,12 @@ def get_residues(path, AA):
                     residues[-1].append(missing_residues[chain][ind[chain]])
                     ind[chain] += 1
 
-    # Warn user about non-standard residues that MODELLER treats as rigid bodies
+    # Warn user about non-standard residues that Modeller treats as rigid bodies
     if nonstandard_residues:
         names = ", ".join(sorted(nonstandard_residues))
         warnings.warn(
             f"Non-standard residues detected: {names}. These residues are "
-            f"preserved as rigid bodies by MODELLER and any missing atoms "
+            f"preserved as rigid bodies by Modeller and any missing atoms "
             f"will not be modeled.",
             stacklevel=2,
         )
@@ -243,7 +243,7 @@ def clean_termini(residues):
     
 
 def write_alignment(residues, pdb, path, out):
-    """Write a MODELLER alignment file for filling missing residues.
+    """Write a Modeller alignment file for filling missing residues.
 
     Creates a PIR-format alignment file with two sequences: the template
     (with gaps for missing residues) and the target (complete sequence).
@@ -262,9 +262,9 @@ def write_alignment(residues, pdb, path, out):
     See Also
     --------
     https://salilab.org/modeller/10.4/manual/node501.html
-        MODELLER alignment file format documentation.
+        Modeller alignment file format documentation.
     https://salilab.org/modeller/wiki/Missing_residues
-        MODELLER missing residues tutorial.
+        Modeller missing residues tutorial.
     """
     seq = "/".join(
         "".join(res[1] if res[2] != "R" else "-" for res in chain) for chain in residues
@@ -280,7 +280,7 @@ def write_alignment(residues, pdb, path, out):
 def transfer_numbering(e, ali, path, out):
     """Transfer residue numbers and chain IDs from template to built model.
 
-    MODELLER restarts residue numbering at 1 and reassigns chain IDs. This
+    Modeller restarts residue numbering at 1 and reassigns chain IDs. This
     function restores the original numbering from the template PDB file.
     Insertion codes introduced by the transfer are corrected by
     :func:`fix_numbering`.
@@ -288,7 +288,7 @@ def transfer_numbering(e, ali, path, out):
     Parameters
     ----------
     e : modeller.Environ
-        MODELLER environment object.
+        Modeller environment object.
     ali : str
         Path to the alignment file.
     path : str
@@ -379,10 +379,10 @@ def fix_numbering(pdb_content):
 
 
 def build_model(residues, pdb, path, ali, out, optimize=1):
-    """Run MODELLER to build missing residues and atoms.
+    """Run Modeller to build missing residues and atoms.
 
     Constructs a complete model by filling in missing residues and atoms
-    using MODELLER's homology modeling capabilities. The level of
+    using Modeller's homology modeling capabilities. The level of
     structure optimization can be controlled.
 
     Parameters
@@ -394,7 +394,7 @@ def build_model(residues, pdb, path, ali, out, optimize=1):
     path : str
         Path to the template PDB file.
     ali : str
-        Path to the MODELLER alignment file.
+        Path to the Modeller alignment file.
     out : str
         Path to the output PDB file.
     optimize : int, optional
@@ -407,13 +407,13 @@ def build_model(residues, pdb, path, ali, out, optimize=1):
     Notes
     -----
     The output PDB file will have residue numbering transferred from the
-    template. MODELLER intermediate files are cleaned up automatically.
+    template. Modeller intermediate files are cleaned up automatically.
     """
     ali = os.path.abspath(ali)
     cwd = os.getcwd()
     dir = os.path.dirname(os.path.abspath(out))
     os.makedirs(dir, exist_ok=True)
-    os.chdir(dir) # MODELLER only supports writing files to the current working directory
+    os.chdir(dir) # Modeller only supports writing files to the current working directory
 
     class CustomModel(AutoModel):
         def get_model_filename(self, root_name, id1, id2, file_ext):
