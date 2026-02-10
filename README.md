@@ -39,6 +39,9 @@ git clone git@github.com:davidkastner/quantumPDB.git
 ### Creating python environment
 All the dependencies can be loaded together using the prebuilt environment.yml file.
 Compatibility is automatically tested for python versions 3.8 and higher.
+If you are using MODELLER, you must register for a MODELLER license key
+[here](https://salilab.org/modeller/registration.html) and set the environment
+variable KEY_MODELLER prior to installing the python environment.
 If you are only going to be using the package run:
 ```bash
 cd quantumPDB
