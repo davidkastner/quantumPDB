@@ -9,6 +9,7 @@ force fields.
 import os
 import json
 import shutil
+import warnings
 import numpy as np
 from qp.manager import ff14SB_dict
 from scipy.spatial import KDTree
@@ -121,16 +122,29 @@ def parse_pdb(input_pdb, output_pdb, ff_dict):
     ff_dict : dict
         Nested dict from :func:`~qp.manager.ff14SB_dict.get_ff14SB_dict`.
     """
+    skipped_residues = set()
     with open(input_pdb, 'r') as infile, open(output_pdb, 'w') as outfile:
         for line in infile:
             if line.startswith('ATOM'):
                 atom_name = line[12:16].strip()
                 residue_name = line[17:20].strip()
-                if atom_name in ff_dict.get(residue_name, {}):
+                if residue_name not in ff_dict:
+                    skipped_residues.add(residue_name)
+                    continue
+                if atom_name in ff_dict[residue_name]:
                     # Dump information into the B-factor column (columns 61-66)
                     ff_value = ff_dict[residue_name][atom_name]
                     line = line[:60] + f"{ff_value:>6.2f}" + line[66:]
                     outfile.write(line)
+    if skipped_residues:
+        warnings.warn(
+            f"The following residues were not found in the force field "
+            f"dictionary and were excluded from the MM point charge "
+            f"embedding: {', '.join(sorted(skipped_residues))}. To include "
+            f"these residues, supply custom charges via the "
+            f"'charge_embedding_charges' configuration option.",
+            stacklevel=2,
+        )
 
 def read_pdb(file_path):
     """Read a PDB file and extract ATOM record lines.

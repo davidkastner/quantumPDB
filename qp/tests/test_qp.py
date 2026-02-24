@@ -13,6 +13,7 @@ import pytest
 
 import qp
 from qp.manager.charge_embedding import load_custom_charges, get_charges, parse_pdb_to_xyz
+from qp.manager.job_scripts import write_qm
 
 
 def test_qp_imported():
@@ -170,3 +171,68 @@ def test_parse_pdb_to_xyz_residue_based_selection():
     finally:
         os.unlink(pdb_path)
         os.unlink(out_path)
+
+
+# --- Common kwargs for write_qm tests ---
+
+_BASE_QM_KWARGS = dict(
+    optimization=False,
+    coord_file="cluster.xyz",
+    basis="lacvps_ecp",
+    method="wpbeh",
+    total_charge=-1,
+    multiplicity=1,
+    guess="generate",
+    pcm_radii_file="/path/to/pcm_radii",
+    constraint_freeze="",
+    dielectric=10,
+)
+
+
+def test_write_qm_charge_embedding_only():
+    """Test that charge embedding without implicit solvent produces pointcharges but no PCM."""
+    result = write_qm(**_BASE_QM_KWARGS, use_charge_embedding=True, use_implicit_solvent=False)
+    assert "pointcharges ptchrges.xyz" in result
+    assert "pointcharges_self_interaction true" in result
+    assert "pcm cosmo" not in result
+    assert "epsilon" not in result
+
+
+def test_write_qm_implicit_solvent_only():
+    """Test that implicit solvent without charge embedding produces PCM but no pointcharges."""
+    result = write_qm(**_BASE_QM_KWARGS, use_charge_embedding=False, use_implicit_solvent=True)
+    assert "pcm cosmo" in result
+    assert "epsilon 10" in result
+    assert "pcm_radii_file /path/to/pcm_radii" in result
+    assert "pointcharges ptchrges.xyz" not in result
+
+
+def test_write_qm_both_enabled():
+    """Test that both charge embedding and implicit solvent can be enabled together."""
+    result = write_qm(**_BASE_QM_KWARGS, use_charge_embedding=True, use_implicit_solvent=True)
+    assert "pointcharges ptchrges.xyz" in result
+    assert "pointcharges_self_interaction true" in result
+    assert "pcm cosmo" in result
+    assert "epsilon 10" in result
+    assert "pcm_radii_file /path/to/pcm_radii" in result
+
+
+def test_write_qm_neither_enabled():
+    """Test that disabling both produces neither PCM nor pointcharges blocks."""
+    result = write_qm(**_BASE_QM_KWARGS, use_charge_embedding=False, use_implicit_solvent=False)
+    assert "pointcharges ptchrges.xyz" not in result
+    assert "pcm cosmo" not in result
+    # Core keywords should still be present
+    assert "method wpbeh" in result
+    assert "basis lacvps_ecp" in result
+
+
+def test_write_qm_backward_compatible_default():
+    """Test that omitting use_implicit_solvent defaults to True (PCM on).
+
+    This preserves backward compatibility for callers that do not pass
+    the new parameter.
+    """
+    result = write_qm(**_BASE_QM_KWARGS, use_charge_embedding=False)
+    assert "pcm cosmo" in result
+    assert "pointcharges ptchrges.xyz" not in result

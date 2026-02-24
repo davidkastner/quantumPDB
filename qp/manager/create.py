@@ -261,7 +261,7 @@ def get_charge(structure_dir=None):
     return charge, spin
 
 
-def create_jobs(pdb_list_path, output_dir, optimization, basis, method, guess, use_charge_embedding, charge_embedding_cutoff, charge_embedding_charges, gpus, memory, scheduler, pcm_radii_file, dielectric):
+def create_jobs(pdb_list_path, output_dir, optimization, basis, method, guess, use_charge_embedding, charge_embedding_cutoff, charge_embedding_charges, gpus, memory, scheduler, pcm_radii_file, dielectric, use_implicit_solvent=True):
     """Generate QM job input files for all extracted clusters.
 
     Creates TeraChem input files (``qmscript.in``) and scheduler submission
@@ -300,6 +300,9 @@ def create_jobs(pdb_list_path, output_dir, optimization, basis, method, guess, u
         Path to PCM radii file for implicit solvent.
     dielectric : float
         Dielectric constant for PCM solvent model.
+    use_implicit_solvent : bool, optional
+        If True, include PCM implicit solvent in TeraChem input. Can be
+        enabled alongside ``use_charge_embedding``. Default is True.
     """
 
     orig_dir = os.getcwd()
@@ -342,10 +345,10 @@ def create_jobs(pdb_list_path, output_dir, optimization, basis, method, guess, u
             job_name = f"{pdb_name}{structure_name}"
             
             if scheduler == "slurm":
-                qmscript = job_scripts.write_qm(optimization, coord_file, basis, method, total_charge, multiplicity, guess, pcm_radii_file, constraint_freeze, dielectric, use_charge_embedding)
+                qmscript = job_scripts.write_qm(optimization, coord_file, basis, method, total_charge, multiplicity, guess, pcm_radii_file, constraint_freeze, dielectric, use_charge_embedding, use_implicit_solvent)
                 jobscript = job_scripts.write_slurm_job(job_name, gpus, memory)
             if scheduler == "sge":
-                qmscript = job_scripts.write_qm(optimization, coord_file, basis, method, total_charge, multiplicity, guess, pcm_radii_file, constraint_freeze, dielectric, use_charge_embedding)
+                qmscript = job_scripts.write_qm(optimization, coord_file, basis, method, total_charge, multiplicity, guess, pcm_radii_file, constraint_freeze, dielectric, use_charge_embedding, use_implicit_solvent)
                 jobscript = job_scripts.write_sge_job(job_name, gpus, memory)
             
             with open('qmscript.in', 'w') as f:
