@@ -298,10 +298,14 @@ def run(config):
                 if v:
                     click.echo(click.style(k + " errors: ", bold=True, fg="red") + ", ".join(v))
     
-        except:
+        except Exception as e:
             # Log the exception details to stderr, which is already redirected to log.out
             click.echo(f"> CRITICAL FAILURE: Error processing {pdb.upper()}", err=True)
             traceback.print_exc(file=sys.stderr)
+            # if keyboard interrupt, exit the program
+            if isinstance(e, KeyboardInterrupt):
+                click.echo(f"> Keyboard interrupt detected. Exiting program.")
+                exit()
 
 
 @cli.command()
