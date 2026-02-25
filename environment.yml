@@ -7,7 +7,6 @@ dependencies:
   - python=3.8
   - biopython
   - click
-  - importlib
   - matplotlib
   - modeller
   - numpy

@@ -1,12 +1,12 @@
 """Stored job submission scripts"""
 
-def write_qm(optimization, coord_file, basis, method, total_charge, multiplicity, guess, pcm_radii_file, constraint_freeze, dielectric, use_charge_embedding):
+def write_qm(optimization, coord_file, basis, method, total_charge, multiplicity, guess, pcm_radii_file, constraint_freeze, dielectric, use_charge_embedding, use_implicit_solvent=True):
     """Generate a TeraChem input file (qmscript.in).
 
     Creates the input file content for TeraChem with the specified
     calculation parameters. Supports both single-point energy and
-    geometry optimization calculations with either PCM implicit solvent
-    or explicit point charge embedding.
+    geometry optimization calculations. PCM implicit solvent and
+    point charge embedding can be enabled independently or together.
 
     Parameters
     ----------
@@ -31,7 +31,11 @@ def write_qm(optimization, coord_file, basis, method, total_charge, multiplicity
     dielectric : float
         Dielectric constant for PCM solvent.
     use_charge_embedding : bool
-        If True, use point charges instead of PCM.
+        If True, include MM point charges from ``ptchrges.xyz``.
+    use_implicit_solvent : bool, optional
+        If True, include PCM implicit solvent (COSMO) block. Can be
+        enabled alongside ``use_charge_embedding`` for combined
+        QM/MM + implicit solvent calculations. Default is True.
 
     Returns
     -------
@@ -41,18 +45,21 @@ def write_qm(optimization, coord_file, basis, method, total_charge, multiplicity
 
     minimization_keywords = """new_minimizer yes\nrun minimize\n""" if optimization else ""
 
-    if use_charge_embedding:
-        pcm_section = ""
-        pointcharges_section = """pointcharges ptchrges.xyz
-pointcharges_self_interaction true
-"""
-    else:
+    if use_implicit_solvent:
         pcm_section = f"""pcm cosmo
 epsilon {dielectric}
 pcm_radii read
 pcm_radii_file {pcm_radii_file}
 pcm_matrix no
 """
+    else:
+        pcm_section = ""
+
+    if use_charge_embedding:
+        pointcharges_section = """pointcharges ptchrges.xyz
+pointcharges_self_interaction true
+"""
+    else:
         pointcharges_section = ""
 
 

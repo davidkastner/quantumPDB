@@ -163,6 +163,14 @@ These parameters control ``qp submit`` (QM job creation and submission).
      - ``10``
      - Dielectric constant for implicit solvent (PCM). Use ``10`` for
        protein interior, ``78.4`` for aqueous solvent.
+   * - ``use_implicit_solvent``
+     - ``not charge_embedding``
+     - Enable PCM implicit solvent (COSMO). Defaults to ``true`` when
+       ``charge_embedding`` is ``false``, and ``false`` when
+       ``charge_embedding`` is ``true``, preserving backward-compatible
+       behavior. Set explicitly to ``true`` alongside
+       ``charge_embedding: true`` to use both MM point charges and
+       implicit solvent simultaneously.
    * - ``charge_embedding``
      - ``false``
      - Include MM point charges around the QM cluster. By default uses
