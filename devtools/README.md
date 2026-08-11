@@ -29,7 +29,8 @@ This directory contains OS agnostic helper scripts which don't fall in any of th
 - Clone the repository if you have write access to the main repo, fork the repository if you are a collaborator.
 - Make a new branch with `git checkout -b {your branch name}`
 - Make changes and test your code
-- Ensure that the test environment dependencies (`conda-envs`) line up with the build and deploy dependencies (`conda-recipe/meta.yaml`)
+- Ensure that the test environment dependencies (`conda-envs/test_env.yaml`)
+  stay aligned with `environment.yml` and `docs/requirements.yaml`
 - Push the branch to the repo (either the main or your fork) with `git push -u origin {your branch name}`
   * Note that `origin` is the default name assigned to the remote, yours may be different
 - Make a PR on GitHub with your changes

@@ -1,7 +1,14 @@
 input: [1sp9, 2q4a, 3a8g, 3x20, 6f2a]
 output_dir: qp/tests/samples
+<<<<<<< HEAD
+modeller: false
+protoss: false
+find_backbone_atoms: true
+=======
 modeller: true
 protoss: true
+find_backbone_atoms:true
+>>>>>>> 0c142f3 (restored original samples.yaml)
 coordination: true
 skip: all
 optimize_select_residues: 1

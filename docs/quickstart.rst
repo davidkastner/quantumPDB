@@ -5,10 +5,13 @@ This guide walks through a minimal example: generating a QM cluster model for
 **taurine dioxygenase (TauD)**, a mononuclear non-heme iron enzyme (PDB: `1OS7
 <https://www.rcsb.org/structure/1OS7>`_).
 
+The same configuration also lives under ``example/basics/`` so you can run it
+directly from a clone of the repository.
+
 1. Create the Configuration File
 ---------------------------------
 
-Create a file called ``config.yaml``:
+Create a file called ``config.yaml`` (or use ``example/basics/cluster_only.yaml``):
 
 .. code-block:: yaml
 
@@ -40,6 +43,12 @@ This tells QuantumPDB to:
 
    qp run -c config.yaml
 
+Or, from the repository root:
+
+.. code-block:: bash
+
+   qp run -c example/basics/cluster_only.yaml
+
 QuantumPDB processes the structure through three stages:
 
 1. **Structure preparation** --- Modeller rebuilds missing atoms, residues, and
@@ -52,7 +61,7 @@ QuantumPDB processes the structure through three stages:
 3. Expected Output
 -------------------
 
-After a successful run, the output directory will contain:
+After a successful run, the output directory will contain something like:
 
 .. code-block:: text
 
@@ -65,37 +74,42 @@ After a successful run, the output directory will contain:
        │   ├── 1os7_protoss.pdb      # Protonated structure
        │   ├── 1os7_protoss_orig.pdb # Pre-active-site-fix copy
        │   ├── 1os7_ligands.sdf      # Ligand structures (SDF)
-       │   └── 1os7_log.txt          # Protoss log
-       ├── charge.csv                # Per-residue charges
+       │   └── 1os7_log.txt          # Protoss clash log (empty under API v2)
+       ├── charge.csv                # Per-cluster / per-sphere charges
        ├── count.csv                 # Residue counts per sphere
-       └── FE_A501/                  # Cluster directory (one per center)
-           ├── 1/                    # Sphere 1
-           │   ├── cluster.pdb
-           │   └── cluster.xyz
-           └── 2/                    # Sphere 2 (includes sphere 1)
-               ├── cluster.pdb
-               └── cluster.xyz
+       └── A501/                     # Cluster directory named by metal_id
+           ├── 0.pdb                 # Center residue(s)
+           ├── 1.pdb                 # First interaction sphere
+           ├── 2.pdb                 # Second sphere (includes sphere 1)
+           ├── A501.pdb              # Combined cluster PDB
+           └── A501.xyz              # Combined cluster XYZ
 
-Each cluster directory is named by the center residue, chain, and residue
-number (e.g., ``FE_A501`` for iron at position 501 on chain A). Numbered
-subdirectories contain progressively larger clusters.
+Each cluster directory is named by the matched center residue ID
+(``metal_id``), for example ``A501`` for the iron at position 501 on chain A.
+Numbered ``{i}.pdb`` files are cumulative sphere models; the combined
+``{metal_id}.pdb`` / ``.xyz`` files are what ``qp submit`` uses.
+
+For ground-truth examples of this layout, see the regression samples under
+``qp/tests/samples/`` (for example ``1lm6/A204/``).
 
 4. Inspecting the Results
 --------------------------
 
 Open the cluster PDB files in a molecular viewer such as PyMOL or VMD to
 verify that the active site is correctly captured. The ``charge.csv`` file
-records the computed net charge for each residue, and ``count.csv`` lists
-the number of residues in each interaction sphere.
+records net charge per cluster and sphere, and ``count.csv`` lists residue
+composition in each interaction sphere. See :doc:`output` for exact formats.
 
 Next Steps
 ----------
 
 - **Multiple structures:** Use a CSV input file to process many PDBs at once
   (see :doc:`input_formats`)
-- **QM calculations:** Set up TeraChem or ORCA job files with ``qp submit``
-  (see :doc:`cli`)
-- **Analysis:** Run charge scheme analysis with ``qp analyze``
-  (see :doc:`cli`)
+- **Cluster options:** Tune spheres, smoothing, capping, and naming
+  (see :doc:`cluster_models`)
+- **QM calculations:** Create TeraChem job files with ``qp submit``
+  (see :doc:`qm_jobs`)
+- **Analysis:** Run checkup and Multiwfn post-processing with ``qp analyze``
+  (see :doc:`analysis`)
 - **Configuration:** Fine-tune parameters for your system
   (see :doc:`configuration`)

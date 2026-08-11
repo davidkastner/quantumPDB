@@ -1,0 +1,18 @@
+# SUBMIT — TeraChem jobs with MM charge embedding and PCM
+input: example/basics/proteins.csv
+output_dir: example/basics/output
+optimization: false
+method: wpbeh
+basis: lacvps_ecp
+guess: generate
+gpus: 1
+memory: 8G
+dielectric: 10
+charge_embedding: true
+charge_embedding_cutoff: 20
+charge_embedding_charges: example/basics/custom_charges.json
+use_implicit_solvent: true
+scheduler: slurm
+create_jobs: true
+submit_jobs: false
+job_count: 80

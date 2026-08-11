@@ -1,0 +1,14 @@
+# RUN — minimal TauD / 1OS7 cluster generation
+input: 1OS7
+output_dir: example/basics/output
+modeller: true
+protoss: true
+coordination: true
+skip: all
+center_residues: [FE]
+number_of_spheres: 2
+smoothing_method: 2
+capping_method: 1
+compute_charges: true
+count_residues: true
+write_xyz: true

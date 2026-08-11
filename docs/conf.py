@@ -56,7 +56,7 @@ extensions = [
 ]
 
 autosummary_generate = True
-autosummary_generate_overwrite = True
+autosummary_generate_overwrite = False
 autosummary_imported_members = False
 autodoc_member_order = "bysource"
 autodoc_default_options = {
@@ -96,7 +96,12 @@ language = "en"
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path .
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
+exclude_patterns = [
+    "_build",
+    "Thumbs.db",
+    ".DS_Store",
+    "autosummary/qp.cluster.spheres_bad*",
+]
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = "default"
@@ -134,18 +139,18 @@ html_context = {
     "style": "dark",
     "landing_page": {
         "menu": [
-            {"title": "quantumpdb", "url": "https://quantumpdb.readthedocs.io/"},
+            {"title": "quantumpdb", "url": "index.html"},
             {
                 "title": "Installation",
-                "url": "https://quantumpdb.readthedocs.io/en/latest/getting_started.html",
+                "url": "getting_started.html",
             },
             {
                 "title": "Quickstart",
-                "url": "https://quantumpdb.readthedocs.io/en/latest/quickstart.html",
+                "url": "quickstart.html",
             },
             {
                 "title": "User Guide",
-                "url": "https://quantumpdb.readthedocs.io/en/latest/cli.html",
+                "url": "workflow.html",
             },
         ]
     }

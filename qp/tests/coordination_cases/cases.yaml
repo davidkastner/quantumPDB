@@ -1,0 +1,72 @@
+# Shared cluster parameters for all coordination integration cases.
+defaults:
+  modeller: true
+  protoss: true
+  coordination: true
+  skip: all
+  number_of_spheres: 3
+  radius_of_first_sphere: 4.0
+  capping_method: 1
+  smoothing_method: 2
+  include_ligands: 2
+  compute_charges: true
+  write_hetero_pdb: true
+  count_residues: true
+  write_xyz: true
+  additional_ligands: []
+  merge_distance_cutoff: 0.0
+  optimize_select_residues: 1
+
+cases:
+  - case: ASP_proton
+    pdb: 1k6w
+    center_residues: [FE]
+  - case: CSS_ligand
+    pdb: 4kwk
+    center_residues: [FE2]
+  - case: CYS_ligand
+    pdb: 4qm9
+    center_residues: [FE]
+  - case: GLU_proton
+    pdb: 2ji1
+    center_residues: [FE2]
+  - case: HIS_flipping
+    pdb: 6f2a
+    center_residues: [FE2]
+  - case: cluster_smoothing
+    pdb: 6b9t
+    center_residues: [FE]
+  - case: deprotonated_HIS
+    pdb: 3hpv
+    center_residues: [FE2]
+  - case: nitrile_hydratase_NO
+    pdb: 2ahj
+    center_residues: [FE]
+  - case: nitrile_hydratase_covalent
+    pdb: 3x20
+    center_residues: [FE]
+  - case: nitrile_hydratase_isonitrile
+    pdb: 2zpg
+    center_residues: [FE]
+  - case: oxygen
+    pdb: 1yfw
+    center_residues: [FE]
+  - case: partial_occupancy_AA_gt_other
+    pdb: 5i0r
+    center_residues: [FE]
+  - case: partial_occupancy_large_gt_small
+    pdb: 4xez
+    center_residues: [FE]
+  - case: fake_N_terminus
+    pdb: 1lt3
+    center_residues: [GAL]
+  - case: atom_count
+    pdb: 2d6o
+    center_residues: [GAL]
+  - case: polysacchride
+    pdb: 2wt1
+    center_residues: [GAL]
+  - case: terminal_ligand
+    pdb: 1jyn
+    center_residues: [GAL]
+    number_of_spheres: 2

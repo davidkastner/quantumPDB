@@ -25,7 +25,13 @@ def test_parse_input(tmpdir):
     with open(pdb_path, "w") as f:
         pass
     input_pdbs = [batch, "3a8g", pdb_path]
-    
-    expected_pdbs = [(p, os.path.join(tmpdir, p, f"{p}.pdb")) for p in pdbs]
-    output_pdbs = setup.parse_input(input_pdbs, tmpdir)
+    center_yaml_residues = ["FE", "FE2"]
+
+    expected_pdbs = [(p, os.path.join(tmpdir, p, f"{p}.pdb"), None) for p in pdbs]
+    # Local .pdb path keeps the absolute input path rather than the download target
+    expected_pdbs[-1] = ("4ilv", pdb_path, None)
+    output_pdbs, output_centers = setup.parse_input(
+        input_pdbs, tmpdir, center_yaml_residues
+    )
     assert expected_pdbs == output_pdbs, "Parsed input does not match expected"
+    assert output_centers == center_yaml_residues, "Center residues do not match expected"

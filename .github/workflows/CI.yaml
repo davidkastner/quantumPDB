@@ -1,8 +1,6 @@
 name: CI
 
 on:
-  # GitHub has started calling new repo's first branch "main" https://github.com/github/renaming
-  # The cookiecutter uses the "--initial-branch" flag when it runs git-init
   push:
     branches:
       - "main"
@@ -10,22 +8,46 @@ on:
     branches:
       - "main"
   schedule:
-    # Weekly tests run on main by default:
-    #   Scheduled workflows run on the latest commit on the default or base branch.
-    #   (from https://help.github.com/en/actions/reference/events-that-trigger-workflows#scheduled-events-schedule)
+    # Weekly smoke on the default branch (same as PR matrix)
     - cron: "0 0 * * 0"
+  workflow_dispatch:
+    inputs:
+      os:
+        description: Runner OS
+        required: true
+        default: ubuntu-latest
+        type: choice
+        options:
+          - ubuntu-latest
+          - macos-latest
+      python-version:
+        description: Python version
+        required: true
+        default: "3.12"
+        type: choice
+        options:
+          - "3.10"
+          - "3.11"
+          - "3.12"
+
+defaults:
+  run:
+    shell: bash -el {0}
 
 jobs:
   test:
-    name: Test on ${{ matrix.os }}, Python ${{ matrix.python-version }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [macOS-latest, ubuntu-latest, windows-latest]
-        python-version: [3.8, 3.9, "3.10"]
+    name: Test on ${{ github.event.inputs.os || 'ubuntu-latest' }}, Python ${{ github.event.inputs.python-version || '3.12' }}
+    runs-on: ${{ github.event.inputs.os || 'ubuntu-latest' }}
+    env:
+      # Consumed by the salilab modeller post-link script during install.
+      # Also used below to rewrite config.py when the env is restored from cache.
+      KEY_MODELLER: ${{ secrets.MODELLER_LICENSE_KEY }}
+      # Fail fast on ProteinsPlus outages; live Protoss tests skip instead of fail.
+      PROTOSS_UPLOAD_RETRIES: "1"
+      PROTOSS_UPLOAD_RETRY_DELAY: "5"
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Additional info about the build
         shell: bash
@@ -34,31 +56,89 @@ jobs:
           df -h
           ulimit -a
 
-      # More info on options: https://github.com/marketplace/actions/provision-with-micromamba
-      - uses: mamba-org/provision-with-micromamba@main
+      - uses: mamba-org/setup-micromamba@v2
         with:
           environment-file: devtools/conda-envs/test_env.yaml
           environment-name: test
-          channels: conda-forge,defaults
-          extra-specs: |
-            python=${{ matrix.python-version }}
+          create-args: >-
+            python=${{ github.event.inputs.python-version || '3.12' }}
+          cache-environment: true
+          condarc: |
+            channels:
+              - conda-forge
+              - salilab
+            channel_priority: strict
+
+      - name: Configure Modeller license
+        run: |
+          if [ -z "${KEY_MODELLER}" ]; then
+            echo "::error::MODELLER_LICENSE_KEY secret is empty or unavailable"
+            exit 1
+          fi
+          python <<'PY'
+          import glob
+          import os
+          import sys
+
+          key = os.environ["KEY_MODELLER"]
+          matches = sorted(
+              glob.glob(
+                  os.path.join(
+                      sys.prefix, "lib", "modeller-*", "modlib", "modeller", "config.py"
+                  )
+              )
+          )
+          if not matches:
+              raise SystemExit(f"Could not find modeller config.py under {sys.prefix}")
+          path = matches[-1]
+          install_dir = os.path.abspath(
+              os.path.join(os.path.dirname(path), os.pardir, os.pardir)
+          )
+          with open(path, "w", encoding="utf-8") as fh:
+              fh.write(f"install_dir = {install_dir!r}\n")
+              fh.write(f"license = {key!r}\n")
+          print(f"Configured Modeller license at {path}")
+          PY
+          python -c "import modeller; print('modeller import ok:', getattr(modeller, '__version__', 'unknown'))"
 
       - name: Install package
-        # conda setup requires this special shell
-        shell: bash -l {0}
         run: |
           python -m pip install . --no-deps
           micromamba list
 
       - name: Run tests
-        # conda setup requires this special shell
-        shell: bash -l {0}
         run: |
           pytest -v --cov=qp --cov-report=xml --color=yes qp/tests/
 
       - name: CodeCov
-        uses: codecov/codecov-action@v1
+        uses: codecov/codecov-action@v5
         with:
-          file: ./coverage.xml
+          files: ./coverage.xml
           flags: unittests
-          name: codecov-${{ matrix.os }}-py${{ matrix.python-version }}
+          name: codecov-${{ github.event.inputs.os || 'ubuntu-latest' }}-py${{ github.event.inputs.python-version || '3.12' }}
+          fail_ci_if_error: false
+
+  docs:
+    name: Build Sphinx docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: docs/requirements.yaml
+          environment-name: docs
+          cache-environment: true
+          condarc: |
+            channels:
+              - conda-forge
+            channel_priority: strict
+
+      - name: Install package
+        run: |
+          python -m pip install . --no-deps
+
+      - name: Build HTML documentation
+        run: |
+          cd docs
+          make html

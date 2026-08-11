@@ -1,4 +1,4 @@
-qp.structure.setup
+﻿qp.structure.setup
 ==================
 
 .. automodule:: qp.structure.setup
@@ -12,6 +12,7 @@ qp.structure.setup
       :toctree:
       :nosignatures:
    
+      ensure_structure_pdb
       fetch_pdb
       get_centers
       get_pdbs

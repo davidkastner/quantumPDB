@@ -4,14 +4,6 @@
 .. automodule:: qp.cluster
    :no-members:
 
-   
-   
-   
-
-   
-   
-   
-
 
 
 .. rubric:: Submodules
@@ -22,6 +14,9 @@
 
    qp.cluster.charge_count
    qp.cluster.spheres
-   qp.cluster.spheres_bad
    qp.cluster.struct_to_file
 
+.. note::
+
+   The legacy module ``qp.cluster.spheres_bad`` is intentionally omitted from
+   this index. Use ``qp.cluster.spheres``.

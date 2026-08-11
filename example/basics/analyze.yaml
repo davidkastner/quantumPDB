@@ -1,0 +1,10 @@
+# ANALYZE — checkup + Multiwfn post-processing flags
+input: example/basics/proteins.csv
+output_dir: example/basics/output
+method: wpbeh
+job_checkup: true
+delete_queued: false
+multiwfn_path: Multiwfn
+charge_scheme: Hirshfeld
+calc_charge_schemes: false
+calc_dipole: false

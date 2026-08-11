@@ -1,0 +1,15 @@
+# SUBMIT — create TeraChem jobs from clusters produced under example/basics/output
+input: example/basics/proteins.csv
+output_dir: example/basics/output
+optimization: false
+method: wpbeh
+basis: lacvps_ecp
+guess: generate
+gpus: 1
+memory: 8G
+dielectric: 10
+charge_embedding: false
+scheduler: slurm
+create_jobs: true
+submit_jobs: false
+job_count: 80

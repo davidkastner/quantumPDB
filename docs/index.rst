@@ -18,7 +18,7 @@ faithfully capture the chemical environment, even for non-spherical active sites
 
    `Installation <getting_started.html>`_
    `Quickstart <quickstart.html>`_
-   `Configuration <configuration.html>`_
+   `Workflow <workflow.html>`_
    `GitHub <https://github.com/davidkastner/quantumpdb>`_
 
 .. toctree::
@@ -31,14 +31,24 @@ faithfully capture the chemical environment, even for non-spherical active sites
 
 .. toctree::
    :maxdepth: 2
-   :caption: User Guide
+   :caption: Core Workflow
    :hidden:
 
    workflow
    input_formats
+   cluster_models
+   qm_jobs
+   analysis
+   output
    configuration
    cli
-   output
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Advanced Workflows
+   :hidden:
+
+   special_workflows
 
 .. toctree::
    :maxdepth: 2

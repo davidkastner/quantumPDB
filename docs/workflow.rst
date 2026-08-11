@@ -21,7 +21,11 @@ or entire loops due to crystallographic disorder. QuantumPDB uses
 
 **What happens:**
 
-1. The PDB file is fetched from the RCSB (or read from a local path).
+1. The structure is fetched from the RCSB or read from a local path. Classic
+   PDB is preferred; if only mmCIF is available (or a local ``.cif`` /
+   ``.mmcif`` is supplied), QuantumPDB converts it to classic PDB and may
+   write a ``*_mmcif_remap.json`` sidecar. Oversized structures (>99999 atoms
+   or >62 chains) are skipped in batch mode. See :doc:`input_formats`.
 2. REMARK 465 (missing residues) and REMARK 470 (missing atoms) records are
    parsed to identify gaps.
 3. Unresolved terminal residues are trimmed (they cannot be reliably modeled).
@@ -47,9 +51,12 @@ hydrogen positions and resolves alternate conformations.
 1. Partial occupancy is resolved by selecting a self-consistent coordinate set,
    prioritizing center residues and canonical amino acids.
 2. The structure is uploaded to Protoss for protonation.
-3. The Protoss log is checked for steric clashes. If clashes are found, the
-   problematic residues are removed and rebuilt by Modeller. This feedback
-   loop repeats up to ``max_clash_refinement_iter`` times (default: 5).
+3. Historically, the Protoss clash log was checked for steric clashes so that
+   problematic residues could be removed and rebuilt by Modeller (up to
+   ``max_clash_refinement_iter`` times). ProteinsPlus API v2 no longer
+   exposes this log, so that feedback loop is currently inactive; the
+   ``*_log.txt`` file is written empty as a placeholder. If residues appear
+   to be missing after protonation, inspect the structure manually.
 4. Metalloenzyme-specific corrections are applied:
 
    - Histidine ring flips for metal coordination
@@ -87,11 +94,15 @@ cluster model.
 7. Net charges are computed from protonation states, ionizable side chains,
    and user-provided metal oxidation states.
 
-**Output:** Per-center directories containing ``cluster.pdb`` and
-``cluster.xyz`` for each sphere level, plus ``charge.csv`` and ``count.csv``.
+**Output:** Per-center directories named by ``metal_id`` containing cumulative
+``0.pdb``, ``1.pdb``, ... sphere models plus combined ``{metal_id}.pdb`` /
+``.xyz``, along with ``charge.csv`` and ``count.csv``. See :doc:`output` and
+:doc:`cluster_models`.
 
-Cluster extraction is performed **per chain** --- a multi-chain protein produces
-separate clusters for each chain that contains a matching center residue.
+Cluster extraction is performed **per matched center set**, not strictly per
+chain. A multi-chain protein produces a separate cluster for each matching
+center (or merged center group). Matching centers on different chains remain
+separate unless you merge them with dash syntax or ``merge_distance_cutoff``.
 
 Stage 4: Job Management
 ------------------------
@@ -99,12 +110,13 @@ Stage 4: Job Management
 **Module:** ``qp.manager``
 
 QuantumPDB generates ready-to-run QM input files and manages job submission.
+See :doc:`qm_jobs` for a full walkthrough.
 
 **What happens:**
 
-1. For each cluster, a QM input file is generated for TeraChem (primary) or
-   ORCA (alternative) with the specified method, basis set, and electronic
-   state.
+1. For each cluster, a TeraChem input file (``qmscript.in``) is generated with
+   the specified method, basis set, and electronic state. The current job
+   generator is TeraChem-only.
 2. The electronic state (charge and spin multiplicity) is computed from:
 
    - The cluster's ``charge.csv`` and ``spin.csv`` (from Stages 2--3)
@@ -129,6 +141,7 @@ Stage 5: Analysis
 **Module:** ``qp.analyze``
 
 Post-processing extracts electronic properties from completed QM calculations.
+See :doc:`analysis` for details.
 
 **What happens:**
 

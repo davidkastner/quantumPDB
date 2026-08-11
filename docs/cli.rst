@@ -62,9 +62,9 @@ Create and submit QM calculation job files.
 
 This command has two sub-steps controlled by separate flags:
 
-1. **Create job files** (``create_jobs: true``) --- Generates TeraChem or ORCA
-   input scripts for each cluster, including scheduler submission scripts
-   (SLURM or SGE).
+1. **Create job files** (``create_jobs: true``) --- Generates TeraChem
+   ``qmscript.in`` files for each cluster, including scheduler submission
+   scripts (SLURM or SGE). The current job generator is TeraChem-only.
 2. **Submit jobs** (``submit_jobs: true``) --- Submits the generated jobs to the
    scheduler, up to ``job_count`` concurrent jobs.
 
@@ -105,9 +105,10 @@ This command has two sub-steps controlled by separate flags:
 
 .. note::
 
-   The ``submit`` command requires a CSV input file with ``oxidation`` and
-   ``multiplicity`` columns so that the correct electronic state can be set in
-   the QM input files.
+   Unlike ``qp run``, ``qp submit`` requires ``input`` to be a path to an
+   existing CSV file. That CSV must include ``oxidation`` and ``multiplicity``
+   columns so the correct electronic state can be set in the QM input files.
+   See :doc:`qm_jobs`.
 
 qp analyze
 ----------

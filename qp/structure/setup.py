@@ -6,6 +6,8 @@ import sys
 import yaml
 import requests
 
+from qp.structure.mmcif_to_pdb import OversizedStructureError, convert_mmcif_to_pdb
+
 
 def read_config(config_file):
     """Read and parse a YAML configuration file.
@@ -34,7 +36,7 @@ def parse_input(input, output, center_yaml_residues):
     Parameters
     ----------
     input : str or list
-        Input specification: PDB code(s), path to PDB file(s), or path to CSV.
+        Input specification: PDB code(s), path to PDB/mmCIF file(s), or path to CSV.
     output : str
         Path to the output directory.
     center_yaml_residues : list
@@ -44,8 +46,9 @@ def parse_input(input, output, center_yaml_residues):
     -------
     tuple of (list, list)
         ``(pdb_all, center_residues)`` where ``pdb_all`` is a list of
-        ``(pdb_id, pdb_path)`` tuples and ``center_residues`` is a list
-        of center definition strings.
+        ``(pdb_id, pdb_path, source_cif)`` tuples and ``center_residues`` is a
+        list of center definition strings. ``source_cif`` is a local mmCIF
+        path when the user supplied ``.cif``/``.mmcif``, otherwise ``None``.
 
     Raises
     ------
@@ -84,7 +87,11 @@ def parse_input(input, output, center_yaml_residues):
 
 def fetch_pdb(pdb, out):
     """
-    Fetches the PDB file for a given PDB code.
+    Fetch a structure for a PDB code, falling back to mmCIF when needed.
+
+    Tries the classic PDB download first. If RCSB returns 404 (common for
+    entries with ``pdb_format_compatible = N``), downloads the mmCIF and
+    converts it to ``out``.
 
     Parameters
     ----------
@@ -93,31 +100,84 @@ def fetch_pdb(pdb, out):
     out: str
         Path to output PDB file
 
+    Returns
+    -------
+    str
+        ``"pdb"`` if a classic PDB was downloaded, or ``"mmcif"`` if the
+        file was obtained via mmCIF conversion.
+
     Raises
     ------
     ValueError
-        If the PDB ID returns a 404 error (invalid user input).
+        If neither PDB nor mmCIF is available for the ID.
     IOError
         If there is a network or server-side error.
     """
-    url = f"https://files.rcsb.org/view/{pdb}.pdb"
+    pdb = pdb.strip()
+    out = os.path.abspath(out)
+    os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
+
+    pdb_url = f"https://files.rcsb.org/download/{pdb}.pdb"
     try:
-        r = requests.get(url, timeout=15)
+        r = requests.get(pdb_url, timeout=30)
     except requests.exceptions.RequestException as e:
-        # Raise an IOError for network-level problems
         raise IOError(f"Could not connect to the server. Details: {e}")
 
-    # Check the status code from the server's response
     if r.status_code == 200:
-        os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
         with open(out, "w") as f:
             f.write(r.text)
-    elif r.status_code == 404:
-        # Raise a ValueError for an invalid PDB ID
-        raise ValueError(f"PDB ID '{pdb}' is not valid or does not exist.")
-    else:
-        # Raise an IOError for other server-side problems
+        return "pdb"
+    if r.status_code != 404:
         raise IOError(f"Server returned an error with status code {r.status_code}.")
+
+    # Classic PDB unavailable — try mmCIF (entries marked pdb_format_compatible=N)
+    print(f"> PDB unavailable for {pdb}; fetching mmCIF")
+    cif_url = f"https://files.rcsb.org/download/{pdb}.cif"
+    try:
+        r_cif = requests.get(cif_url, timeout=60)
+    except requests.exceptions.RequestException as e:
+        raise IOError(f"Could not connect to the server. Details: {e}")
+
+    if r_cif.status_code == 404:
+        raise ValueError(f"PDB ID '{pdb}' is not valid or does not exist.")
+    if r_cif.status_code != 200:
+        raise IOError(f"Server returned an error with status code {r_cif.status_code}.")
+
+    cif_path = os.path.join(os.path.dirname(out), f"{pdb}.cif")
+    with open(cif_path, "w") as f:
+        f.write(r_cif.text)
+    print(f"> Converting mmCIF → PDB ({cif_path})")
+    convert_mmcif_to_pdb(cif_path, out)
+    return "mmcif"
+
+
+def ensure_structure_pdb(pdb_id, pdb_path, source_cif=None):
+    """Ensure ``pdb_path`` exists as a classic PDB, converting mmCIF if needed.
+
+    Parameters
+    ----------
+    pdb_id : str
+        Structure identifier (PDB code or local basename).
+    pdb_path : str
+        Target classic PDB path used by the rest of the pipeline.
+    source_cif : str or None
+        Optional local mmCIF path to convert when ``pdb_path`` is missing.
+
+    Returns
+    -------
+    str
+        One of ``"exists"``, ``"converted"``, ``"pdb"``, or ``"mmcif"``.
+    """
+    pdb_path = os.path.abspath(pdb_path)
+    if os.path.isfile(pdb_path):
+        return "exists"
+
+    if source_cif:
+        print(f"> Converting mmCIF → PDB ({source_cif})")
+        convert_mmcif_to_pdb(source_cif, pdb_path)
+        return "converted"
+
+    return fetch_pdb(pdb_id, pdb_path)
 
 
 def get_pdbs(input_path, output_path):
@@ -127,42 +187,52 @@ def get_pdbs(input_path, output_path):
     Parameters
     ----------
     input_path: list
-        List of PDB codes, paths to PDB files, or path to CSV file
+        List of PDB codes, paths to PDB/mmCIF files, or path to CSV file
     output_path: str
         Path to output directory
 
     Returns
     -------
     pdb_all
-        List of tuples containing parsed PDB ID and path to PDB file
+        List of ``(pdb_id, pdb_path, source_cif)`` tuples. ``source_cif`` is
+        set for local ``.cif``/``.mmcif`` inputs; otherwise ``None``.
 
 
     Notes
     -----
     Store input PDBs as a tuple of
     Parsed ID (PDB code or filename)
-    Path to PDB file (existing or to download)
+    Path to PDB file (existing or to download/convert)
+    Optional local mmCIF source path
     """
     pdb_all = []
     for pdb_id in input_path:
         if os.path.isfile(pdb_id):
             pdb, ext = os.path.splitext(os.path.basename(pdb_id))
             pdb = pdb.replace(".", "_")
-            if ext == ".pdb":
-                pdb_all.append((pdb, pdb_id))
-            elif ext == ".csv":
+            ext_lower = ext.lower()
+            if ext_lower == ".pdb":
+                pdb_all.append((pdb, pdb_id, None))
+            elif ext_lower in (".cif", ".mmcif"):
+                target = os.path.join(output_path, pdb, f"{pdb}.pdb")
+                pdb_all.append((pdb, target, os.path.abspath(pdb_id)))
+            elif ext_lower == ".csv":
                 with open(pdb_id, "r") as csvfile:
                     reader = csv.DictReader(csvfile)
                     for row in reader:
                         pdb = row['pdb_id']
-                        pdb_all.append((pdb, os.path.join(output_path, pdb, f"{pdb}.pdb")))
+                        pdb_all.append((pdb, os.path.join(output_path, pdb, f"{pdb}.pdb"), None))
             else:
                 with open(pdb_id, "r") as f:
                     pdb_all.extend(
-                        [(pdb, os.path.join(output_path, pdb, f"{pdb}.pdb")) for pdb in f.read().splitlines()]
+                        [
+                            (pdb, os.path.join(output_path, pdb, f"{pdb}.pdb"), None)
+                            for pdb in f.read().splitlines()
+                            if pdb.strip()
+                        ]
                     )
         else:
-            pdb_all.append((pdb_id, os.path.join(output_path, pdb_id, f"{pdb_id}.pdb")))
+            pdb_all.append((pdb_id, os.path.join(output_path, pdb_id, f"{pdb_id}.pdb"), None))
 
     return pdb_all
 

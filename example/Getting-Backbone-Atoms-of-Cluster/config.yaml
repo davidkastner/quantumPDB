@@ -1,0 +1,27 @@
+#######
+# RUN #
+#######
+# Initialization parameters
+input: test.pdb                    # Path to protein csv, single PDB, or list of PDBs [PDB1, PDB2, PDB3]
+output_dir: dataset/v1                 # Path to save the generated clusters
+modeller: true                         # Model missing loops
+protoss: true # use protoss to protonate structure
+coordination: true                     # Generate clusters
+find_backbone_atoms: true #output list of backbone atoms 
+optimize_select_residues: 1            # Modeller to model no (0), missing (1), or all (2) residues
+convert_to_oxo: true                   # Used to convert A-KG NHIEs to Succinate-Oxo NHIEs, usually False
+compute_charges: false
+max_clash_refinement_iter: 5           # The max number of times to iterate over the modeller protoss loop 
+# Cluster model parameters
+max_atom_count: 750            
+center_residues: [FE1]             # Residue name to use as the cluster center
+additional_ligands: []                 # Residues beyond first sphere to include
+number_of_spheres: 3                   # Coordination spheres to generate
+radius_of_first_sphere: 2.0            # Distance based cut off to determine first sphere
+include_ligands: 2                     # Only ligands and waters in first sphere (0), Only non-water ligands (1), Everything (2)
+capping_method: 0                      # Cap residues with None (0), hydrogens (1), ACE/NME (2)
+smoothing_method: 2                    # Smoothing method Box plot (0), DBSCAN (1), [Dummy Atom] (2), None (3)
+cluster_name_template: null            # Optional format-string for cluster folder/file names, e.g. "A_{radius}"; fields: radius, metal_id, index, pdb. Default (null) names clusters by residue ID as before.
+# Output parameters                               
+count_residues: true                   # Count the number of residues
+write_xyz: true                        # Write out xyz files

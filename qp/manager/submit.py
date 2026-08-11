@@ -61,7 +61,14 @@ def prepare_jobs(job_count, method):
     pdb_dirs = sorted([d for d in os.listdir() if os.path.isdir(d) and not d == 'Protoss'])
     for pdb in pdb_dirs:
         pdb_dir_path = os.path.join(base_dir, pdb)
-        structure_dirs = sorted(glob.glob(os.path.join(pdb_dir_path, '[A-Z][0-9]*')))
+        # Match any cluster subdirectory, regardless of naming scheme
+        # (default residue-based, e.g. A199, or a custom
+        # cluster_name_template, e.g. A_4). Previously this only matched
+        # '[A-Z][0-9]*', which silently skipped non-residue-based names.
+        structure_dirs = sorted([
+            os.path.join(pdb_dir_path, d) for d in os.listdir(pdb_dir_path)
+            if os.path.isdir(os.path.join(pdb_dir_path, d)) and d != 'Protoss'
+        ])
         
         if len(structure_dirs) == 0:
             continue

@@ -44,11 +44,15 @@ Protoss
      running.
 
 **Protoss removes residues due to steric clashes.**
-   This is expected behavior. Protoss identifies steric clashes in the
-   structure, and QuantumPDB automatically feeds these back to Modeller for
-   rebuilding. This loop repeats up to ``max_clash_refinement_iter`` times
-   (default: 5). If clashes persist, check the structure for unusual
-   conformations near the active site.
+   Protoss may still drop clashing residues during protonation. Under the
+   older ProteinsPlus API, QuantumPDB read the Protoss clash log and fed
+   those residues back to Modeller for rebuilding (up to
+   ``max_clash_refinement_iter`` times). ProteinsPlus API v2 no longer
+   provides that log, so automatic clash remodeling is currently inactive
+   and ``Protoss/{pdb}_log.txt`` is empty. Temporary workaround: compare
+   the Modeller and Protoss PDBs for missing residues and inspect unusual
+   conformations near the active site. A future release may restore this
+   behavior via a local input/output residue diff.
 
 Cluster Extraction
 ------------------
@@ -122,6 +126,30 @@ General
    there is no trajectory parsing --- you must provide a single PDB frame.
 
 **Which QM code should I use?**
-   TeraChem (GPU-accelerated) is the primary target and best tested. ORCA
-   (CPU-based) is supported as an alternative. The ``method`` and ``basis``
-   parameters follow TeraChem conventions by default.
+   TeraChem (GPU-accelerated) is the only QM code currently supported by the
+   job generator. The ``method`` and ``basis`` parameters follow TeraChem
+   conventions. ORCA input writing is not implemented.
+
+**No clusters were generated / the run exits asking for a center.**
+   Provide either YAML ``center_residues`` or a CSV ``center`` column. If both
+   are present, the CSV value wins for each PDB. Batch YAML lists such as
+   ``[FE, FE2]`` are consumed **one item per PDB**, not as two centers inside
+   one structure. For multiple centers in one structure, use fuzzy syntax
+   (``FE_FE2``), CSV center definitions, or ``merge_distance_cutoff``.
+
+**An mmCIF structure was skipped with an oversized warning.**
+   Classic PDB conversion supports at most 99,999 atoms and 62 chains.
+   Larger entries raise ``OversizedStructureError`` and are skipped in batch
+   mode. See :doc:`input_formats`.
+
+**``qp submit`` fails even though ``qp run`` worked.**
+   ``submit`` requires ``input`` to be an existing CSV path (not a PDB ID or
+   YAML list). Each cluster directory must contain exactly one ``.xyz`` file.
+   Missing ``oxidation`` / ``multiplicity`` columns will produce incorrect
+   electronic states.
+
+**Multiwfn cannot find molden files.**
+   Charge and dipole analysis look under ``{cluster}/{method}/scr/`` for
+   ``*.molden`` outputs from completed TeraChem jobs. Confirm ``method``
+   matches the submit config and that the calculation finished successfully.
+   ``charge_scheme`` must be a single scheme name (not a comma-separated list).

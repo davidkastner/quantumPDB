@@ -32,45 +32,83 @@ from Bio.PDB.NeighborSearch import NeighborSearch
 from scipy.spatial import Voronoi
 from qp.cluster import struct_to_file
 from sklearn.cluster import DBSCAN
+from qp.structure.mmcif_to_pdb import expand_resnames_for_matching, normalize_center_key
 
 
 RANDOM_SEED = 66265
 
 class CenterResidue:
-    def __init__(self, center_residue: str):
+    def __init__(self, center_residue: str, resname_map=None):
         """Parse a center residue definition string.
 
-        If the string contains dashes (e.g., ``'CU_A357-CU_A358'``), strict
-        mode is used and each dash-separated token must exactly match a
-        residue's ``RESNAME_CHAINID`` key. Otherwise, fuzzy mode is used
-        and underscore-separated tokens are matched against HETATM residue
-        names.
+        Matching mode is chosen as follows:
+
+        * ``exact:FE_A199`` --- **strict** single-residue selection. The
+          ``exact:`` prefix is required for a single ``RESNAME_CHAINID`` key
+          because bare ``FE_A199`` would otherwise be ambiguous with fuzzy
+          resnames (e.g. CCD code ``A199``).
+        * ``CU_A357-CU_A358`` --- **strict** multi-residue list. Dash-separated
+          exact keys do not need the ``exact:`` prefix.
+        * ``exact:FE_A155-HIS_A93`` --- also strict; the prefix is allowed on
+          multi-residue lists too.
+        * ``FE`` / ``FE_FE2`` --- **fuzzy** mode: underscore-separated residue
+          names matched against HETATM records only.
+
+        When ``resname_map`` is provided (from an mmCIF→PDB remap sidecar),
+        original longer residue names (e.g. 5-letter CCD codes) are also
+        accepted and matched against the remapped 3-letter names present in
+        the structure. Other pipeline stages that use resnames are unchanged.
 
         Parameters
         ----------
         center_residue : str
             Center definition string from the config or CSV input.
+        resname_map : dict, optional
+            Mapping of original residue names → PDB residue names
+            (``{original: mapped}``), typically from ``*_mmcif_remap.json``.
         """
         self.center_residue_str = center_residue
-        residue_list = center_residue.split("-")
-        if len(residue_list) == 1:
-            self.mode = "fuzzy"
-            self.residue_list = center_residue.split("_")
-        else:
+        self.resname_map = dict(resname_map or {})
+
+        raw = center_residue.strip()
+        exact_prefix = raw.lower().startswith("exact:")
+        if exact_prefix:
+            raw = raw.split(":", 1)[1].strip()
+            if not raw:
+                raise ValueError(
+                    "Center residue 'exact:' prefix must be followed by a "
+                    "RESNAME_CHAINID key (e.g. 'exact:FE_A199')."
+                )
+
+        residue_list = raw.split("-")
+        if exact_prefix or len(residue_list) > 1:
             self.mode = "strict"
             self.residue_list = residue_list
-        
+        else:
+            self.mode = "fuzzy"
+            self.residue_list = raw.split("_")
+
     def __str__(self):
         return self.center_residue_str
     
     def __repr__(self):
         return self.center_residue_str
 
+    def _structure_resnames(self):
+        """Residue names that should match structure ``get_resname()`` values."""
+        return expand_resnames_for_matching(self.residue_list, self.resname_map)
+
+    def _normalize_strict_key(self, key: str) -> str:
+        """Rewrite a strict center key through ``resname_map`` when needed."""
+        return normalize_center_key(key, self.resname_map)
+
     def __contains__(self, res: Residue):
         """Test whether a residue matches this center definition.
 
         In fuzzy mode, matches any HETATM residue whose name appears in the
-        residue list. In strict mode, matches by exact ``RESNAME_CHAINID`` key.
+        residue list (or maps to that name via ``resname_map``). In strict
+        mode, matches by exact ``RESNAME_CHAINID`` key, accepting original
+        mmCIF residue names when a remap is available.
 
         Parameters
         ----------
@@ -82,9 +120,11 @@ class CenterResidue:
         bool
         """
         if self.mode == "fuzzy":
-            return res.get_resname() in self.residue_list and res.id[0] != ' '
+            return res.get_resname() in self._structure_resnames() and res.id[0] != ' '
         elif self.mode == "strict":
-            return make_res_key(res) in self.residue_list
+            key = make_res_key(res)
+            allowed = {self._normalize_strict_key(tok) for tok in self.residue_list}
+            return key in allowed
 
 
 def get_grid_coord_idx(coord, coord_min, mean_distance):
@@ -837,7 +877,7 @@ def cap_chains(model: Model, residues: Set[Residue], capping: int) -> Set[Residu
                 if capping == 1:
                     cap_residues.add(build_hydrogen(res, pre, "N"))
                 else:
-                    cap_residues.add(build_heavy(res, pre, "N"))
+                    cap_residues.add(build_heavy(chain, res, pre, "N"))
                 N_capped_flag = True
         if not N_capped_flag:
             if not check_atom_valence(res, cluster_tree, "N", 3):
@@ -859,7 +899,7 @@ def cap_chains(model: Model, residues: Set[Residue], capping: int) -> Set[Residu
                 if capping == 1:
                     cap_residues.add(build_hydrogen(res, nxt, C_name))
                 else:
-                    cap_residues.add(build_heavy(res, nxt, C_name))
+                    cap_residues.add(build_heavy(chain, res, nxt, C_name))
                 C_capped_flag = True
         if not C_capped_flag:
             if not check_atom_valence(res, cluster_tree, C_name, 3):
@@ -1029,9 +1069,16 @@ def compute_charge(spheres, structure, ligand_charge, center_residue):
                     # TODO: termini
                     c -= 1
 
-                # Check for charged N-terminus
-                if res_id in n_terminals \
-                    and res.has_id("N"): # exclude sugar chain terminus
+                # Check for charged N-terminus (NH3+ / Pro NH2+).
+                # Protoss may leave a "fake" N-terminus with a single amide-like H;
+                # H-capping then yields neutral NH2. NeighborSearch counts the N
+                # itself, so CN > 4 marks NH3+ / Pro-NH2+ (5 neighbors) but not
+                # capped NH2 (4 neighbors).
+                if (
+                    res_id in n_terminals
+                    and res.has_id("N")  # exclude sugar chain terminus
+                    and check_atom_valence(res, cluster_tree, "N", 4)
+                ):
                     c += 1
 
                 # Check for charged C-terminus
@@ -1152,6 +1199,7 @@ def extract_clusters(
     xyz=True,
     hetero_pdb=False,
     include_ligands=2,
+    cluster_name_template=None,
     **smooth_params
 ):
     """Extract active site coordination spheres using Voronoi tessellation.
@@ -1196,6 +1244,37 @@ def extract_clusters(
     include_ligands : int, optional
         Ligand inclusion mode: 0 = first sphere only unless in ``ligands``,
         1 = all non-water, 2 = all (default 2).
+    cluster_name_template : str, optional
+        Python format-string controlling cluster directory/file names.
+        Defaults to ``None``, which preserves the original behavior of
+        naming each cluster after its chain + residue number(s), e.g.
+        ``A199``, or ``A1_A2_A3_A4`` for a cluster merging several centers
+        (see ``merge_cutoff``). This can produce filenames long enough to
+        exceed OS path length limits (notably on Windows) when many
+        residues are merged into one center, so a template can be supplied
+        instead. The template is evaluated once per cluster with these
+        fields available:
+
+        - ``radius``: ``first_sphere_radius``, formatted without a
+          trailing ``.0`` (e.g. ``4`` or ``3.5``).
+        - ``metal_id``: the original chain + residue string, e.g. ``A199``.
+        - ``index``: 1-based count of the cluster within this call
+          (1, 2, 3, ...).
+        - ``pdb``: the base name of ``out`` (typically the PDB ID).
+
+        For example ``"A_{radius}"`` names clusters like ``A_4``, and
+        ``"cluster_{index}"`` names them ``cluster_1``, ``cluster_2``, etc.
+        If two clusters in the same call resolve to the same name (e.g.
+        several distinct centers sharing one radius), a numeric suffix is
+        appended automatically so nothing gets overwritten (``A_4``,
+        ``A_4_1``, ``A_4_2``, ...). ``charge.csv`` and ``count.csv`` rows
+        are keyed by the final cluster name (not ``metal_id``), since
+        downstream QM job creation (``qp create``/``qp submit``) looks up
+        each cluster's charge by matching its directory name against
+        these files. When a template renames a cluster away from its
+        residue-based ``metal_id``, that original identity is instead
+        recorded in ``cluster_name_map.csv`` (``cluster_name,metal_id``)
+        so it isn't lost.
     **smooth_params
         Additional parameters for the smoothing method.
 
@@ -1203,7 +1282,8 @@ def extract_clusters(
     -------
     list of str
         Paths to the generated cluster directories (e.g.,
-        ``['out/A199', 'out/B350']``).
+        ``['out/A199', 'out/B350']``, or ``['out/A_4', 'out/A_4_1']`` with
+        ``cluster_name_template="A_{radius}"``).
     """
     parser = PDBParser(QUIET=True)
     structure = parser.get_structure("PDB", path)
@@ -1218,21 +1298,53 @@ def extract_clusters(
     aa_charge = {}
     res_count = {}
     cluster_paths = []
-    for c in centers:
+    cluster_names_used = {}
+    cluster_name_map = {}
+    pdb_name = os.path.basename(os.path.normpath(out))
+    for index, c in enumerate(centers, start=1):
         metal_id, residues, spheres = get_next_neighbors(
             c, neighbors, sphere_count, ligands, first_sphere_radius, smooth_method, include_ligands, **smooth_params
         )
         complete_oligomer(ligand_charge, model, residues, spheres, include_ligands)
-        cluster_path = f"{out}/{metal_id}"
+
+        if cluster_name_template:
+            name_fields = {
+                "radius": f"{first_sphere_radius:g}",
+                "metal_id": metal_id,
+                "index": index,
+                "pdb": pdb_name,
+            }
+            try:
+                cluster_name = cluster_name_template.format(**name_fields)
+            except (KeyError, IndexError) as e:
+                raise ValueError(
+                    f"Invalid cluster_name_template {cluster_name_template!r}: "
+                    f"unknown field {e}. Available fields: {sorted(name_fields)}"
+                ) from e
+        else:
+            cluster_name = metal_id
+
+        # Guard against two clusters resolving to the same name (e.g. several
+        # distinct centers sharing the same radius) so nothing overwrites.
+        if cluster_name in cluster_names_used:
+            cluster_names_used[cluster_name] += 1
+            cluster_name = f"{cluster_name}_{cluster_names_used[cluster_name]}"
+        else:
+            cluster_names_used[cluster_name] = 0
+
+        cluster_path = f"{out}/{cluster_name}"
         cluster_paths.append(cluster_path)
         os.makedirs(cluster_path, exist_ok=True)
+
+        if cluster_name != metal_id:
+            cluster_name_map[cluster_name] = metal_id
 
         if max_atom_count is not None:
             prune_atoms(c, residues, spheres, max_atom_count, ligands)
         if charge:
-            aa_charge[metal_id] = compute_charge(spheres, structure, ligand_charge, center_residue)
+            aa_charge[cluster_name] = compute_charge(spheres, structure, ligand_charge, center_residue)
         if count:
-            res_count[metal_id] = count_residues(spheres)
+            res_count[cluster_name] = count_residues(spheres)
         if capping:
             cap_residues = cap_chains(model, residues, capping)
             if capping == 2:
@@ -1247,8 +1359,8 @@ def extract_clusters(
             for cap in cap_residues:
                 cap.get_parent().detach_child(cap.get_id())
         if xyz:
-            struct_to_file.to_xyz(f"{cluster_path}/{metal_id}.xyz", *sphere_paths)
-            struct_to_file.combine_pdbs(f"{cluster_path}/{metal_id}.pdb", center_residue, *sphere_paths, hetero_pdb=hetero_pdb)
+            struct_to_file.to_xyz(f"{cluster_path}/{cluster_name}.xyz", *sphere_paths)
+            struct_to_file.combine_pdbs(f"{cluster_path}/{cluster_name}.pdb", center_residue, *sphere_paths, hetero_pdb=hetero_pdb)
 
     if charge:
         with open(f"{out}/charge.csv", "w") as f:
@@ -1268,6 +1380,15 @@ def extract_clusters(
                     s = ", ".join(f"{r} {c}" for r, c in sorted(sphere.items()))
                     f.write(f',"{s}"')
                 f.write("\n")
+
+    if cluster_name_map:
+        # Only written when cluster_name_template renamed at least one
+        # cluster away from its residue-based metal_id, so the mapping
+        # back to the original chain/residue identity isn't lost.
+        with open(f"{out}/cluster_name_map.csv", "w") as f:
+            f.write("cluster_name,metal_id\n")
+            for cluster_name, metal_id in sorted(cluster_name_map.items()):
+                f.write(f"{cluster_name},{metal_id}\n")
 
     return cluster_paths
 

@@ -2,92 +2,90 @@
 QuantumPDB
 ==============================
 
+**QuantumPDB** (`qp`) automates generation of quantum mechanical (QM) cluster
+models from protein structures: structure preparation, protonation, Voronoi
+cluster extraction, TeraChem job setup, and post-processing analysis.
+
+Full user documentation: [hjkgrpquantumpdb.readthedocs.io](https://hjkgrpquantumpdb.readthedocs.io/)
 
 ## Table of Contents
 1. **Overview**
 2. **Installation**
-    * Download the package
-    * Creating python environment
-    * Command-line interface
-3. **What is included?**
-    * File structure
+3. **Package layout**
 4. **Documentation**
-    * Read the Docs
-    * Examples
-5. **Developer Guide**
-    * GitHub refresher
-6. **Areas of Active Development**
-7. **QuantumPDB File Structure**  
-
+5. **Quick example**
+6. **Developer guide**
+7. **Areas of active development**
+8. **Generated file structure**
 
 ## 1. Overview
-The purpose of quantumPDB (qp) is to serve as a toolkit for working with our database of proteins to setup and facilitate DFT-calculation and cluster model creation.
+QuantumPDB turns PDB / mmCIF inputs into ready-to-run QM cluster models for
+metalloenzyme active sites. Unlike simple distance cutoffs, it builds
+hierarchical interaction spheres with Voronoi tessellation.
 
 ![Software Diagram](https://raw.githubusercontent.com/davidkastner/quantumPDB/main/docs/_static/QuantumPDB.png)
 
 ## 2. Installation
-Install the package by running the follow commands inside the repository. This will perform a developmental version install. It is good practice to do this inside of a virtual environment. A yaml environmental file has been created to facilitate the installation of dependencies.
+Clone the repository and perform a developer install inside a conda environment:
 
-### Setup developing environment
-To begin working with quantumPDB, first clone the repo and then move into the top-level directory of the package.
-Then perform a developer install.
-Remember to update your GitHub [ssh keys](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account).
 ```bash
 git clone git@github.com:davidkastner/quantumPDB.git
-```
-
-### Creating python environment
-All the dependencies can be loaded together using the prebuilt environment.yml file.
-Compatibility is automatically tested for python versions 3.8 and higher.
-If you are only going to be using the package run:
-```bash
 cd quantumPDB
 conda env create -f environment.yml
-source activate qp
+conda activate qp
 python -m pip install -e .
 ```
 
-### Command-line interface
-All of the functionality of quantumPDB has been organized into a command-line interface (CLI).
-After performing the developer install, the CLI can be called from anywhere using `qp`.
+Compatibility is tested for Python 3.10–3.12 (requires Python ≥ 3.8). After
+install, the `qp` CLI is available: `qp run`, `qp submit`, and `qp analyze`.
 
+Modeller needs a free academic license key:
 
-## 3. What is included?
-### Package architecture
+```bash
+export KEY_MODELLER="XXXX"
+```
+
+## 3. Package layout
 ```
 .
-├── docs                           # Readthedocs documentation site
-└── qp                             # quantumPDB subpackages and modules
-    |── cli.py                     # Command-line interface entry point
-    ├── checks                     # Perform quality and structural checks
-    │   ├── fetch_pdb              # Get a PDB
-    │   └── to_xyz                 # Save structure to a new XYZ
-    ├── structure                  # Correct the PDB structure
-    │   ├── missing_loops          # Use modeller to add missing loops
-    │   └── add_hydrogens          # Get the structure with hydrogens
-    ├── clusters                   # Generalizable plotting and vizualization
-    │   └── coordination_spheres   # Select the first, second, etc. spheres
-    └── manager  
-        ├── failure_checkup
-        ├── find_incomplete
-        └── job_manager
+├── docs/                  # Sphinx / Read the Docs sources
+├── example/               # Runnable examples (see example/basics/)
+├── config.yaml            # Annotated config template (valid keys)
+└── qp/
+    ├── cli.py             # CLI entry point
+    ├── structure/         # Fetch, mmCIF conversion, Modeller, NHIE-oxo
+    ├── protonate/         # Protoss API and active-site fixes
+    ├── cluster/           # Voronoi spheres and cluster I/O
+    ├── manager/           # TeraChem job creation and submission
+    ├── analyze/           # Job checkup and Multiwfn post-processing
+    ├── resources/         # Bundled assets and helper scripts
+    └── tests/             # Pytest suite and golden samples
 ```
-
 
 ## 4. Documentation
-### Run the following commands to update the ReadTheDocs site
+User guides and API docs are hosted on Read the Docs. To build locally:
+
 ```bash
+cd docs
 make clean
 make html
+# open _build/html/index.html
 ```
 
+See also `docs/README.md` for the Sphinx / conda docs environment.
 
-## 5. Developer guide
+## 5. Quick example
+```bash
+qp run -c example/basics/cluster_only.yaml
+```
 
-### GitHub refresher
-#### Push new changes
-Use this Git sequence to make a quick push.
+This downloads 1OS7, runs Modeller + Protoss, and writes cluster models under
+`example/basics/output/`. See [Quickstart](https://hjkgrpquantumpdb.readthedocs.io/en/latest/quickstart.html)
+and `example/basics/README.md`.
 
+## 6. Developer guide
+
+### Push new changes
 ```
 git status
 git pull
@@ -96,88 +94,78 @@ git commit -m "Change a specific functionality"
 git push -u origin main
 ```
 
-#### Making a pull request
-Use this Git sequence to make a branch and make a pull request.
-Recommend for significant changes.
-
+### Making a pull request
 ```
 git checkout main
 git pull
-
-# Before you begin making changes, create a new branch
 git checkout -b new-feature-branch
 git add -A
 git commit -m "Detailed commit message describing the changes"
 git push -u origin new-feature-branch
-
-# Visit github.com to add description, submit, merge the pull request
-
-# Once finished on github.com, return to local
+# Open the PR on GitHub, then:
 git checkout main
 git pull
-
-# Delete the remote branch
 git branch -d new-feature-branch
 ```
 
-#### Handle merge conflict
-
+### Handle merge conflict
 ```
 git stash push --include-untracked
 git stash drop
 git pull
 ```
-## 6. Areas of active development
-Currently working on handling all edge cases, including non-canonical amino acids. Additionally, support for mmCIFs will eventually needed to be added to work with newer and larger PDBs. Documentation is present for all functions in the code, but should be added with external examples for use. 
 
-## 7. QuantumPDB generated file structure
-An example file structure from a `qp` run given the parameters in `config.yaml` `input: qp_input.csv` and `output_dir: dataset/`.
-If we run `qp run -c ./config.yaml`, then the file structure will be generated in `dataset` if `qp_input.csv` specfies `1a9s`.
+## 7. Areas of active development
+Temporary mmCIF support is available via `qp.structure.mmcif_to_pdb`: local
+`.cif` / `.mmcif` inputs and RCSB entries without a classic PDB file are
+converted to `{id}.pdb` before Modeller / Protoss / clustering. Multi-character
+chain IDs and >3-character residue names are remapped (see
+`{id}_mmcif_remap.json`); structures that exceed classic PDB limits
+(>99999 atoms or >62 chains) are skipped with a warning in batch runs.
+Center-residue selection accepts either the original or remapped residue names
+when a remap sidecar is present. Native mmCIF handling for larger entries is
+still planned.
+
+## 8. Generated file structure
+Example layout after `qp run` (and optionally `qp submit`) for PDB `1a9s` with
+`output_dir: dataset/`:
+
 ```
 .
-├── config.yaml                           # The input yaml containing all `qp` job parameters 
-├── qp_input.csv                          # List of PDB ID's to run `qp`
-└── dataset                               # Specified with "output_dir: dataset/" in config.yaml
-    └── 1a9s                              # One of these is generated for each entry in qp_input.csv
-        ├── 1a9s_modeller.pdb             # Modeller optimized structure with added missing atoms and loops
-        ├── 1a9s.ali                      # Alignment file needed by Modeller
-        ├── 1a9s.pdb                      # Original 1a9s PDB downloaded directly from the Protein Data Bank
-        ├── charge.csv                    # Generated file used to calculate the charge of the system
-        ├── count.csv                     # Generated file that keeps track of the residue counts
-        ├── Protoss                       # Directory storing all Protoss files
-        │   ├── 1a9s_ligands.sdf          # Ligand structural files
-        │   ├── 1a9s_log.txt              # Error log from Protoss server
-        │   └── 1a9s_protoss.pdb          # Protonated result returned from the Protoss server
-        └── A290                          # Generated for each cluster, named by chain (A) and the res number of center (290)
-            ├── 0.pdb                     # Structure of the center residue
-            ├── 1.pdb                     # Structure of the first sphere around the center
-            ├── 2.pdb                     # Structure of the second sphere around the first
-            ├── A290.pdb                  # Structure of the entire cluster in PDB format
-            ├── A290.xyz                  # Structure of the entire cluster in XYZ format
-            └── wpbeh                     # QM job file specified with "method: wpbeh" in "config.yaml"
-                ├── A290.xyz              # Structure of the entire cluster in XYZ format
-                ├── jobscript.sh          # SLURM/SGE submit script
-                ├── ptchrges.xyz          # MM embedded point charges specified with "charge_embedding: true"
-                ├── qmscript.in           # QM job input using TeraChem
-                ├── qmscript.out          # QM job output details
-                └── wpbeh                 # Results from the TeraChem QM calculation
-                    ├── A290.basis
-                    ├── A290.geometry
-                    ├── A290.molden
-                    ├── bond_order.list
-                    ├── c0
-                    ├── charge_mull.xls
-                    ├── grad.xyz
-                    ├── mullpop
-                    ├── results.dat
-                    └── xyz.xyz
+├── config.yaml
+├── proteins.csv
+└── dataset
+    └── 1a9s
+        ├── 1a9s_modeller.pdb
+        ├── 1a9s.ali
+        ├── 1a9s.pdb
+        ├── charge.csv
+        ├── count.csv
+        ├── Protoss
+        │   ├── 1a9s_ligands.sdf
+        │   ├── 1a9s_log.txt
+        │   └── 1a9s_protoss.pdb
+        └── A290                      # metal_id directory
+            ├── 0.pdb                 # center
+            ├── 1.pdb                 # first sphere
+            ├── 2.pdb                 # second sphere
+            ├── A290.pdb              # combined cluster
+            ├── A290.xyz
+            └── wpbeh                 # method directory from qp submit
+                ├── A290.xyz
+                ├── jobscript.sh
+                ├── ptchrges.xyz      # if charge_embedding: true
+                ├── qmscript.in       # TeraChem input
+                └── .submit_record
 ```
+
+See `docs/output.rst` and `qp/tests/samples/` for authoritative formats.
 
 ### Copyright
 
 Copyright (c) 2024, Kulik Group MIT
 
 #### Acknowledgements
- 
-Project based on the 
+
+Project based on the
 [Computational Molecular Science Python Cookiecutter](https://github.com/molssi/cookiecutter-cms) version 1.1.

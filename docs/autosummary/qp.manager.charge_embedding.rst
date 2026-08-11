@@ -14,6 +14,7 @@ qp.manager.charge\_embedding
    
       calculate_centroid
       get_charges
+      load_custom_charges
       parse_pdb
       parse_pdb_to_xyz
       read_pdb

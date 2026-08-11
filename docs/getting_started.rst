@@ -6,7 +6,7 @@ This page covers how to install QuantumPDB and its dependencies.
 Prerequisites
 -------------
 
-- **Python 3.8+**
+- **Python 3.8+** (CI currently tests 3.10–3.12; Read the Docs builds with 3.11)
 - **Conda** (recommended for managing the environment and installing Modeller)
 - **Internet access** (required for Protoss protonation via the ProteinsPlus web server)
 
@@ -78,11 +78,9 @@ These are only needed for specific pipeline stages and are **not** required to
 generate cluster models.
 
 **TeraChem** (Stage 4 --- QM calculations)
-   TeraChem is the primary GPU-accelerated quantum chemistry code supported by
-   QuantumPDB. A license is required. See https://www.petachem.com/.
-
-**ORCA** (Stage 4 --- QM calculations)
-   ORCA is supported as a CPU-based alternative. See https://orcaforum.kofo.mpg.de/.
+   TeraChem is the GPU-accelerated quantum chemistry code targeted by the
+   current job generator (``qmscript.in``). A license is required. See
+   https://www.petachem.com/. ORCA input generation is not implemented.
 
 **Multiwfn** (Stage 5 --- post-processing)
    `Multiwfn <http://sobereva.com/multiwfn/>`_ is required only for charge

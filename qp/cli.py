@@ -23,14 +23,14 @@ def welcome():
     click.secho("             ║        |__||__|        ║             ", bold=True)
     click.secho("             ║                        ║             ", bold=True)
     click.secho("             ║       QUANTUMPDB       ║             ", bold=True)
-    click.secho("             ║  [quantumpdb.rtfd.io]  ║             ", bold=True)
+    click.secho("             ║hjkgrpquantumpdb.rtfd.io║             ", bold=True)
     click.secho("             ╚═══════════╗╔═══════════╝             ", bold=True)
     click.secho("                 ╔═══════╝╚═══════╗                 ", bold=True)
     click.secho("                 ║ THE KULIK LAB  ║                 ", bold=True)
     click.secho("                 ╚═══════╗╔═══════╝                 ", bold=True)
     click.secho("  ╔══════════════════════╝╚══════════════════════╗  ", bold=True)
     click.secho("  ║   Code: github.com/davidkastner/quantumpdb   ║  ", bold=True)
-    click.secho("  ║   Docs: quantumpdb.readthedocs.io            ║  ", bold=True)
+    click.secho("  ║   Docs: hjkgrpquantumpdb.readthedocs.io      ║  ", bold=True)
     click.secho("  ║      - Clusters: qp run -c config.yaml       ║  ", bold=True)
     click.secho("  ║      - QM calcs: qp submit -c config.yaml    ║  ", bold=True)
     click.secho("  ╚══════════════════════════════════════════════╝\n", bold=True)
@@ -75,6 +75,7 @@ def run(config):
     input = config_data.get('input', [])
     output = config_data.get('output_dir', '')
     center_yaml_residues = config_data.get('center_residues', [])
+    backbone=config_data.get('find_backbone_atoms', False)
     pdb_all, center_residues = setup.parse_input(input, output, center_yaml_residues)
 
     if modeller:
@@ -96,6 +97,7 @@ def run(config):
         count = config_data.get('count_residues', True)
         xyz = config_data.get('write_xyz', True)
         hetero_pdb = config_data.get('write_hetero_pdb', False)
+        cluster_name_template = config_data.get('cluster_name_template', None)
         smooth_choice = config_data.get('smoothing_method', 2)
         smooth_options = {0: {}, 1: {"eps": 6, "min_samples": 3}, 2: {"mean_distance": 3}, 3: {}}
         smooth_method_options = {0: "box_plot", 1: "dbscan", 2: "dummy_atom", 3: False}
@@ -105,32 +107,60 @@ def run(config):
         if capping or charge:
             protoss = True
 
-    for pdb, path in pdb_all:
+    for pdb, path, source_cif in pdb_all:
         try:
             click.secho("╔══════╗", bold=True)
             click.secho(f"║ {pdb.upper()} ║", bold=True)
             click.secho("╚══════╝", bold=True)
 
-            # Skips fetching if PDB file exists
+            # Fetch classic PDB, or convert local/RCSB mmCIF when needed
             if not os.path.isfile(path):
-                click.echo(f"> Fetching PDB file")
+                if source_cif:
+                    click.echo("> Preparing structure from local mmCIF")
+                else:
+                    click.echo("> Fetching structure file")
                 try:
-                    setup.fetch_pdb(pdb, path)
+                    setup.ensure_structure_pdb(pdb, path, source_cif=source_cif)
+                except setup.OversizedStructureError as e:
+                    # Skip oversized mmCIF conversions; keep batch running
+                    click.secho(
+                        f"> Warning: skipping oversized structure {pdb.upper()}: {e}\n",
+                        italic=True,
+                        fg="yellow",
+                    )
+                    err["PDB"].append(pdb)
+                    if center_residues:
+                        center_residues.pop(0)
+                    continue
                 except ValueError as e:
-                    # Catches invalid PDB ID
+                    # Catches invalid PDB ID / conversion failures
                     click.secho(f"> Error: {e}\n", italic=True, fg="red")
                     err["PDB"].append(pdb)
+                    if center_residues:
+                        center_residues.pop(0)
                     continue
                 except IOError as e:
                     # Catches network and server issues
                     click.secho(f"> Error: A server or network issue occurred. {e}\n", italic=True, fg="red")
                     err["PDB"].append(pdb)
+                    if center_residues:
+                        center_residues.pop(0)
                     continue
             
             # Extract the current center residue from the list of all residues
             from qp.cluster.spheres import CenterResidue
-            center_residue = CenterResidue(center_residues.pop(0))
+            from qp.structure.mmcif_to_pdb import load_remap_sidecar
+            # Allow center specs to use original mmCIF residue names (e.g. 5-letter CCD)
+            remap = load_remap_sidecar(path)
+            center_residue = CenterResidue(
+                center_residues.pop(0),
+                resname_map=remap.get("resname_map"),
+            )
             click.echo(f"> Using center residue: {center_residue}")
+            if remap.get("resname_map"):
+                click.echo(
+                    f"> mmCIF resname remap available for center matching: {remap['resname_map']}"
+                )
             
             residues_with_clashes = [] # Start by assuming no protoss clashes
             for i in range(max_clash_refinement_iter):
@@ -274,8 +304,29 @@ def run(config):
                     path, f"{output}/{pdb}", center_residue, sphere_count, 
                     first_sphere_radius, max_atom_count, merge_cutoff, smooth_method,
                     ligands, capping, charge, ligand_charge, count, xyz, hetero_pdb, include_ligands,
+                    cluster_name_template=cluster_name_template,
                     **smooth_params
                 )
+                if backbone:
+                    from qp.cluster.get_backbone import search_backbone_atoms
+                    click.echo("> Searching for backbone atoms (C, CA, N, O)")
+                    for cluster_path in cluster_paths:
+                        cluster_dir = os.path.basename(cluster_path.rstrip('/'))
+                        pdb_file = os.path.join(cluster_path, f"{cluster_dir}.pdb")
+        
+                        if not os.path.exists(pdb_file):
+                            click.echo(f"  > PDB file not found: {pdb_file}")
+                            continue
+                        backbone_data = search_backbone_atoms(pdb_file)
+            
+                        backbone_output = pdb_file.replace(".pdb", "_backbone.txt")
+                        with open(backbone_output, "w") as f:
+                            f.write("Atom_ID\n")
+                            for index  in backbone_data:
+                                f.write(f"{index}\n")
+            
+                        click.echo(f"  > Found {len(backbone_data)} backbone atoms in {cluster_path}")
+                        click.echo(f"  > Saved to {backbone_output}")
 
                 if charge:
                     charge_csv_path = f"{output}/{pdb}/charge.csv"
